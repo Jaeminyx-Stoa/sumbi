@@ -73,7 +73,68 @@ project ─ deliverable (ID, acceptance, state, dispatched/closed at)
   - Deliverable elapsed time (dispatch to acceptance or abandonment) is split into agent, CI, human and rate-limit waiting.
   - The sum of parallel session time is kept apart from the time a person actually waited.
 
-## Components: three layers and two kits
+## Components
+
+### 0. Install — `sumbi install`
+
+Seeds a sensible first harness in the current repository, starting from what is already there.
+
+1. **Inventory** (offline, read-only). Detect what is installed and what is enforced:
+   - **Instructions:** `AGENTS.md` (root and nested), `CLAUDE.md` and its `@` imports, `.claude/rules`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursor/rules` and similar agent rule files.
+   - **Skills, commands, subagents:** `.claude/skills`, `.agents/skills`, `.claude/commands`, `.claude/agents` and other Agent Skills folders.
+   - **Hooks, permissions, MCP:** `.claude/settings.json`, `.codex/config.toml`, `.codex/hooks.json`, `.mcp.json`.
+   - **Enforcement:**
+     - CI workflows and their jobs
+     - required checks and rulesets (GitHub API, optional)
+     - `CODEOWNERS`, pull request templates
+     - pre-commit and git hooks
+     - lint, format and type-check configs
+     - test commands
+   - **Cost signals:** always-loaded instruction size per agent (estimated tokens), skill metadata size, hooks that run on every prompt.
+
+   The report lists counts and repository-relative paths, never file contents.
+2. **Gaps.** Rules over the inventory. Examples:
+   - no `AGENTS.md`
+   - a `CLAUDE.md` that does not import `AGENTS.md`
+   - always-loaded instructions over budget
+   - no documented test command
+   - CI checks that are not required
+   - no review gate on risky paths
+   - no handoff convention
+   - no friction line
+3. **Candidates.** Practices from the curated catalog (below) that address the detected gaps. Each practice states the files it adds or changes, its risk level, its expected effect, and how sumbi will judge it.
+4. **Plan, then apply.**
+   - `--dry-run` (the default) prints the plan as diffs.
+   - `--apply` writes it: new files or managed blocks only, never overwriting, with backups.
+   - Every applied practice is recorded as an intervention (practice id, version, provenance, prediction) in `.sumbi/interventions.jsonl`.
+5. **Baseline.** If agent logs exist, `collect` runs over a recent window before anything is applied, so the next round has something to compare against.
+
+**Catalog (the default source).** Curated, vendored and versioned in this repository. Practices are distilled from harnesses with a track record and re-expressed in sumbi's own words, with the sources credited:
+
+- **[Superpowers](https://github.com/obra/superpowers)** (MIT): process discipline as composable skills — brainstorm, plan, test first, verify before claiming completion, request review — plus systematic debugging and git worktrees for parallel work.
+- **[gstack](https://github.com/garrytan/gstack)** (MIT): role-based review gates (plan, engineering, design, QA, security, release) inside a sprint flow.
+- **[gajae code](https://github.com/Yeachan-Heo/gajae-code)** (MIT): an external harness for any repository, with plan-gated work — interview, plan, critique, then change — and approval gates.
+- **Two in-house harness labs:**
+  - a short `AGENTS.md` table of contents, with documents opened on demand
+  - a work-size table with review levels
+  - handoff documents
+  - the friction line
+  - devices before rules
+
+**Discovery (`--discover`, off by default; proposals only).**
+- **What it does:** searches GitHub, and optionally the web, for harnesses and skills that address the detected gaps.
+- **What it reports per candidate:**
+  - provenance: repository, commit SHA, license, stars, last update
+  - a static risk scan: executables, hooks, network calls, install scripts, and instruction text that tries to override safety or move data out
+  - the gap it would close
+- **What it never does:** install. A candidate enters the catalog only after a maintainer reviews it, pins it by SHA and re-expresses it. Copyleft or unlicensed sources are used as ideas only.
+
+**Why the catalog is the default.** Installing harness content straight from the internet is a supply-chain risk:
+- hooks and scripts execute
+- skills and instructions can carry prompt injection
+- licenses vary
+
+Reviewed philosophy from proven harnesses is safer than fresh, unreviewed code. Discovery feeds the review queue rather than the repository.
 
 ### 1. Collect — `sumbi collect`
 
@@ -109,11 +170,6 @@ Windows are `[start, end)` everywhere. Errors, caps and unsupported fields are r
 - The skill uses the [Agent Skills](https://agentskills.io) `SKILL.md` format. Support beyond Claude Code and Codex is tracked in the support matrix.
 - The lab lives where product agents do not read it.
 
-### Product kit — `sumbi init product` (optional example)
-
-- Contents: a short `AGENTS.md` table of contents, a map, a brief template, a handoff template, and the `Harness friction:` report line.
-- Existing files are never overwritten; sumbi proposes a diff instead.
-
 ## Support matrix
 
 "Any repository, any agent" is defined by levels. Each feature is marked *verified*, *secondary source* or *unverified*.
@@ -127,20 +183,31 @@ Windows are `[start, end)` everywhere. Errors, caps and unsupported fields are r
 
 ## Milestones and acceptance
 
-- **M1 — measurement base.**
-  - Scope: read local Claude Code and Codex logs for a fixed window. Join them with a minimal `deliverables.csv` to report the four deliverable states and total tokens by kind. Keep observed and estimated time apart. Use recorded GitHub responses. No installation, remote hosts or propagation yet.
+- **M1a — collect core.**
+  - Scope: read local Claude Code and Codex logs for a fixed window: tokens by kind, observed and estimated time, friction counts, project attribution with evidence, and the coverage report.
   - Accept 1: matches hand-computed truths on synthetic fixtures.
-  - Accept 2: passes the edge cases — window boundaries, resumed sessions, duplicates, broken lines, Windows paths, a failure with no pull request, a session spanning several repositories.
+  - Accept 2: passes the edge cases — window boundaries, resumed sessions, duplicates, broken lines, Windows paths, cumulative-counter resets, a session spanning several repositories.
   - Accept 3: the coverage report exposes gaps.
-  - Accept 4: no project names in core code (a test enforces it).
+  - Accept 4: no organization, project or host names in the code; configuration supplies them.
+- **M1b — install.**
+  - Scope: inventory, gap rules, catalog v0 (about eight practices), `--dry-run` and `--apply`, the interventions file, and a baseline hook into `collect`.
+  - Accept 1: on fixture repositories (empty, Claude-only, Codex-only, both, heavily configured), the inventory and gaps match hand-written expectations.
+  - Accept 2: `--apply` never overwrites, is idempotent, and leaves backups; re-running proposes nothing new.
+  - Accept 3: no network access.
+- **M1c — discovery (proposals only).**
+  - Scope: GitHub search for candidates per gap, with provenance, license and a static risk scan, written as a proposal file.
+  - Accept: never writes outside its proposal file; tests use recorded API responses.
+- **M1d — deliverables.**
+  - Scope: join sessions with a minimal `deliverables.csv` and recorded GitHub responses to report the four deliverable states and cost per success.
+  - Accept: matches hand-computed truths, including a failure with no pull request.
 - **M2 — minimal judging.**
   - Scope: cohort comparison, non-inferiority margin and sample size, intervals on cost ratios, task-type breakdown, confounder flags.
   - Accept: reproduces a hand-built round table, or explains every difference.
 - **M3 — real connections.**
   - Scope: live GitHub adapter, SSH hosts with a pinned zipapp, separation of committable aggregates from local free text.
   - Accept: the next lab rounds are collected with sumbi.
-- **M4 — seeding and propagation.**
-  - Scope: `init lab`, `init product` (example), `notice sync`, the gate-change detector.
+- **M4 — lab kit and propagation.**
+  - Scope: `init lab`, `notice sync`, the gate-change detector.
   - Accept: in a temporary home, only in-scope sessions receive notices; install and uninstall are idempotent; existing files are never overwritten.
 - **M5 — replay A/B** (costs tokens; the owner decides).
   - Rerun past work under harness A and B: randomized order, isolation, repetitions, and unseen tasks (merged pull requests alone are a survivor sample).
