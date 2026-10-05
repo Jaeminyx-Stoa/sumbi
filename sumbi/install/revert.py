@@ -78,6 +78,8 @@ def revert_install(repository: Path | str, backup_id: str) -> dict:
     root = Path(repository).resolve()
     if not root.is_dir():
         raise InstallError("Revert requires an existing workspace directory.")
+    if not safe_path(root, ".sumbi").is_dir():
+        raise InstallError("No local install metadata exists; no files reverted.")
     lock = safe_path(root, ".sumbi/install.lock")
     try:
         descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -88,7 +90,8 @@ def revert_install(repository: Path | str, backup_id: str) -> dict:
     try:
         targets = _manifest(root, backup_id)
         ledger = read_bytes(root, LEDGER)
-        _checked(root, LEDGER, ledger)
+        ledger_path = _checked(root, LEDGER, ledger)
+        ledger_mode = ledger_path.stat().st_mode & 0o777 if ledger is not None else 0o600
         try:
             if not ledger or not ledger.endswith(b"\n"):
                 raise ValueError
@@ -128,7 +131,7 @@ def revert_install(repository: Path | str, backup_id: str) -> dict:
         if normalized != prior_normalized:
             record = {"action": "revert", "backup_id": backup_id, "files": results,
                       "utc_time": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
-            _write(root, LEDGER, ledger, ledger + (json.dumps(record, sort_keys=True) + "\n").encode(), 0o600)
+            _write(root, LEDGER, ledger, ledger + (json.dumps(record, sort_keys=True) + "\n").encode(), ledger_mode)
         return {"backup_id": backup_id, "files": results,
                 "refused": sum(f["status"] == "refused" for f in results)}
     except BaseException as error:

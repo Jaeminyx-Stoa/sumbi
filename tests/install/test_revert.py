@@ -22,6 +22,21 @@ class RevertTests(OfflineTest):
     def ledger(self, root):
         return [json.loads(line) for line in (root / ".sumbi/interventions.jsonl").read_bytes().splitlines()]
 
+    def test_missing_metadata_is_a_clear_non_mutating_error(self):
+        root = self.copy_fixture("empty")
+        with self.assertRaisesRegex(InstallError, "No local install metadata"):
+            revert_install(root, "20300115T000000.000000Z")
+        self.assertFalse((root / ".sumbi").exists())
+
+    def test_existing_ledger_permissions_survive_revert(self):
+        root, _, backup_id = self.installed()
+        ledger = root / ".sumbi/interventions.jsonl"
+        if os.name == "nt":
+            self.skipTest("POSIX permission bits are not represented on Windows.")
+        ledger.chmod(0o640)
+        revert_install(root, backup_id)
+        self.assertEqual(ledger.stat().st_mode & 0o777, 0o640)
+
     def test_happy_revert_restores_absence_bytes_and_append_only_audit(self):
         root, plan, backup_id = self.installed()
         before_ledger = (root / ".sumbi/interventions.jsonl").read_bytes()

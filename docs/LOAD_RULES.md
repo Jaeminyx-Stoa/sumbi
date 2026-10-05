@@ -32,22 +32,41 @@ but are never read or modified. Placement is path guidance, not loaded-context
 measurement; it does not automatically move files or weaken approval rules.
 
 The install CLI reads the previous fourteen UTC days through every registered
-collect adapter. Each distinct agent/session contributes one start, using fixed
-start metadata when available, otherwise the first dated cwd observation.
-Resumed directory changes do not add launches. The fallback's window timestamp
+collect adapter. Each distinct agent/session contributes one session start,
+including dispatched workers. This measures sessions, not operating-system
+process launches. Fixed start metadata is preferred when an adapter provides it;
+older adapters use the first dated cwd observation for top-level sessions.
+Resumed directory changes do not add session starts. The fallback's window timestamp
 comes from that cwd observation, not inherited parent metadata. Starts outside
-the window, outside the workspace, excluded, unsafe, missing or ambiguous are
-counted separately. A fallback cannot prove the actual launch directory. JSON
+the window, outside the workspace, excluded by globs or Git ignore rules,
+unsafe, missing, non-directory or ambiguous are counted separately. Ignore
+rules are checked locally in the root and nested repositories; ignored roots
+are never exported. If Git ignore checks are unavailable, the affected cwd is
+withheld and coverage is unknown. A fallback cannot prove the original start cwd. JSON
 and text show agent labels, counts and workspace-relative paths only, never
 raw session IDs, prompts, commands or absolute paths. Paths are local inventory
 evidence and can reveal repository names; review them before sharing a plan.
 
 Starts are grouped into workspace root, nested repository, and other subfolder,
-with the nearest discovered repository recorded for each subfolder. Adapter
+with the nearest discovered repository recorded for each subfolder. Total and
+per-agent counts visibly separate top-level and worker sessions, as do path
+rows. `sessions` includes safe, scoped workers whose start evidence is unknown;
+`placement_sessions` and path rows include only sessions eligible for guidance.
+Worker placement requires normalized `start_evidence: session-header` and a
+fixed `start_cwd`: a worker's own header establishes its session start even when
+it shares its parent's directory. Worker first-observed-cwd fallbacks lack that
+evidence, contribute `worker_start_unknown`, and supply no paths or recommendation
+votes. Missing provenance on older adapters is treated the same way. The newer
+normalized adapter interface supplies own-header provenance for Codex and
+first-observed-cwd provenance for Claude; standalone installs using older
+adapters conservatively report unknown worker coverage. Adapter
 parse/read failures are visible as coverage diagnostics; inventory still works.
 Unknown adapters get `load-rules-unverified`. Uncertain paths receive
 `target-load-unknown`. A planned instruction target receives `target-not-loaded`
-when more than half that agent's observed starts miss its default launch path.
+when more than half that agent's eligible observed session starts miss its
+default instruction discovery path. Worker fan-out can affect this session-based
+majority when each worker has its own header; visible role counts expose that
+weighting. Unknown worker starts never decide the majority.
 Ties do not warn. Recommended entry paths are ranked by the missed start counts
 they address. A non-git workspace root can therefore need root guidance for one
 agent and separate nested-repository guidance for another.

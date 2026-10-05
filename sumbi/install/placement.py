@@ -12,7 +12,33 @@ from sumbi.model import Coverage, Window, normalize_path
 from .errors import InstallError
 from .gaps import has_import
 from .inventory import read_bytes, safe_path
-from .exclusions import excluded_by
+from .exclusions import GitIgnore, excluded_by
+
+
+class _IgnoreChecks:
+    """Keep ignore roots and query results local, including nested contexts."""
+
+    def __init__(self, root: Path, repositories: list[str]):
+        self.root = root
+        self.repositories = repositories
+        self.contexts, self.results = {}, {}
+
+    def check(self, relative: str) -> bool | None:
+        scopes = ["."] + sorted((p for p in self.repositories if
+            _key(relative) == _key(p) or _key(relative).startswith(_key(p) + "/")), key=len)
+        for index, scope in enumerate(scopes):
+            if scope not in self.contexts:
+                self.contexts[scope] = GitIgnore(self.root if scope == "." else safe_path(self.root, scope))
+            context = self.contexts[scope]
+            target = scopes[index + 1] if index + 1 < len(scopes) else relative
+            local = target if scope == "." else target[len(scope):].lstrip("/") or "."
+            key = scope, local
+            if key not in self.results:
+                ignored = context.excludes(local) or context.check(local)
+                self.results[key] = ignored if context.available else None
+            if self.results[key] is not False:
+                return self.results[key]
+        return False
 
 
 def load_rules() -> dict:
@@ -38,16 +64,20 @@ def read_starts(home: Path, *, now: datetime | None = None) -> tuple[list, Windo
 
 
 def observed_starts(root: Path, report: dict, sessions, window: Window | None = None) -> dict:
-    """Count one launch per session; resumed directory changes are not launches."""
+    """Count session starts, with worker attribution and uncertain child coverage."""
+    root = root.resolve()
     base = normalize_path(str(root.resolve()))
-    counts, coverage, seen = Counter(), Counter(), set()
+    counts, coverage, roles, agent_roles, seen = Counter(), Counter(), Counter(), Counter(), set()
     repositories = report["versioning"]["nested_repositories"]["paths"]
+    ignored = _IgnoreChecks(root, repositories)
+    patterns = tuple(e["pattern"] for e in report["exclusions"]["patterns"])
     for session in sessions:
         identity = session.agent, session.raw_id
         if identity in seen:
             coverage["duplicate_sessions"] += 1
             continue
         seen.add(identity)
+        role = "worker" if session.parent_raw_id or getattr(session, "is_worker", False) else "top-level"
         dated = [e for e in session.cwd_events if e[0] is not None]
         when = getattr(session, "start_at", None) or min((t for t, _ in dated), default=None)
         if window is not None and not window.contains(when):
@@ -75,15 +105,26 @@ def observed_starts(root: Path, report: dict, sessions, window: Window | None = 
         except ValueError:
             coverage["unsafe_cwd"] += 1
             continue
-        patterns = tuple(e["pattern"] for e in report["exclusions"]["patterns"])
         if relative != "." and excluded_by(relative, patterns):
             coverage["excluded_cwd"] += 1
             continue
         try:
-            if relative != ".":
-                safe_path(root, relative)
-        except InstallError:
+            directory = root if relative == "." else safe_path(root, relative)
+            if not directory.is_dir():
+                coverage["missing_or_non_directory_cwd"] += 1
+                continue
+            excluded = ignored.check(relative)
+        except (InstallError, OSError):
             coverage["unsafe_cwd"] += 1
+            continue
+        if excluded is not False:
+            coverage["excluded_cwd" if excluded else "gitignore_unknown_cwd"] += 1
+            continue
+        roles[role] += 1
+        agent_roles[session.agent, role] += 1
+        if role == "worker" and (getattr(session, "start_evidence", None) != "session-header"
+                or not getattr(session, "start_cwd", None)):
+            coverage["worker_start_unknown"] += 1
             continue
         scope = next((p for p in sorted(repositories, key=len, reverse=True)
                       if path == normalize_path(str(root / p))
@@ -91,10 +132,21 @@ def observed_starts(root: Path, report: dict, sessions, window: Window | None = 
         if scope:
             relative = scope + relative[len(scope):]
         kind = "workspace-root" if relative == "." else "nested-repository" if scope else "subfolder"
-        counts[session.agent, relative, kind, scope] += 1
-    return {"status": "observed" if counts else "no-starts-found", "sessions": sum(counts.values()),
-            "paths": [{"agent": a, "path": p, "kind": k, "repository": r, "count": n}
-                      for (a, p, k, r), n in sorted(counts.items())],
+        counts[session.agent, relative, kind, scope, role] += 1
+    paths = {}
+    for (agent, path, kind, repository, role), count in sorted(counts.items()):
+        row = paths.setdefault((agent, path), {"agent": agent, "path": path, "kind": kind,
+            "repository": repository, "count": 0, "roles": {"top-level": 0, "worker": 0}})
+        row["count"] += count
+        row["roles"][role] += count
+    return {"status": "observed" if roles else "no-starts-found", "sessions": sum(roles.values()),
+            "placement_sessions": sum(counts.values()),
+            "roles": {role: roles[role] for role in ("top-level", "worker")},
+            "agents": [{"agent": agent, "roles": {role: agent_roles[agent, role]
+                for role in ("top-level", "worker")},
+                "placement_sessions": sum(row["count"] for row in paths.values() if row["agent"] == agent)}
+                for agent in sorted({agent for agent, _ in agent_roles})],
+            "paths": list(paths.values()),
             "coverage": dict(sorted(coverage.items()))}
 
 
@@ -193,6 +245,8 @@ def annotate_placement(plan, sessions, window: Window | None = None, coverage: d
                     ("broken_lines", "unreadable_files", "invalid_timestamps", "unknown_record_types")):
                 plan.report["warnings"].append({"kind": "start-coverage-incomplete", "agent": agent})
     plan.report["observed_starts"] = starts
+    if any(starts["coverage"].get(k) for k in ("worker_start_unknown", "gitignore_unknown_cwd")):
+        plan.report["warnings"].append({"kind": "start-coverage-incomplete"})
     plan.report["load_rules_version"] = rules["version"]
     by_agent = {r["agent"]: r for r in rules["agents"]}
     contents = {c.path: c.after for c in plan.changes}

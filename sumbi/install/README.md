@@ -43,7 +43,10 @@ Codex starts inside a nested repository normally stop discovery at its git root.
 Claude Code discovers ancestor `CLAUDE.md` files and can load `AGENTS.md` under
 version/settings-dependent fallback rules. Install reads recent session starts
 through the collect adapter registry and reports `target-not-loaded` with
-recommended entry paths when a planned instruction misses most observed starts.
+recommended entry paths when a planned instruction misses most eligible observed
+session starts. Top-level and worker counts are shown separately. Workers with
+only an inferred first cwd contribute unknown coverage, not recommendation votes.
+Ignored, missing and unsafe cwd paths are withheld from placement output.
 See [load rules and limitations](../../docs/LOAD_RULES.md). Inherited cost
 estimates remain upper bounds, not proof of loaded context.
 
