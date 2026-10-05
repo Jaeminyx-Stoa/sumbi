@@ -1,4 +1,4 @@
-"""Offline outcome interface over recorded GitHub REST response fixtures."""
+"""Outcome interface and strict recorded GitHub REST response fixtures."""
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -14,6 +14,14 @@ FIX = re.compile(r"\b(?:fix(?:es|ed|ing)?|revert(?:s|ed|ing)?|regression|follow[
 REVERT = re.compile(r"\brevert(?:s|ed|ing)?\b", re.I)
 
 
+def references(pull):
+    repo, number = pull.id.rsplit("#", 1)
+    return re.compile(r"(?<![A-Za-z0-9_./-])(?:#" + number + "|"
+                      + re.escape(repo) + "#" + number + "|https://github\\.com/"
+                      + re.escape(repo) + "/pull/" + number + "|(?:PR|pull request)\\s+" + number
+                      + "|" + re.escape(pull.merge_sha) + r")(?![A-Za-z0-9_])", re.I)
+
+
 @dataclass(frozen=True)
 class PullRequest:
     id: str
@@ -26,6 +34,7 @@ class PullRequest:
     checks: str
     title: str
     body: str
+    observed_checks: str = "unknown"
 
 
 @dataclass(frozen=True)
@@ -77,7 +86,8 @@ class FixtureOutcomes:
         if not isinstance(raw["pulls"], list) or not isinstance(raw["commits"], list):
             raise ValueError("Outcomes: pulls and commits must be arrays")
         for entry in raw["pulls"]:
-            if not isinstance(entry, dict) or set(entry) != {"response", "checks_at_merge"}:
+            if (not isinstance(entry, dict) or not {"response", "checks_at_merge"} <= set(entry)
+                    or set(entry) - {"response", "checks_at_merge", "observed_checks_at_merge"}):
                 raise ValueError("Outcomes: each pull needs response and checks_at_merge")
             pr = entry["response"]
             number = pr["number"]
@@ -100,9 +110,12 @@ class FixtureOutcomes:
             if not isinstance(pr["title"], str) or (pr["body"] is not None and not isinstance(pr["body"], str)):
                 raise ValueError("Outcomes: PR title/body must be strings or null body")
             checks = self._checks(entry["checks_at_merge"], head, merged)
+            observed = entry.get("observed_checks_at_merge", "unknown")
+            if observed not in ("unknown", "green", "red"):
+                raise ValueError("Outcomes: invalid observed check label")
             self.pulls[identity] = PullRequest(identity, pr["state"], created, closed, merged,
                                               head.lower(), merge.lower() if merge else None,
-                                              checks, pr["title"], pr["body"] or "")
+                                              checks, pr["title"], pr["body"] or "", observed)
         commits = []
         for commit in raw["commits"]:
             if not re.fullmatch(SHA, commit["sha"]) or not isinstance(commit["commit"]["message"], str):
@@ -170,15 +183,20 @@ class FixtureOutcomes:
         return self.observations.get(repo)
 
     def disturbances(self, pull, days):
-        repo, number = pull.id.rsplit("#", 1)
+        repo = pull.id.rsplit("#", 1)[0]
         end = pull.merged_at + timedelta(days=days)
-        refs = re.compile(r"(?<![A-Za-z0-9_./-])(?:#" + number + "|"
-                          + re.escape(repo) + "#" + number + "|https://github\\.com/"
-                          + re.escape(repo) + "/pull/" + number + "|(?:PR|pull request)\\s+" + number
-                          + "|" + re.escape(pull.merge_sha) + r")(?![A-Za-z0-9])", re.I)
+        refs = references(pull)
         follows = [p for p in self.pulls.values() if p.id.rsplit("#", 1)[0] == repo
                    and pull.merged_at < p.created_at < end
                    and FIX.search(p.title + "\n" + p.body) and refs.search(p.title + "\n" + p.body)]
         reverts = [t for t, message in self.commits.get(repo, []) if pull.merged_at < t < end
-                   and REVERT.search(message) and re.search(r"(?<![0-9a-f])" + pull.merge_sha + r"(?![0-9a-f])", message, re.I)]
+                   and REVERT.search(message) and refs.search(message)]
         return sorted(follows, key=lambda p: (p.created_at, p.id)), sorted(reverts)
+
+    def commit_fixes(self, pull, days):
+        """Optional adapter extension: bounded follow-up signals without a PR."""
+        repo = pull.id.rsplit("#", 1)[0]
+        end = pull.merged_at + timedelta(days=days)
+        refs = references(pull)
+        return sorted(t for t, message in self.commits.get(repo, []) if pull.merged_at < t < end
+                      and FIX.search(message) and not REVERT.search(message) and refs.search(message))

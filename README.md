@@ -9,8 +9,10 @@ sumbi is a self-improving harness for coding agents. Seed a sensible harness in 
 **Status:** M1a and M1b provide offline harness installation and read-only local
 session measurement for Claude Code and Codex through one `sumbi` command.
 Install records a repository-scoped 14-day baseline before applying practices.
-M1d adds an offline deliverable ledger, recorded pull-request outcomes and token
-cost per success. Live outcomes, comparison verdicts and propagation remain planned.
+M1d adds a deliverable ledger, recorded or read-only live GitHub pull-request
+outcomes, PR roles and token cost per success. Live required-check evidence remains
+unknown when historical requirements are unavailable. Comparison verdicts and
+propagation remain planned.
 
 ## Quickstart
 

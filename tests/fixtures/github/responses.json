@@ -1,0 +1,119 @@
+{
+  "/repos/example/sample/pulls": [
+    {
+      "number": 1,
+      "state": "closed",
+      "created_at": "2030-01-01T00:00:00Z",
+      "merged_at": "2030-01-02T00:00:00Z",
+      "closed_at": "2030-01-02T00:00:00Z",
+      "head": {
+        "sha": "0000000000000000000000000000000000000001"
+      },
+      "merge_commit_sha": "0000000000000000000000000000000000000065",
+      "title": "Synthetic change",
+      "body": null,
+      "base": {
+        "ref": "main"
+      }
+    },
+    {
+      "number": 2,
+      "state": "closed",
+      "created_at": "2030-01-04T00:00:00Z",
+      "merged_at": "2030-01-05T00:00:00Z",
+      "closed_at": "2030-01-05T00:00:00Z",
+      "head": {
+        "sha": "0000000000000000000000000000000000000002"
+      },
+      "merge_commit_sha": "0000000000000000000000000000000000000066",
+      "title": "Fix #1",
+      "body": null,
+      "base": {
+        "ref": "main"
+      }
+    },
+    {
+      "number": 3,
+      "state": "closed",
+      "created_at": "2030-01-01T00:00:00Z",
+      "merged_at": null,
+      "closed_at": "2030-01-02T00:00:00Z",
+      "head": {
+        "sha": "0000000000000000000000000000000000000003"
+      },
+      "merge_commit_sha": null,
+      "title": "Synthetic change",
+      "body": null,
+      "base": {
+        "ref": "main"
+      }
+    }
+  ],
+  "/repos/example/sample/commits": [
+    {
+      "sha": "ffffffffffffffffffffffffffffffffffffffff",
+      "commit": {
+        "message": "Revert change 0000000000000000000000000000000000000065",
+        "committer": {
+          "date": "2030-01-03T00:00:00Z"
+        }
+      }
+    }
+  ],
+  "/repos/example/sample/commits/0000000000000000000000000000000000000001/check-runs": {
+    "total_count": 1,
+    "check_runs": [
+      {
+        "name": "test",
+        "head_sha": "0000000000000000000000000000000000000001",
+        "started_at": "2030-01-01T00:00:00Z",
+        "completed_at": "2030-01-02T00:00:00Z",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "/repos/example/sample/commits/0000000000000000000000000000000000000001/statuses": [],
+  "/repos/example/sample/commits/0000000000000000000000000000000000000065/check-runs": {
+    "total_count": 1,
+    "check_runs": [
+      {
+        "name": "test",
+        "head_sha": "0000000000000000000000000000000000000065",
+        "started_at": "2030-01-01T00:00:00Z",
+        "completed_at": "2030-01-02T00:00:00Z",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "/repos/example/sample/commits/0000000000000000000000000000000000000065/statuses": [],
+  "/repos/example/sample/commits/0000000000000000000000000000000000000002/check-runs": {
+    "total_count": 1,
+    "check_runs": [
+      {
+        "name": "test",
+        "head_sha": "0000000000000000000000000000000000000002",
+        "started_at": "2030-01-04T00:00:00Z",
+        "completed_at": "2030-01-05T00:00:00Z",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "/repos/example/sample/commits/0000000000000000000000000000000000000002/statuses": [],
+  "/repos/example/sample/commits/0000000000000000000000000000000000000066/check-runs": {
+    "total_count": 1,
+    "check_runs": [
+      {
+        "name": "test",
+        "head_sha": "0000000000000000000000000000000000000066",
+        "started_at": "2030-01-04T00:00:00Z",
+        "completed_at": "2030-01-05T00:00:00Z",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "/repos/example/sample/commits/0000000000000000000000000000000000000066/statuses": []
+}

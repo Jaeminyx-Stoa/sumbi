@@ -245,8 +245,9 @@ outside the repository; only aggregate numbers may be reported for review.
 
 ## M1d deliverables and cost per success
 
-`sumbi deliver` joins the ledger, recorded GitHub responses and the same billable
-events used by `collect`. It makes no network calls. Copy
+`sumbi deliver` joins the ledger, GitHub outcomes and the same billable
+events used by `collect`. A directory selects offline recorded responses;
+`--outcomes github` selects the read-only live REST adapter. Copy
 [the empty template](deliverables.template.csv) into a private local ledger.
 
 ```sh
@@ -275,7 +276,7 @@ Errors name the row and field, never echo input values or private paths.
 | `dispatched_at` | Required UTC ISO timestamp ending in `Z` or `+00:00`. Fixed at dispatch. |
 | `acceptance` | Required short text, 1-512 characters, fixed at dispatch. Validated then discarded; never included in reports. |
 | `repos` | Required list of `owner/repo` IDs. Case-insensitive, no repeated entries. |
-| `prs` | Optional list of `owner/repo#n`, positive PR numbers. Each PR must belong to `repos` and may occur in only one ledger row. All listed PRs are constituent work that must succeed. Do not list follow-up attempts as separate deliverables; detection includes their spend and outcomes. |
+| `prs` | Optional list of `owner/repo#n[:role]`, positive PR numbers. Roles are exactly `constituent` (default), `retry`, or `followup`. Each PR must belong to `repos` and may occur only once across the ledger, regardless of role. Every constituent must succeed. Keep retries and follow-ups in the original deliverable row. |
 | `branches` | Optional unique list of bounded literal Git branch names, at most 200 characters each. No expansions or invalid dot segments. Branch names stay in memory. |
 | `state_override` | Blank, `abandoned`, or `abandoned@<UTC timestamp>`. No override can declare success. Abandonment may be recorded without a PR. A timestamp cannot precede dispatch. |
 | `accepted_by_human` | Blank means human acceptance is not required. `n` means required and pending; `y` means required and accepted. |
@@ -284,6 +285,82 @@ Errors name the row and field, never echo input values or private paths.
 Keep real ledgers and recorded API responses outside version control: acceptance,
 notes, branch names, PR titles/bodies and commit messages may contain private text.
 The shipped fixtures are authored synthetic data only.
+
+For example, `example/sample#12:retry;example/sample#15:constituent` records a
+replacement attempt. A closed-unmerged retry is superseded only when a constituent
+in the same repository merges after that retry closes; otherwise it remains a failure. Open retries
+remain pending. Merged retries need their own checks and observation windows.
+Any listed retry excludes first-pass success. At least one constituent is needed
+for success; roles never excuse a failed constituent.
+
+An explicit `:followup` needs no title/body reference and can span ledger repositories.
+A follow-up merged strictly
+inside a constituent's observation window excludes first-pass success and needs
+its own green merge and complete observation window for eventual success. For
+unmerged follow-ups, creation time selects the window; open work is pending and
+closed-unmerged work fails. Out-of-window explicit follow-ups remain linked for
+spend but do not affect that constituent's outcome. Missing listed PRs prevent a
+success claim. Automatic text-based detection still applies to every role.
+
+### Live GitHub outcomes
+
+Run from a scratch folder, keeping all destinations outside Git working trees:
+
+```sh
+sumbi deliver --ledger deliverables.csv --outcomes github \
+  --cache private-cache --record private-recordings \
+  --since 2030-01-01T00:00Z --until 2030-01-10T00:00Z --json deliver.json
+```
+
+Authentication uses the first nonblank value of `GITHUB_TOKEN`, then `GH_TOKEN`,
+then captured stdout from `gh auth token` if `gh` exists. A missing credential
+fails with a fixed diagnostic. Tokens are used only in the Authorization header,
+never URLs, logs, reports or recordings. Redirects are rejected to avoid forwarding
+credentials. GitHub permissions only need to read repository contents, PRs,
+checks and commit statuses. The adapter performs GET requests only.
+
+PRs are enumerated by creation time with pagination, including open and closed
+work. Commits are enumerated on the default branch and captured PR target branches
+from the earliest dispatch through observation time. This avoids search-index lag
+and the search API's result cap. Unreachable/deleted branch history and commits on
+unrelated branches are outside this evidence scope. Request or pagination failure
+stops collection instead of silently claiming complete coverage. Scan patterns
+are bounded literal PR references and full SHAs; title, body and commit-message
+fields are limited to 65536 characters each. Oversize responses fail explicitly.
+
+Check runs (`filter=all`) and commit statuses are read for the merge SHA, falling
+back to the PR head when the merge SHA has no pre-merge results. Only starts and
+status updates at or before merge qualify. A check completed after merge cannot
+contribute its later conclusion: it is red (still pending) at merge. The latest
+attempt by start time and latest status update win; missing evidence is unknown.
+`observed_checks_at_merge` is green/red/unknown for these visible results.
+
+**REST does not expose an authoritative historical required-check list.** The live
+adapter therefore reports `required_checks_at_merge: unknown` and withholds success
+even if observed results are green. It never substitutes current branch protection,
+current rulesets, or all observed checks for historical requirements. Authoritative
+historical snapshots in offline fixtures can establish green/red/missing required
+checks using the contract below. This limitation is visible in each PR outcome.
+
+`--cache DIR` defaults to `~/.cache/sumbi/outcomes`. Responses expire after five
+minutes. A cache hit retains the original observation time, so cached data cannot
+age a deliverable into success. Files are replaced atomically with private POSIX
+file modes where supported; Windows access follows local directory permissions.
+403/429 rate limits use reset and Retry-After headers, with up to three retries.
+Waits over one hour fail with a later-retry diagnostic. Ordinary access-denied 403s
+do not trigger a rate-limit wait. Network timeouts and response size limits are
+explicit. No destination may be inside a Git repository or overlap session logs,
+the ledger, salt file or report. Cache and record directories must be separate.
+
+`--record DIR` writes allow-listed REST pages under `responses/` and normalized
+repository fixtures at the top level, replayable with `--outcomes DIR` without
+credentials or network access. All author/personal fields are dropped rather than
+retaining logins; this is stronger than pseudonymizing them. Active credentials
+and recognizable GitHub token patterns are redacted from retained text. Only fields
+used for outcomes are retained. Titles, bodies and commit messages remain private
+local evidence; sanitization is not a guarantee that prose contains no private
+information. Never commit real recordings. Committed test recordings are authored
+synthetic data. Cache/record flags require `--outcomes github`.
 
 ### Recorded outcomes contract
 
@@ -312,6 +389,8 @@ nullable `merged_at`, `head.sha`, nullable `merge_commit_sha`, `title` and nulla
 order must be consistent. Recorded changes precede the exclusive `observed_at`.
 Each commit response needs `sha`, `commit.message`, and `commit.committer.date`,
 within `[coverage_start, observed_at)`.
+PR entries may also carry `observed_checks_at_merge` (`green`, `red`, or
+`unknown`); it is diagnostic and never substitutes for `checks_at_merge`.
 
 For merged PRs, `checks_at_merge` is null when historical evidence is unavailable,
 or an object with exactly `head_sha`, `captured_at`, `required`, `check_runs` and
@@ -335,13 +414,16 @@ prevents a success claim. Coverage counters expose the missing evidence.
 
 ### States, attempts and time
 
-All PRs in a ledger row must merge and have green required checks. A later PR in
+All constituent and active repair PRs must merge and have green required checks.
+A later PR in
 the same repository is a disturbance when its creation is inside
 `(merged_at, merged_at + window)` and its title/body contains fix, revert,
 regression, hotfix or follow-up wording plus a bounded `#number`, same-repository
 qualified PR ID/URL, `PR n`/`pull request n`, or full merge SHA reference. A commit
-in the same interval with revert wording and the full
-merge SHA is a revert. These patterns deliberately do not understand arbitrary
+in the same interval with revert wording and a bounded PR or full merge SHA
+reference is a revert. A fix commit with the same reference patterns excludes
+first-pass success and extends maturity through its own observation window.
+It does not establish a merged PR repair for a revert. These patterns deliberately do not understand arbitrary
 prose, abbreviated SHAs or cross-repository issue references. Detection is a
 recorded-evidence signal and can have false positives; it is not semantic review.
 

@@ -76,10 +76,12 @@ def parser() -> argparse.ArgumentParser:
     commands = root.add_subparsers(dest="command", required=True)
     configure_install(commands.add_parser("install", help="Inventory and seed repository practices offline"))
     configure_collection(commands.add_parser("collect", help="Measure local session logs without transcripts"))
-    command = commands.add_parser("deliver", help="Join a dispatch ledger with offline outcomes and sessions")
+    command = commands.add_parser("deliver", help="Join a dispatch ledger with recorded or live GitHub outcomes")
     configure_collection(command, deliver=True)
     command.add_argument("--ledger", type=Path, required=True)
-    command.add_argument("--outcomes", type=Path, required=True)
+    command.add_argument("--outcomes", required=True, metavar="github|DIR")
+    command.add_argument("--cache", type=Path, metavar="DIR", help="Private GitHub response cache outside repositories")
+    command.add_argument("--record", type=Path, metavar="DIR", help="Record filtered GitHub responses for offline replay")
     command.add_argument("--follow-up-days", type=idle, default=7.0)
     return root
 
@@ -125,13 +127,34 @@ def main(argv: list[str] | None = None) -> int:
     if any(p.is_relative_to(source.resolve()) for p in resolved for source in sources):
         root.error("Output destinations must be outside session-log directories")
     if args.command == "deliver":
-        if any(p == args.ledger.resolve() or p.is_relative_to(args.outcomes.resolve()) for p in resolved):
+        live = args.outcomes == "github"
+        outcome_dir = None if live else Path(args.outcomes)
+        if not live and (args.cache is not None or args.record is not None):
+            root.error("Cache and record options require --outcomes github")
+        if any(p == args.ledger.resolve() or (outcome_dir and p.is_relative_to(outcome_dir.resolve())) for p in resolved):
             root.error("Deliver output must not overwrite ledger or outcome fixtures")
         from sumbi.deliver import deliver, text_summary as deliver_summary
         from sumbi.outcomes import FixtureOutcomes
         try:
             salt = read_salt(args.salt_file)
-            report = deliver(args.home, window, args.ledger, FixtureOutcomes(args.outcomes),
+            if live:
+                from sumbi.github_outcomes import GitHubOutcomes, outside_repository
+                from sumbi.ledger import read_ledger
+                cache = args.cache if args.cache is not None else Path.home() / ".cache/sumbi/outcomes"
+                stores = [outside_repository(p) for p in (cache, args.record) if p is not None]
+                for destination in resolved:
+                    outside_repository(destination)
+                protected = [args.ledger.resolve(), *resolved]
+                if args.salt_file:
+                    protected.append(args.salt_file.resolve())
+                if any(p.is_relative_to(store) for p in protected for store in stores) or any(
+                        store.is_relative_to(source.resolve()) or source.resolve().is_relative_to(store)
+                        for store in stores for source in sources):
+                    raise ValueError("GitHub cache and record must not overlap inputs or output")
+                outcomes = GitHubOutcomes(read_ledger(args.ledger), cache=cache, record=args.record)
+            else:
+                outcomes = FixtureOutcomes(outcome_dir)
+            report = deliver(args.home, window, args.ledger, outcomes,
                              agents=agents, rules=rules, idle_minutes=args.idle_minutes,
                              salt=salt, follow_up_days=args.follow_up_days)
             data = json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
