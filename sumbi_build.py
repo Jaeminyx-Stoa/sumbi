@@ -72,7 +72,7 @@ def build_sdist(sdist_directory, config_settings=None):
     sources = [ROOT / p for p in ("pyproject.toml", "sumbi_build.py", "README.md", "LICENSE")]
     for directory in ("sumbi", "tests", "docs"):
         sources.extend(p for p in sorted((ROOT / directory).rglob("*"))
-                       if p.is_file() and p.suffix in (".py", ".md", ".json", ".jsonl"))
+                       if p.is_file() and p.suffix in (".py", ".md", ".json", ".jsonl", ".csv"))
     with tarfile.open(destination / filename, "w:gz") as archive:
         for path in sources:
             archive.add(path, arcname=STEM + "/" + path.relative_to(ROOT).as_posix(), recursive=False)

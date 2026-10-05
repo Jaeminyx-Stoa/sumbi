@@ -1,0 +1,2 @@
+{"type": "assistant", "sessionId": "split", "timestamp": "2030-01-01T00:02:00Z", "message": {"id": "split-a", "content": [], "usage": {"input_tokens": 10, "cache_creation_input_tokens": 2, "cache_read_input_tokens": 3, "output_tokens": 5}}, "cwd": "/synthetic/sample/D1"}
+{"type": "assistant", "sessionId": "split", "timestamp": "2030-01-01T00:03:00Z", "message": {"id": "split-b", "content": [], "usage": {"input_tokens": 10, "cache_creation_input_tokens": 2, "cache_read_input_tokens": 3, "output_tokens": 5}}, "cwd": "/synthetic/sample/Dsplit"}

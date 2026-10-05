@@ -1,0 +1,258 @@
+{
+  "repository": "example/sample",
+  "coverage_start": "2030-01-01T00:00:00Z",
+  "observed_at": "2030-02-01T00:00:00Z",
+  "pulls_complete": true,
+  "commits_complete": true,
+  "pulls": [
+    {
+      "response": {
+        "number": 1,
+        "state": "closed",
+        "created_at": "2030-01-01T00:00:00Z",
+        "merged": true,
+        "merged_at": "2030-01-02T00:00:00Z",
+        "closed_at": "2030-01-02T00:00:00Z",
+        "head": {
+          "sha": "0000000000000000000000000000000000000001"
+        },
+        "merge_commit_sha": "0000000000000000000000000000000000000065",
+        "title": "Synthetic change",
+        "body": null
+      },
+      "checks_at_merge": {
+        "head_sha": "0000000000000000000000000000000000000001",
+        "captured_at": "2030-01-02T00:00:00Z",
+        "required": [
+          "test"
+        ],
+        "check_runs": [
+          {
+            "name": "test",
+            "head_sha": "0000000000000000000000000000000000000001",
+            "started_at": "2030-01-01T00:00:00Z",
+            "completed_at": "2030-01-02T00:00:00Z",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ],
+        "statuses": []
+      }
+    },
+    {
+      "response": {
+        "number": 2,
+        "state": "closed",
+        "created_at": "2030-01-01T00:00:00Z",
+        "merged": true,
+        "merged_at": "2030-01-02T00:00:00Z",
+        "closed_at": "2030-01-02T00:00:00Z",
+        "head": {
+          "sha": "0000000000000000000000000000000000000002"
+        },
+        "merge_commit_sha": "0000000000000000000000000000000000000066",
+        "title": "Synthetic change",
+        "body": null
+      },
+      "checks_at_merge": {
+        "head_sha": "0000000000000000000000000000000000000002",
+        "captured_at": "2030-01-02T00:00:00Z",
+        "required": [
+          "test"
+        ],
+        "check_runs": [
+          {
+            "name": "test",
+            "head_sha": "0000000000000000000000000000000000000002",
+            "started_at": "2030-01-01T00:00:00Z",
+            "completed_at": "2030-01-02T00:00:00Z",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ],
+        "statuses": []
+      }
+    },
+    {
+      "response": {
+        "number": 3,
+        "state": "closed",
+        "created_at": "2030-01-01T00:00:00Z",
+        "merged": true,
+        "merged_at": "2030-01-28T00:00:00Z",
+        "closed_at": "2030-01-28T00:00:00Z",
+        "head": {
+          "sha": "0000000000000000000000000000000000000003"
+        },
+        "merge_commit_sha": "0000000000000000000000000000000000000067",
+        "title": "Synthetic change",
+        "body": null
+      },
+      "checks_at_merge": {
+        "head_sha": "0000000000000000000000000000000000000003",
+        "captured_at": "2030-01-28T00:00:00Z",
+        "required": [
+          "test"
+        ],
+        "check_runs": [
+          {
+            "name": "test",
+            "head_sha": "0000000000000000000000000000000000000003",
+            "started_at": "2030-01-27T00:00:00Z",
+            "completed_at": "2030-01-28T00:00:00Z",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ],
+        "statuses": []
+      }
+    },
+    {
+      "response": {
+        "number": 4,
+        "state": "closed",
+        "created_at": "2030-01-01T00:00:00Z",
+        "merged": true,
+        "merged_at": "2030-01-02T00:00:00Z",
+        "closed_at": "2030-01-02T00:00:00Z",
+        "head": {
+          "sha": "0000000000000000000000000000000000000004"
+        },
+        "merge_commit_sha": "0000000000000000000000000000000000000068",
+        "title": "Synthetic change",
+        "body": null
+      },
+      "checks_at_merge": {
+        "head_sha": "0000000000000000000000000000000000000004",
+        "captured_at": "2030-01-02T00:00:00Z",
+        "required": [
+          "test"
+        ],
+        "check_runs": [
+          {
+            "name": "test",
+            "head_sha": "0000000000000000000000000000000000000004",
+            "started_at": "2030-01-01T00:00:00Z",
+            "completed_at": "2030-01-02T00:00:00Z",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ],
+        "statuses": []
+      }
+    },
+    {
+      "response": {
+        "number": 5,
+        "state": "closed",
+        "created_at": "2030-01-01T00:00:00Z",
+        "merged": true,
+        "merged_at": "2030-01-02T00:00:00Z",
+        "closed_at": "2030-01-02T00:00:00Z",
+        "head": {
+          "sha": "0000000000000000000000000000000000000005"
+        },
+        "merge_commit_sha": "0000000000000000000000000000000000000069",
+        "title": "Synthetic change",
+        "body": null
+      },
+      "checks_at_merge": {
+        "head_sha": "0000000000000000000000000000000000000005",
+        "captured_at": "2030-01-02T00:00:00Z",
+        "required": [
+          "test"
+        ],
+        "check_runs": [
+          {
+            "name": "test",
+            "head_sha": "0000000000000000000000000000000000000005",
+            "started_at": "2030-01-01T00:00:00Z",
+            "completed_at": "2030-01-02T00:00:00Z",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ],
+        "statuses": []
+      }
+    },
+    {
+      "response": {
+        "number": 6,
+        "state": "closed",
+        "created_at": "2030-01-01T00:00:00Z",
+        "merged": true,
+        "merged_at": "2030-01-02T00:00:00Z",
+        "closed_at": "2030-01-02T00:00:00Z",
+        "head": {
+          "sha": "0000000000000000000000000000000000000006"
+        },
+        "merge_commit_sha": "000000000000000000000000000000000000006a",
+        "title": "Synthetic change",
+        "body": null
+      },
+      "checks_at_merge": {
+        "head_sha": "0000000000000000000000000000000000000006",
+        "captured_at": "2030-01-02T00:00:00Z",
+        "required": [
+          "test"
+        ],
+        "check_runs": [
+          {
+            "name": "test",
+            "head_sha": "0000000000000000000000000000000000000006",
+            "started_at": "2030-01-01T00:00:00Z",
+            "completed_at": "2030-01-02T00:00:00Z",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ],
+        "statuses": []
+      }
+    },
+    {
+      "response": {
+        "number": 7,
+        "state": "closed",
+        "created_at": "2030-01-04T00:00:00Z",
+        "merged": true,
+        "merged_at": "2030-01-05T00:00:00Z",
+        "closed_at": "2030-01-05T00:00:00Z",
+        "head": {
+          "sha": "0000000000000000000000000000000000000007"
+        },
+        "merge_commit_sha": "000000000000000000000000000000000000006b",
+        "title": "Fix #6",
+        "body": null
+      },
+      "checks_at_merge": {
+        "head_sha": "0000000000000000000000000000000000000007",
+        "captured_at": "2030-01-05T00:00:00Z",
+        "required": [
+          "test"
+        ],
+        "check_runs": [
+          {
+            "name": "test",
+            "head_sha": "0000000000000000000000000000000000000007",
+            "started_at": "2030-01-04T00:00:00Z",
+            "completed_at": "2030-01-05T00:00:00Z",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ],
+        "statuses": []
+      }
+    }
+  ],
+  "commits": [
+    {
+      "sha": "ffffffffffffffffffffffffffffffffffffffff",
+      "commit": {
+        "committer": {
+          "date": "2030-01-03T00:00:00Z"
+        },
+        "message": "Revert change\nThis reverts commit 0000000000000000000000000000000000000066."
+      }
+    }
+  ]
+}

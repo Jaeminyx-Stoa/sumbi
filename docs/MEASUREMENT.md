@@ -242,3 +242,200 @@ Run `python -m unittest discover -s tests`. Tests use only authored synthetic
 records and temporary homes. The fixture README gives the hand arithmetic.
 No test uses a network service. Real-data comparisons and raw records belong
 outside the repository; only aggregate numbers may be reported for review.
+
+## M1d deliverables and cost per success
+
+`sumbi deliver` joins the ledger, recorded GitHub responses and the same billable
+events used by `collect`. It makes no network calls. Copy
+[the empty template](deliverables.template.csv) into a private local ledger.
+
+```sh
+sumbi deliver --ledger deliverables.csv --outcomes recorded-outcomes \
+  --since 2030-01-01T00:00Z --until 2030-01-10T00:00Z \
+  --project sample --match-path '/synthetic/sample*' --json out/deliver.json
+```
+
+The collect options `--home`, `--agents`, project matching blocks, `--idle-minutes`,
+`--salt-file` and `--json` work here too. `--follow-up-days` selects a positive
+finite observation window, default 7 days. There is no `--local-review`: this
+command never reads message prose for linking. JSON defaults to
+`out/deliver.json`; `--json -` puts the summary on stderr. Writes are atomic and
+cannot overwrite the ledger, outcomes, salt file or session-log directories.
+
+### Ledger contract
+
+Use UTF-8 CSV with these exact columns, in order. All fields are single-line,
+without surrounding whitespace, and at most 4096 characters. Lists use semicolons
+without spaces; quote a CSV field when it contains a comma. Empty lists are blank.
+Errors name the row and field, never echo input values or private paths.
+
+| Column | Meaning and validation |
+| --- | --- |
+| `id` | Unique 1-64 character identifier: initial letter/digit, then letters, digits, underscore, dot or hyphen. Choose a public-safe ID; it appears verbatim in reports. |
+| `dispatched_at` | Required UTC ISO timestamp ending in `Z` or `+00:00`. Fixed at dispatch. |
+| `acceptance` | Required short text, 1-512 characters, fixed at dispatch. Validated then discarded; never included in reports. |
+| `repos` | Required list of `owner/repo` IDs. Case-insensitive, no repeated entries. |
+| `prs` | Optional list of `owner/repo#n`, positive PR numbers. Each PR must belong to `repos` and may occur in only one ledger row. All listed PRs are constituent work that must succeed. Do not list follow-up attempts as separate deliverables; detection includes their spend and outcomes. |
+| `branches` | Optional unique list of bounded literal Git branch names, at most 200 characters each. No expansions or invalid dot segments. Branch names stay in memory. |
+| `state_override` | Blank, `abandoned`, or `abandoned@<UTC timestamp>`. No override can declare success. Abandonment may be recorded without a PR. A timestamp cannot precede dispatch. |
+| `accepted_by_human` | Blank means human acceptance is not required. `n` means required and pending; `y` means required and accepted. |
+| `notes` | Optional local text; validated then discarded. |
+
+Keep real ledgers and recorded API responses outside version control: acceptance,
+notes, branch names, PR titles/bodies and commit messages may contain private text.
+The shipped fixtures are authored synthetic data only.
+
+### Recorded outcomes contract
+
+`Outcomes` is the adapter interface (`pull`, `observation`, `disturbances`), separate
+from judgment. `FixtureOutcomes` reads every top-level `*.json` in its directory.
+Each file covers one unique repository and uses this wrapper around GitHub REST
+response objects. Unknown wrapper fields and inconsistent evidence are rejected.
+No fixture filename or response prose is emitted.
+
+```json
+{
+  "repository": "example/sample",
+  "coverage_start": "2030-01-01T00:00:00Z",
+  "observed_at": "2030-02-01T00:00:00Z",
+  "pulls_complete": true,
+  "commits_complete": true,
+  "pulls": [{"response": {}, "checks_at_merge": null}],
+  "commits": []
+}
+```
+
+The empty `response` above is a shape placeholder. A PR response needs `number`,
+`state` (`open`/`closed`), `created_at`, nullable `closed_at`, boolean `merged`,
+nullable `merged_at`, `head.sha`, nullable `merge_commit_sha`, `title` and nullable
+`body`. SHAs are full 40-character hex IDs. Merged PRs must be closed, and timestamp
+order must be consistent. Recorded changes precede the exclusive `observed_at`.
+Each commit response needs `sha`, `commit.message`, and `commit.committer.date`,
+within `[coverage_start, observed_at)`.
+
+For merged PRs, `checks_at_merge` is null when historical evidence is unavailable,
+or an object with exactly `head_sha`, `captured_at`, `required`, `check_runs` and
+`statuses`. `captured_at` equals `merged_at` and `head_sha` equals the PR head.
+`required` is the unique list of historically required check names/contexts. An
+explicit empty list means no checks were required; null does not mean that.
+Check-run REST objects need `name`, `head_sha`, `started_at`, nullable
+`completed_at`, `status`, and nullable `conclusion`. Commit status objects need
+`context`, `sha`, `updated_at`, and `state`. All evidence must be for this head
+and at or before merge. The latest check attempt by start time and latest commit
+status by update time win; conflicting ties fail validation. If both check and
+status use the same required name, both must pass. Completed `success`, `neutral`
+and `skipped` checks qualify; commit statuses require `success`. Missing required
+results are unknown, never green. Present-day checks cannot stand in for checks
+at merge, and current branch protection cannot stand in for the historical list.
+
+The completeness flags attest that all PRs and commits in the declared interval
+were captured (including pagination). They do not infer completeness from a
+partial list. A missing PR, missing required-check snapshot or incomplete capture
+prevents a success claim. Coverage counters expose the missing evidence.
+
+### States, attempts and time
+
+All PRs in a ledger row must merge and have green required checks. A later PR in
+the same repository is a disturbance when its creation is inside
+`(merged_at, merged_at + window)` and its title/body contains fix, revert,
+regression, hotfix or follow-up wording plus a bounded `#number`, same-repository
+qualified PR ID/URL, `PR n`/`pull request n`, or full merge SHA reference. A commit
+in the same interval with revert wording and the full
+merge SHA is a revert. These patterns deliberately do not understand arbitrary
+prose, abbreviated SHAs or cross-repository issue references. Detection is a
+recorded-evidence signal and can have false positives; it is not semantic review.
+
+- `success`: every required attempt merged green, all observation windows closed
+  with complete captures, and required human acceptance recorded.
+- `failed`: explicit abandonment, a constituent/repair PR closed unmerged, or a
+  revert without a later merged repair.
+- `in_progress`: no PR yet, open work/repair, missing PR/check evidence, a red
+  merge check, or pending human acceptance.
+- `immature`: merged work whose observation window remains open or incomplete,
+  including the window of a merged follow-up repair.
+
+A detected repair is another attempt of the original deliverable. Eventual
+success requires its own green merge and completed observation window. A revert
+PR never qualifies as a repair. First-pass success excludes every detected fix
+or revert. Several constituent PRs count as one deliverable. Closed unmerged
+constituents stay failed: the ledger must not drop failed work to improve rates.
+
+Outcomes are assessed as of each repository's recorded `observed_at`, which may
+follow the spend period. Period successes use the final successful merge time,
+not the later maturity date. Elapsed seconds run from dispatch to final merge,
+recorded abandonment, or a terminal closed-unmerged PR. A revert retains the
+original merge as the elapsed endpoint. Unknown abandonment time and work with
+no merge or closure are null, never zero. Waiting components are not available
+in M1d; elapsed is observed calendar time and does not claim agent/human splits.
+
+### Links and allocation
+
+For each billable event, the priority is:
+
+1. A bounded deliverable ID in its own working directory or structured branch
+   (`gitBranch` in Claude, `branch`/`git.branch` in Codex context).
+2. A ledger branch or exact PR URL in recognized tool inputs/outputs. Only known
+   shell/PR tools supply these references. Literal `git switch`, `checkout` or
+   `branch` operands and structured branch fields qualify. A one-line branch
+   output qualifies only when paired with a literal Git branch query. Unknown tools,
+   wrapper code, shell expansions/chains and ordinary messages are not mined.
+3. A unique repository candidate with a dispatch-to-close time match, explicitly
+   labeled `project_time_weak`. This is a candidate, not proof of ownership.
+
+Contexts clear turn references. A structured branch persists across turns in the
+same directory; a directory change, branch switch or conflicting branch-query
+output invalidates it. An unrelated PR head does not change the working branch.
+Pre-window evidence can establish context; future
+evidence cannot relink earlier events. Claude's selected streaming snapshot owns
+its branch and tool inputs. Codex's closing cumulative snapshot owns the delta.
+No proportional split is invented. Ambiguity at a priority stops allocation;
+several deliverables in a session split only when events establish unique links.
+Parent/subagent relationships alone do not establish deliverable ownership.
+
+Windows directory ID matching is case-insensitive; POSIX paths and branches are
+case-sensitive. Repository candidates use local Git origins matching ledger `owner/repo` IDs.
+With missing origins, a matching project's origin patterns can identify a ledger
+repository. A path-only project rule can use the repository basename as its rule
+label (`--project sample` for `example/sample`). A unique explicit deliverable
+link can identify a single repository when no origin is available. Known foreign
+origins, excluded projects, conflicting repositories or multiple ledger repos
+without a unique repository leave spend outside allocated deliverable costs.
+Ambiguous repository candidates remain `unassigned`; repository-scoped events
+with no unique deliverable are `unallocated`; excluded projects are `other`.
+
+JSON links contain pseudonymous session IDs, ledger IDs, evidence labels, event
+counts and token kinds. PR and repository IDs are pseudonymized; head SHAs remain
+machine IDs. Acceptance, notes, branches, commands, outputs, paths, origins and
+outcome prose are never emitted. All existing collection coverage counters remain.
+
+### Cost and rates
+
+Costs are reported **tokens**, not currency. Total excludes reasoning output,
+which is an output subset. Unreported kinds remain null; coverage separately
+counts events with missing token kinds, including partially reported aggregates.
+No prices are assumed. Project matching scopes both cost denominators and spend;
+ledger-wide state and success-rate rows still include every ledger deliverable.
+
+- Operational: scoped project spend in `[since, until)` divided by successful
+  deliverables whose final merge is in that period, assessed using later recorded
+  maturity evidence. Failed and immature work's period spend remains in the
+  numerator. The project aggregate includes its separately displayed unallocated
+  spend; this never assigns those tokens to a deliverable. `operational_linked`
+  also shows the ratio using linked spend alone. Repository rows show project
+  ratios; a deliverable touching several repositories counts once in each
+  applicable repository denominator, so these rows are not additive.
+- Cohort: all observed linked spend from dispatch through the available lifetime
+  scan for deliverables dispatched in `[since, until)`, divided by their eventual
+  successes. Includes failed work and retries. The scan begins at the earlier of
+  period start and first ledger dispatch and ends at the later of period end and
+  last repository observation. Logs may be missing: lifetime means all observed
+  events, not a guarantee of complete historical logging.
+
+Period and lifetime scan lines separately display `linked`, `unallocated`,
+`unassigned` and `other` spend. Unknown spend is never spread into individual
+deliverables or cohort costs. The cohort has no invented share of unlinked spend.
+Zero successes produce null costs per success. Each rate includes numerator,
+denominator and a Wilson 95% interval; denominators include failed, immature and
+ongoing rows, so immature cohorts must not be treated as final verdicts. A zero
+denominator yields a null rate and interval. M1d always reports savings verdict
+`not_evaluated`; M2 will establish completeness thresholds and comparison rules.
