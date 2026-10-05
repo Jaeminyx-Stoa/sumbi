@@ -87,6 +87,12 @@ assert the named proposal/reason and the numeric components where they change.
 | adopt | None | Non-inferior at margin .5; both ratios .4 with upper .554167 | adopt |
 | reject (inferior) | All 20 after rows abandoned at 40 seconds; remove their ledger PR links; margin 10 points | Success 0/20 minus 16/20 = -.8; CI [-.919342337420202, -.5305100232026292]; upper < -.1 | reject |
 | owner decides | All after merges/abandonments at 200 seconds; spend stays 40 each | Time 4000/16 = 250; ratio 2, CI [1.444047619047619, 2.770833333333332]; tokens remain improved | owner_decides |
+| reject (tokens without offset) | After spend 200 tokens and elapsed 100 seconds per row | Tokens 4000/16 = 250 vs 2000/16 = 125, ratio 2, CI [1.444047619047619, 2.770833333333332]; time ratio 1, CI [.7220238095238095, 1.385416666666666]; equal success is non-inferior but not significantly higher | reject: tokens_worse_without_offset |
+| reject (time without offset) | After spend 100 tokens and elapsed 200 seconds per row | Time 4000/16 = 250 vs 2000/16 = 125, ratio 2 with the same CI; token ratio 1 with the same uncertain CI | reject: time_worse_without_offset |
+| unobservable Claude effort | Replace B01 and A01 Codex logs with authored Claude fixtures, preserving total spend | Each arm has 1 Claude and 19 Codex sessions; effort mix uses 19 high reports per arm; Claude effort is informational and omitted | adopt; effort_unobservable |
+| partial effort | In the mixed-agent round, remove effort from A02 Codex context only | Claude remains unobservable; Codex before reports 19/19, after reports 18/19 | withhold: effort_metadata_partial |
+| asymmetric effort | Remove effort from every after Codex context | Before reports 20/20; after reports 0/20 | withhold: effort_metadata_asymmetric |
+| other-project context | Add 1,000,000 tokens under an explicitly out-of-scope project path | Relevant share 0/(2000+800) = 0; other context 1,000,000 | adopt |
 | coverage | Set repository `commits_complete` false | Cannot establish outside follow-up coverage | withhold: incomplete_coverage |
 | not preregistered | Register Jan 8 at 00:00:01 UTC | Registered after application and after-window start | withhold: not_preregistered |
 | blocking confounder | Change all after models to `synthetic-next` | Dominant value changes; TV distance 1 | withhold: not_comparable, model_mix_shift |
@@ -103,6 +109,15 @@ the cost gate and does not fabricate a finite cost or a ratio.
 
 The opposite-cost variant multiplies the base **time** point and percentile
 limits by five: `2 = 5*.4`, while tokens stay .4. This is a tradeoff, not adoption.
+
+The two no-offset variants retain success 16/20 in both arms, with the base
+Newcombe interval [-.24679166221252044, .24679166221252044]. Its lower limit
+exceeds the registered -.5 margin but does not exceed zero. A ratio of 2 scales
+the base bootstrap values by five; a ratio of 1 scales them by 2.5. Thus the
+regressing cost has a lower bound above 1, while the other cost's interval
+crosses 1. Neither success nor the other cost provides a detected offset.
+The Claude fixtures report model and CLI but never effort. A registered
+`effort_change` event still blocks that otherwise adoptable mixed-agent round.
 
 ## Published interval checks and additional boundaries
 

@@ -15,6 +15,7 @@ from sumbi.compare import compare, mix_distance, text_summary, verdict
 from sumbi.compare_stats import bootstrap, classify_ratio, newcombe, sample_size
 from sumbi.deliver import wilson
 from sumbi.ledger import read_ledger
+from sumbi.model import ProjectRule
 from sumbi.outcomes import FixtureOutcomes
 from sumbi.registration import read_registration
 
@@ -129,7 +130,7 @@ class CompareRoundTests(unittest.TestCase):
 
     def run_round(self, **kwargs):
         return compare(self.root / "home", self.ledger, FixtureOutcomes(self.root / "outcomes"),
-                       self.registration, agents=["codex"], salt=b"synthetic", resamples=1000, **kwargs)
+                       self.registration, agents=kwargs.pop("agents", ["codex"]), salt=b"synthetic", resamples=1000, **kwargs)
 
     def edit_json(self, path, edit):
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -221,6 +222,50 @@ class CompareRoundTests(unittest.TestCase):
         self.assertAlmostEqual(report["ratios"]["time"]["interval_95"][1], 2.770833333333332)
         self.assertEqual(report["ratios"]["time"]["classification"], "worse")
         self.assertEqual(report["ratios"]["total"]["classification"], "improved")
+
+    def set_after_time(self, seconds):
+        end = f"2030-01-08T00:{seconds // 60:02d}:{seconds % 60:02d}Z"
+        def change(raw):
+            for p in raw["pulls"]:
+                if p["response"]["number"] > 100:
+                    p["response"].update(merged_at=end, closed_at=end)
+                    p["checks_at_merge"]["captured_at"] = end
+                    p["checks_at_merge"]["statuses"][0]["updated_at"] = end
+        self.edit_json(self.outcome_path, change)
+        self.edit_ledger(lambda rows: [r.update(state_override="abandoned@" + end)
+            for r in rows if r["id"].startswith("A") and not r["prs"]])
+
+    def test_round_reject_tokens_worse_without_offset(self):
+        self.set_after_time(100)
+        for i in range(1, 21):
+            self.edit_log(f"A{i:02d}", lambda e: e[2]["payload"]["info"]["total_token_usage"].update(
+                input_tokens=160, cached_input_tokens=40, output_tokens=40, reasoning_output_tokens=10))
+        report = self.run_round()
+        self.assert_proposal(report, "reject", "tokens_worse_without_offset")
+        self.assertEqual(report["arms"]["after"]["cost"]["total"]["numerator"], 4000)
+        self.assertEqual(report["ratios"]["total"]["value"], 2)
+        self.assertAlmostEqual(report["ratios"]["total"]["interval_95"][0], 1.444047619047619)
+        self.assertAlmostEqual(report["ratios"]["total"]["interval_95"][1], 2.770833333333332)
+        self.assertEqual(report["ratios"]["time"]["value"], 1)
+        self.assertAlmostEqual(report["ratios"]["time"]["interval_95"][0], .7220238095238095)
+        self.assertAlmostEqual(report["ratios"]["time"]["interval_95"][1], 1.385416666666666)
+        self.assertEqual(report["ratios"]["time"]["classification"], "uncertain")
+        self.assertLessEqual(report["success_difference"]["interval_95"][0], 0)
+
+    def test_round_reject_time_worse_without_offset(self):
+        self.set_after_time(200)
+        for i in range(1, 21):
+            self.edit_log(f"A{i:02d}", lambda e: e[2]["payload"]["info"]["total_token_usage"].update(
+                input_tokens=80, cached_input_tokens=20, output_tokens=20, reasoning_output_tokens=5))
+        report = self.run_round()
+        self.assert_proposal(report, "reject", "time_worse_without_offset")
+        self.assertEqual(report["ratios"]["time"]["value"], 2)
+        self.assertAlmostEqual(report["ratios"]["time"]["interval_95"][0], 1.444047619047619)
+        self.assertAlmostEqual(report["ratios"]["time"]["interval_95"][1], 2.770833333333332)
+        self.assertEqual(report["ratios"]["total"]["value"], 1)
+        self.assertAlmostEqual(report["ratios"]["total"]["interval_95"][0], .7220238095238095)
+        self.assertAlmostEqual(report["ratios"]["total"]["interval_95"][1], 1.385416666666666)
+        self.assertEqual(report["ratios"]["total"]["classification"], "uncertain")
 
     def test_round_withhold_coverage(self):
         self.edit_json(self.outcome_path, lambda r: r.update(commits_complete=False))
@@ -411,8 +456,59 @@ class CompareRoundTests(unittest.TestCase):
         self.assertEqual(report["coverage"]["unattributed_lifetime_share"]["denominator"], 3800)
 
     def test_missing_metadata_blocks_without_inventing_zero(self):
-        self.edit_log("A01", lambda e: e[1]["payload"].pop("effort"))
-        self.assert_proposal(self.run_round(), "withhold", "effort_metadata_not_reported")
+        self.add_claude_round()
+        self.edit_log("A02", lambda e: e[1]["payload"].pop("effort"))
+        report = self.run_round(agents=["claude-code", "codex"])
+        self.assert_proposal(report, "withhold", "effort_metadata_partial")
+        flag = next(f for f in report["flags"] if f["name"] == "effort_metadata_partial")
+        self.assertEqual(flag["evidence"]["agents"], ["codex"])
+
+    def add_claude_round(self):
+        target = self.root / "home/.claude/projects/fixture"
+        target.mkdir(parents=True)
+        for identity in ("B01", "A01"):
+            shutil.copyfile(self.root / "claude" / (identity + ".jsonl"), target / (identity + ".jsonl"))
+            (self.root / "home/.codex/sessions" / ("rollout-" + identity + ".jsonl")).unlink()
+
+    def test_claude_and_codex_unobservable_effort_reaches_verdict(self):
+        self.add_claude_round()
+        report = self.run_round(agents=["claude-code", "codex"])
+        self.assert_proposal(report, "adopt", "non_inferior_with_cost_improvement")
+        flag = next(f for f in report["flags"] if f["name"] == "effort_unobservable")
+        self.assertEqual(flag, {"name": "effort_unobservable", "blocking": False,
+            "evidence": {"agents": ["claude-code"]}})
+        self.assertEqual({s["agent"] for s in report["session_metadata"]}, {"claude-code", "codex"})
+        for arm in ("before", "after"):
+            values = report["mixes"]["effort"][arm]["values"]
+            self.assertEqual(values["high"]["numerator"], 19)
+            self.assertNotIn("<not_reported>", values)
+        self.edit_json(self.registration, lambda r: r.update(confounders=[
+            {"at": "2030-01-09T00:00:00Z", "label": "effort_change"}]))
+        self.assert_proposal(self.run_round(agents=["claude-code", "codex"]), "withhold", "registered_event")
+
+    def test_asymmetric_effort_reporting_blocks(self):
+        for i in range(1, 21):
+            self.edit_log(f"A{i:02d}", lambda e: e[1]["payload"].pop("effort"))
+        report = self.run_round()
+        self.assert_proposal(report, "withhold", "effort_metadata_asymmetric")
+        flag = next(f for f in report["flags"] if f["name"] == "effort_metadata_asymmetric")
+        self.assertEqual(flag["evidence"]["agents"], ["codex"])
+
+    def test_other_project_heavy_spend_is_context_only(self):
+        source = self.root / "home/.codex/sessions/rollout-B01.jsonl"
+        events = [json.loads(line) for line in source.read_text(encoding="utf-8").splitlines()]
+        events[0]["payload"].update(id="synthetic-other", cwd="Z:/synthetic/other", git={})
+        events[1]["payload"].update(cwd="Z:/synthetic/other", git={})
+        events[2]["payload"]["info"]["total_token_usage"].update(
+            input_tokens=800000, cached_input_tokens=200000, output_tokens=200000)
+        source.with_name("rollout-other.jsonl").write_text(
+            "".join(json.dumps(e) + "\n" for e in events), encoding="utf-8")
+        report = self.run_round(rules=[ProjectRule("sample", paths=["Z:/synthetic/sample/*"])])
+        self.assert_proposal(report, "adopt", "non_inferior_with_cost_improvement")
+        share = report["coverage"]["unattributed_lifetime_share"]
+        self.assertEqual((share["numerator"], share["denominator"], share["value"]), (0, 2800, 0))
+        self.assertEqual(report["coverage"]["other_lifetime_tokens"], 1000000)
+        self.assertIn("Other-project lifetime tokens (context): 1000000", text_summary(report))
 
     def test_partial_or_broken_token_coverage_withholds(self):
         self.edit_log("A01", lambda e: e[2]["payload"]["info"]["total_token_usage"].pop("output_tokens"))

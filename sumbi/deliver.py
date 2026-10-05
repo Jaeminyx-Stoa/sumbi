@@ -254,7 +254,7 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
             for session in found:
                 if comparison_metadata:
                     times = [t for t in session.times if t < scan.until]
-                    session_metadata[session.id()] = {"id": session.id(),
+                    session_metadata[session.id()] = {"id": session.id(), "agent": agent,
                         "first_at": min(times).isoformat() if times else None,
                         "last_at": max(times).isoformat() if times else None,
                         "model": sorted(session.models), "effort": sorted(session.efforts),

@@ -686,14 +686,19 @@ evidence, or any weak allocation alongside stronger links, counts as unlinked;
 weak allocation cannot support exposure or lifetime cost. The combined excluded
 and unlinked share **over 10% in either candidate arm** blocks comparability.
 Exactly 10% does not. Excluded work never silently becomes a failure or success
-in the reported retained arm.
+in the reported retained arm. At dispatch, put the deliverable ID in the
+worktree folder or branch name: the existing evidence rules read those fields
+to establish strong links.
 
-Unattributed lifetime spend is `unallocated + unassigned + other + weak-linked`
-tokens divided by **all reported tokens in the lifetime scan**. This deliberately
-includes logs outside matched repositories and windows encountered by that scan;
-select a dedicated log home or project scope when preparing a round. Shares
-**over 5%** block comparability. The numerator and denominator are reported.
-Zero observed tokens give an undefined share, not a claimed zero share.
+Unattributed lifetime spend is `(unallocated + unassigned + weak-linked) /
+(linked + unallocated + unassigned + weak-linked)`. Here `linked` means strong
+linked tokens; the scan's linked bucket already contains weak-linked tokens,
+so those tokens are counted once in the denominator. `unassigned` remains a
+conservative inclusion because it may belong to this project. Spend confidently
+attributed to `other` projects is excluded from both numerator and denominator
+and reported separately as context. Shares **over 5%** block comparability.
+The numerator and denominator are reported. Zero relevant observed tokens give
+an undefined share, not a claimed zero share.
 
 The checks basis must be identical across the retained arms. Every merged attempt,
 including follow-up repairs, contributes its basis: historical snapshots cannot
@@ -704,11 +709,20 @@ unmerged PRs do not claim a checks-at-merge basis.
 Mixes use unique linked sessions per arm, with one observation per distinct
 session metadata value (several values in a session contribute several
 observations). They are not weighted by tokens. Models, efforts and CLI versions
-use collect's bounded labels/pseudonyms. Missing metadata is explicitly
-`<not_reported>` and blocks comparison: its absence cannot establish a stable
-mix. In particular, a format that does not expose effort cannot yet support a
-verdict. Tied dominant values are reported as a set. A change in that dominant
-set, or total variation distance `0.5 * sum(abs(after_share - before_share))`
+use collect's bounded labels/pseudonyms. Session metadata includes the agent.
+Observability is assessed per agent and dimension over the retained sessions:
+
+- If no session of an agent in either arm reports a dimension, an informational
+  `<kind>_unobservable` flag lists that agent. Its sessions are left out of that
+  dimension's mix. Changes in an unobservable dimension can only be caught by
+  registered confounder events, which block comparison.
+- If some sessions of an agent report the dimension and others in the same arm
+  do not, `<kind>_metadata_partial` blocks comparison and lists the agents.
+- If an agent reports the dimension in one arm only,
+  `<kind>_metadata_asymmetric` blocks comparison and lists the agents.
+
+The mix-shift rule applies to the remaining reported session values. Tied
+dominant values are reported as a set. A change in that dominant set, or total variation distance `0.5 * sum(abs(after_share - before_share))`
 **over 0.2**, is blocking for each metadata dimension.
 
 Registered runner/model/effort/CLI events inside either dispatch window block.
@@ -793,6 +807,9 @@ The catalog's `judgment_policy.decision_order` governs four stages:
      worse cost proposes `owner_decides`, even if both costs worsen.
    - One improved cost and the other worse proposes `owner_decides`.
    - Both costs worse otherwise proposes `reject`.
+   - One cost worse and the other uncertain, without significant success
+     improvement, proposes `reject: tokens_worse_without_offset` or
+     `reject: time_worse_without_offset`.
    - Neither cost worse and at least one improved proposes `adopt`.
    - Otherwise propose `withhold: no_detectable_change`.
 

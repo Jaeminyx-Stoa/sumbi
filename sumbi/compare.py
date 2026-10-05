@@ -70,6 +70,10 @@ def verdict(*, coverage_reasons, preregistered, blocking_flags, arms, registered
         return "owner_decides", ["success_cost_tradeoff" if lower > 0 else "time_token_tradeoff"]
     if tokens == time == "worse":
         return "reject", ["tokens_and_time_worse"]
+    if tokens == "worse" and time == "uncertain":
+        return "reject", ["tokens_worse_without_offset"]
+    if time == "worse" and tokens == "uncertain":
+        return "reject", ["time_worse_without_offset"]
     if "worse" not in (tokens, time) and "improved" in (tokens, time):
         return "adopt", ["non_inferior_with_cost_improvement"]
     return "withhold", ["no_detectable_change"]
@@ -134,14 +138,32 @@ def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
             if share["value"] is not None and share["value"] > EXCLUDED_SHARE:
                 flag(arm + "_excluded_or_unlinked", True, share)
         mixes = {}
+        arm_sessions = {arm: [metadata[sid] for sid in sorted({s for r in rows for s in sessions[r["id"]]})]
+                        for arm, rows in arms.items()}
         for kind in ("model", "effort", "cli_version"):
+            unobservable, partial, asymmetric = [], [], []
+            for agent in sorted({s["agent"] for rows in arm_sessions.values() for s in rows}):
+                reported = {arm: [bool(s[kind]) for s in rows if s["agent"] == agent]
+                            for arm, rows in arm_sessions.items()}
+                if not any(any(values) for values in reported.values()):
+                    unobservable.append(agent)
+                    continue
+                if any(any(values) and not all(values) for values in reported.values()):
+                    partial.append(agent)
+                if any(reported["before"]) != any(reported["after"]):
+                    asymmetric.append(agent)
+            for suffix, agents_affected, blocking in (("unobservable", unobservable, False),
+                    ("metadata_partial", partial, True), ("metadata_asymmetric", asymmetric, True)):
+                if agents_affected:
+                    flag(kind + "_" + suffix, blocking, {"agents": agents_affected})
             counts = {}
-            for arm, rows in arms.items():
+            for arm, rows in arm_sessions.items():
                 counter = Counter()
-                for sid in sorted({s for r in rows for s in sessions[r["id"]]}):
-                    # Multiple values are multiple session-value observations;
-                    # absent metadata is an explicit unknown label.
-                    counter.update(metadata[sid][kind] or ["<not_reported>"])
+                for session in rows:
+                    # Unobservable agents do not contribute to this dimension.
+                    # Multiple values remain multiple session-value observations.
+                    if session["agent"] not in unobservable:
+                        counter.update(session[kind])
                 counts[arm] = counter
             summaries = {arm: mix_report(c) for arm, c in counts.items()}
             distance = mix_distance(counts["before"], counts["after"])
@@ -151,8 +173,6 @@ def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
                            "dominant_changed": changed}
             if changed or distance is not None and distance > MIX_DISTANCE:
                 flag(kind + "_mix_shift", True, mixes[kind])
-            if any(c["<not_reported>"] for c in counts.values()):
-                flag(kind + "_metadata_not_reported", True, mixes[kind])
         tasks = {arm: Counter(r["task_type"] or "<not_reported>" for r in rows) for arm, rows in arms.items()}
         task_distance = mix_distance(tasks["before"], tasks["after"])
         mixes["task_type"] = {**{arm: mix_report(c) for arm, c in tasks.items()},
@@ -175,9 +195,10 @@ def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
         if len(all_bases) > 1 or "unknown" in all_bases:
             flag("checks_basis_mixed_or_unknown", True, {arm: dict(sorted(c.items())) for arm, c in bases.items()})
         spend = measured["cost"]["lifetime_scan_spend"]
-        unattributed = fraction(sum(spend[b]["total"] for b in ("unallocated", "unassigned", "other"))
+        # The linked bucket includes weak links, counted once in the denominator.
+        unattributed = fraction(sum(spend[b]["total"] for b in ("unallocated", "unassigned"))
                                 + measured["coverage"]["evidence_tokens"]["project_time_weak"],
-                                sum(s["total"] for s in spend.values()))
+                                sum(spend[b]["total"] for b in ("linked", "unallocated", "unassigned")))
         if unattributed["value"] is not None and unattributed["value"] > UNATTRIBUTED_SHARE:
             flag("unattributed_spend", True, unattributed)
         coverage_reasons = []
@@ -246,7 +267,8 @@ def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
             "success_difference": success, "ratios": ratios, "exclusions": exclusions,
             "mixes": mixes, "flags": flags, "task_type_breakdowns": breakdowns,
             "coverage": {**measured["coverage"], "incomplete_reasons": coverage_reasons,
-                         "unattributed_lifetime_share": unattributed},
+                         "unattributed_lifetime_share": unattributed,
+                         "other_lifetime_tokens": spend["other"]["total"]},
             "links": [{**link, "deliverable_id": pseudonym("deliverable", link["deliverable_id"])
                        if link["deliverable_id"] else None} for link in measured["links"]],
             "session_metadata": measured["session_metadata"],
@@ -303,6 +325,7 @@ def text_summary(report):
             f"Wilson 95% {interval(r['success_rate']['wilson_95'])}" for arm, r in row["arms"].items()))
     share = report["coverage"]["unattributed_lifetime_share"]
     lines.append(f"Unattributed lifetime tokens: {share['numerator']}/{share['denominator']}; share {value(share['value'])}")
+    lines.append(f"Other-project lifetime tokens (context): {report['coverage']['other_lifetime_tokens']}")
     for agent, coverage in report["coverage"]["adapters"].items():
         lines.append(f"Coverage {agent}: sessions {coverage['sessions_read']}; files {coverage['files_scanned']}; "
                      f"broken lines {coverage['broken_lines']}; unreadable files {coverage['unreadable_files']}")
