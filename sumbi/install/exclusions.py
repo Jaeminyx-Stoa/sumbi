@@ -3,13 +3,15 @@
 from fnmatch import fnmatchcase
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
+import os
+import subprocess
 import tomllib
 
 from .errors import InstallError
 
 DEFAULT_EXCLUDES = tuple(f"**/{name}" for name in (
     ".git", ".sumbi", "node_modules", "vendor", ".venv", "venv", "dist",
-    "build", "__pycache__",
+    "build", "__pycache__", ".tmp",
 )) + tuple(f"**/{tests}/**/{data}" for tests in ("test", "tests")
           for data in ("fixtures", "testdata"))
 
@@ -59,3 +61,58 @@ def excluded_by(relative: str, patterns: tuple[str, ...]) -> str | None:
     path = PurePosixPath(relative)
     ancestors = (path, *path.parents)
     return next((p for p in patterns if any(matches(a.as_posix(), p) for a in ancestors)), None)
+
+
+class GitIgnore:
+    """Ask local git for standard ignore rules; never execute project code."""
+
+    def __init__(self, root: Path):
+        self.root = root
+        self.available = True
+        self.versioned = None
+        self.ignored: set[str] = set()
+        result = self._run("rev-parse", "--is-inside-work-tree")
+        if result is None:
+            return
+        if result.returncode == 0 and result.stdout.strip() == b"true":
+            self.versioned = True
+            result = self._run("ls-files", "--others", "--ignored",
+                               "--exclude-standard", "--directory", "-z")
+            if result is not None and result.returncode == 0:
+                self.ignored = {os.fsdecode(p).rstrip("/")
+                                for p in result.stdout.split(b"\0") if p}
+            else:
+                self.available = False
+        elif (result.returncode == 0 and result.stdout.strip() == b"false") or b"not a git repository" in result.stderr:
+            self.versioned = False
+        else:
+            self.available = False
+
+    def _run(self, *arguments: str, data: bytes | None = None):
+        try:
+            return subprocess.run(
+                ["git", "-C", str(self.root), *arguments], input=data,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                env={**os.environ, "LC_ALL": "C"}, timeout=30, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            self.available = False
+            return None
+
+    def excludes(self, relative: str) -> bool:
+        """Match discovered ignored roots without visiting their contents."""
+        if not self.available:
+            return False
+        path = PurePosixPath(relative)
+        return any(p.as_posix() in self.ignored for p in (path, *path.parents))
+
+    def check(self, relative: str) -> bool:
+        """Check prospective writes too, including files that do not exist."""
+        if not self.available or not self.versioned:
+            return False
+        result = self._run("check-ignore", "--stdin", "-z",
+                           data=os.fsencode(relative) + b"\0")
+        if result is None or result.returncode not in (0, 1):
+            self.available = False
+            return False
+        return result.returncode == 0

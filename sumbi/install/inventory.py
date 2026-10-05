@@ -13,7 +13,7 @@ import textwrap
 import tomllib
 
 from .errors import InstallError
-from .exclusions import excluded_by, load_excludes
+from .exclusions import GitIgnore, excluded_by, load_excludes
 
 MAX_BYTES = 1_048_576
 ESTIMATE_RULE = (
@@ -55,19 +55,39 @@ def read_bytes(root: Path, relative: str) -> bytes | None:
         raise InstallError("Cannot read a repository file.") from None
 
 
-def _paths(root: Path, patterns: tuple[str, ...]) -> tuple[list[str], list[dict], dict]:
+def _paths(root: Path, patterns: tuple[str, ...]) -> tuple[list[str], list[dict], dict, dict, set[str]]:
     found, warnings = [], []
     counts = dict.fromkeys(patterns, 0)
+    git = GitIgnore(root)
+    contexts = {root: git}
+    nested, ignored = [], set()
+    ignored_count = 0
+    if git.versioned is False:
+        warnings.append({"kind": "root-not-versioned"})
     def failed(_error: OSError) -> None:
         warnings.append({"kind": "unreadable-directory"})
     for directory, dirs, files in os.walk(root, followlinks=False, onerror=failed):
         base = Path(directory)
+        context_root = next(p for p in (base, *base.parents) if p in contexts)
+        context = contexts[context_root]
+        marker = base / ".git"
+        if base != root and (".git" in dirs or ".git" in files) and not marker.is_symlink() and not getattr(marker, "is_junction", lambda: False)():
+            candidate = GitIgnore(base)
+            contexts[base] = candidate
+            context_root, context = base, candidate
+            if candidate.versioned:
+                nested.append(base.relative_to(root).as_posix())
+        ignored.update((context_root.relative_to(root) / p).as_posix()
+                       for p in context.ignored if context.available)
         kept = []
         for name in sorted(dirs):
             path = base / name
             pattern = excluded_by(path.relative_to(root).as_posix(), patterns)
             if pattern:
                 counts[pattern] += 1
+                continue
+            if context.excludes(path.relative_to(context_root).as_posix()):
+                ignored_count += 1
                 continue
             if path.is_symlink() or getattr(path, "is_junction", lambda: False)():
                 warnings.append({"kind": "skipped-link", "path": path.relative_to(root).as_posix()})
@@ -81,14 +101,54 @@ def _paths(root: Path, patterns: tuple[str, ...]) -> tuple[list[str], list[dict]
             if pattern:
                 counts[pattern] += 1
                 continue
+            if context.excludes(path.relative_to(context_root).as_posix()):
+                ignored_count += 1
+                continue
             if path.is_symlink():
                 warnings.append({"kind": "skipped-link", "path": relative})
             else:
                 found.append(relative)
+    if any(not context.available for context in contexts.values()):
+        warnings.append({"kind": "gitignore-unavailable"})
     return sorted(found), warnings, {
-        "count": sum(counts.values()),
+        "count": sum(counts.values()) + ignored_count,
+        "gitignore_count": ignored_count,
         "patterns": [{"pattern": p, "count": count} for p, count in counts.items()],
-    }
+    }, {"root_versioned": git.versioned, "nested_repositories": _entry(nested)}, ignored
+
+
+def _without_code(text: str) -> str:
+    """Remove fenced blocks and matching backtick spans before import parsing."""
+    lines = []
+    fence = None
+    for line in text.splitlines(keepends=True):
+        if fence is not None:
+            if re.match(r"^ {0,3}" + re.escape(fence[0]) + "{" + str(fence[1]) + r",}[ \t]*(?:\n)?$", line):
+                fence = None
+            lines.append("\n")
+            continue
+        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)", line)
+        if opening:
+            fence = (opening[1][0], len(opening[1]))
+            lines.append("\n")
+        else:
+            lines.append(line)
+    text = "".join(lines)
+    runs = list(re.finditer(r"`+", text))
+    output, start, index = [], 0, 0
+    while index < len(runs):
+        opening = runs[index]
+        closing = next((j for j in range(index + 1, len(runs))
+                        if len(runs[j][0]) == len(opening[0])), None)
+        if closing is None:
+            index += 1
+            continue
+        output.append(text[start:opening.start()])
+        output.append(" ")
+        start = runs[closing].end()
+        index = closing + 1
+    output.append(text[start:])
+    return "".join(output)
 
 
 def _entry(paths: list[str]) -> dict:
@@ -102,7 +162,7 @@ def inventory(repository: Path | str = ".", budget: int = 2000, *,
     if not root.is_dir() or budget < 1:
         raise InstallError("Expected a repository directory and a positive token budget.")
     patterns = load_excludes(root, exclude)
-    paths, warnings, exclusions = _paths(root, patterns)
+    paths, warnings, exclusions, versioning, ignored = _paths(root, patterns)
     texts: dict[str, str] = {}
 
     def content(path: str) -> str:
@@ -147,7 +207,7 @@ def inventory(repository: Path | str = ".", budget: int = 2000, *,
             return
         visited.add(source)
         # Imports must occupy a token boundary; email addresses are not imports.
-        for match in re.finditer(r"(?<![\w@])@(?:\"([^\"\n]+)\"|([^\s`<>]+))", content(source)):
+        for match in re.finditer(r"(?<![\w@])@(?:\"([^\"\n]+)\"|([^\s`<>]+))", _without_code(content(source))):
             target = (match.group(1) or match.group(2)).rstrip(",;)")
             # Only local relative references are inspected; no home expansion.
             if target.startswith(("/", "~")) or "\\" in target or ":" in target:
@@ -168,7 +228,7 @@ def inventory(repository: Path | str = ".", budget: int = 2000, *,
             if escaped or not relative:
                 imports.append({"source": source, "status": "external-not-read"})
                 continue
-            if excluded_by(relative, patterns):
+            if excluded_by(relative, patterns) or any(p.as_posix() in ignored for p in (PurePosixPath(relative), *PurePosixPath(relative).parents)):
                 imports.append({"source": source, "status": "excluded-not-read"})
                 continue
             status = "resolved" if relative in paths else "missing-or-link"
@@ -398,6 +458,7 @@ def inventory(repository: Path | str = ".", budget: int = 2000, *,
                         "root_estimated_tokens": math.ceil(root_characters / 4)}
     return {
         "exclusions": exclusions,
+        "versioning": versioning,
         "instructions": {key: _entry(value) for key, value in instructions.items()},
         "claude_imports": imports, "capabilities": capabilities,
         "configurations": configs,

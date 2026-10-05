@@ -171,7 +171,9 @@ class InventoryTests(OfflineTest):
         (root / ".claude/settings.json").write_text("not JSON", encoding="utf-8")
         (root / ".codex/config.toml").write_text("[bad", encoding="utf-8")
         (root / ".github/workflows/checks.yml").write_text("jobs: {verify: {}}\n", encoding="utf-8")
-        self.assertEqual({w["kind"] for w in inventory(root)["warnings"]}, {"invalid-config", "workflow-jobs-unknown"})
+        git_warning = "root-not-versioned" if shutil.which("git") else "gitignore-unavailable"
+        self.assertEqual({w["kind"] for w in inventory(root)["warnings"]},
+                         {"invalid-config", "workflow-jobs-unknown", git_warning})
 
     def test_alternate_workflow_indentation_and_step_names(self):
         root = self.copy_fixture("configured")
