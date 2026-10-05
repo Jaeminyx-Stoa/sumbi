@@ -189,8 +189,10 @@ evidence, not authenticated against deliberate editing by their owner.
 For each target, revert restores original bytes and mode, or deletes a file
 that was originally absent, only when its current hash equals the applied hash.
 Modified, missing or unsafe targets are refused individually; other eligible
-files can still be restored. Refusals return a nonzero CLI status. Revert never
-restores the old intervention ledger: it appends an `action: revert` record with
+files can still be restored. Refusals return a nonzero CLI status. Original
+POSIX permission modes include set-ID and sticky bits where supported; manifest
+modes exclude file-type bits. The ledger retains its current permission mode.
+Revert never restores the old intervention ledger: it appends an `action: revert` record with
 backup ID, UTC time and per-file statuses, retaining earlier and later records.
 If the ledger append fails, reverted files are rolled back without clobbering
 concurrent edits. The shared exclusive install lock also guards revert.

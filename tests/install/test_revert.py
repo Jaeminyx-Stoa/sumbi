@@ -2,6 +2,8 @@
 
 import json
 import os
+import stat
+import unittest
 from unittest.mock import patch
 
 from sumbi.install import apply_plan, build_plan, revert_install
@@ -36,6 +38,32 @@ class RevertTests(OfflineTest):
         ledger.chmod(0o640)
         revert_install(root, backup_id)
         self.assertEqual(ledger.stat().st_mode & 0o777, 0o640)
+
+    @unittest.skipIf(os.name == "nt", "POSIX special permission bits are not represented on Windows.")
+    def test_original_permission_bits_and_ledger_mode_survive_apply_revert(self):
+        for mode in (0o640, 0o2640, 0o4640, 0o1640, 0o7640):
+            with self.subTest(mode=oct(mode)):
+                root = self.copy_fixture("codex-only")
+                target = root / "AGENTS.md"
+                original = target.read_bytes()
+                target.chmod(mode)
+                ledger = root / ".sumbi/interventions.jsonl"
+                ledger.parent.mkdir(mode=0o700)
+                history = b'{"action":"prior-synthetic-intervention"}\n'
+                ledger.write_bytes(history)
+                ledger.chmod(mode)
+                result = apply_plan(build_plan(root, select=["handoff"]))
+                self.assertEqual(stat.S_IMODE(target.stat().st_mode), mode)
+                self.assertEqual(stat.S_IMODE(ledger.stat().st_mode), mode)
+                self.assertEqual(revert_install(root, result["backup_id"])["refused"], 0)
+                self.assertEqual(target.read_bytes(), original)
+                self.assertEqual(stat.S_IMODE(target.stat().st_mode), mode)
+                self.assertEqual(stat.S_IMODE(ledger.stat().st_mode), mode)
+                self.assertTrue(ledger.read_bytes().startswith(history))
+                audit = ledger.read_bytes()
+                revert_install(root, result["backup_id"])
+                self.assertEqual(ledger.read_bytes(), audit)
+                self.assertEqual(stat.S_IMODE(ledger.stat().st_mode), mode)
 
     def test_happy_revert_restores_absence_bytes_and_append_only_audit(self):
         root, plan, backup_id = self.installed()
@@ -80,7 +108,8 @@ class RevertTests(OfflineTest):
         root, plan, backup_id = self.installed()
         manifest_path = root / ".sumbi/backups" / backup_id / "manifest.json"
         original = json.loads(manifest_path.read_text())
-        for mutation in ("old", "prepared", "hash", "traversal", "metadata", "duplicate", "missing-applied"):
+        for mutation in ("old", "prepared", "hash", "traversal", "metadata", "duplicate", "missing-applied",
+                         "negative-mode", "file-type-mode", "boolean-mode"):
             manifest = json.loads(json.dumps(original))
             if mutation == "old":
                 manifest.pop("version")
@@ -96,6 +125,9 @@ class RevertTests(OfflineTest):
                 manifest["files"].append(manifest["files"][0])
             elif mutation == "missing-applied":
                 manifest["files"][0].pop("applied_hash")
+            elif mutation.endswith("-mode"):
+                manifest["files"][0]["mode"] = {"negative-mode": -1, "file-type-mode": 0o100644,
+                                              "boolean-mode": True}[mutation]
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             with self.subTest(mutation=mutation), self.assertRaises(InstallError):
                 revert_install(root, backup_id)

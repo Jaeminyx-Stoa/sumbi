@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 
 from .apply import _checked, _write
 from .errors import InstallError
@@ -48,7 +49,9 @@ def _manifest(root: Path, backup_id: str) -> list[dict]:
             parts = checked_relative(path).parts
             if any(p.casefold() in {".git", ".sumbi"} for p in parts) and path != LEDGER:
                 raise ValueError
-            if type(entry["absent"]) is not bool or type(entry["mode"]) is not int or not 0 <= entry["mode"] <= 0o777:
+            # Apply records S_IMODE, including supported POSIX special bits.
+            # File-type bits and non-integer values remain invalid.
+            if type(entry["absent"]) is not bool or type(entry["mode"]) is not int or not 0 <= entry["mode"] <= 0o7777:
                 raise ValueError
             before = entry["before_hash"]
             if entry["absent"]:
@@ -91,7 +94,7 @@ def revert_install(repository: Path | str, backup_id: str) -> dict:
         targets = _manifest(root, backup_id)
         ledger = read_bytes(root, LEDGER)
         ledger_path = _checked(root, LEDGER, ledger)
-        ledger_mode = ledger_path.stat().st_mode & 0o777 if ledger is not None else 0o600
+        ledger_mode = stat.S_IMODE(ledger_path.stat().st_mode) if ledger is not None else 0o600
         try:
             if not ledger or not ledger.endswith(b"\n"):
                 raise ValueError
