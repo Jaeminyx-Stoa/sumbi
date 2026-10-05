@@ -4,11 +4,11 @@ from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import subprocess
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from sumbi.install.placement import annotate_placement, load_rules, observed_starts, read_starts
 from sumbi.install.planner import build_plan
-from sumbi.model import Session, Window
+from sumbi.model import Coverage, Session, Window
 from .test_inventory import OfflineTest
 
 NOW = datetime(2030, 1, 15, tzinfo=timezone.utc)
@@ -125,6 +125,39 @@ class PlacementTests(OfflineTest):
         report = observed_starts(root, plan.report, [old], window)
         self.assertEqual(report["sessions"], 0)
         self.assertEqual(report["coverage"]["outside_window"], 1)
+
+    def test_default_start_collection_skips_opt_in_registry_adapters(self):
+        home = Path.home()
+        native_sessions = [Session("claude-code", "a"), Session("codex", "b")]
+
+        def collect_claude(home, window, measured):
+            measured.files_scanned = 1
+            measured.lines_read = 2
+            return native_sessions[:1]
+
+        def collect_codex(home, window, measured):
+            measured.files_scanned = 3
+            measured.broken_lines = 1
+            return native_sessions[1:]
+
+        claude = Mock(collect=Mock(side_effect=collect_claude))
+        codex = Mock(collect=Mock(side_effect=collect_codex))
+        generic = Mock(collect=Mock(side_effect=AssertionError("Opt-in adapter invoked")))
+        registry = {"sumbi-events": generic, "codex": codex, "claude-code": claude}
+        with patch("sumbi.report.ADAPTERS", registry):
+            sessions, window, coverage = read_starts(home, now=NOW)
+
+        self.assertEqual(sessions, native_sessions)
+        self.assertEqual(window, Window(NOW - timedelta(days=14), NOW))
+        self.assertEqual(coverage, {
+            "claude-code": Coverage(files_scanned=1, lines_read=2).as_dict(),
+            "codex": Coverage(files_scanned=3, broken_lines=1).as_dict(),
+        })
+        for adapter in (claude, codex):
+            adapter.collect.assert_called_once()
+            self.assertEqual(adapter.collect.call_args.args[:2], (home, window))
+            self.assertIsInstance(adapter.collect.call_args.args[2], Coverage)
+        generic.collect.assert_not_called()
 
     def test_inherited_parent_time_does_not_replace_child_cwd_launch(self):
         root = self.workspace()

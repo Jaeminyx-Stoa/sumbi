@@ -46,13 +46,14 @@ def load_rules() -> dict:
 
 
 def read_starts(home: Path, *, now: datetime | None = None) -> tuple[list, Window, dict]:
-    """Use every registered collect adapter without exporting log text."""
+    """Read default native adapter starts without exporting log text."""
     from sumbi.report import ADAPTERS
 
     until = now or datetime.now(timezone.utc)
     window = Window(until - timedelta(days=14), until)
     sessions, coverage = [], {}
-    for agent, adapter in ADAPTERS.items():
+    for agent in ("claude-code", "codex"):
+        adapter = ADAPTERS[agent]
         measured = Coverage()
         try:
             sessions.extend(adapter.collect(home, window, measured))
