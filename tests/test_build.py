@@ -45,6 +45,7 @@ class BuildTests(unittest.TestCase):
             root = Path(directory)
             name = sumbi_build.build_sdist(root)
             with tarfile.open(root / name) as archive:
+                self.assertIn(sumbi_build.STEM + "/docs/deliverables.template.csv", archive.getnames())
                 self.assertTrue(all(p.name.startswith(sumbi_build.STEM + "/") for p in archive.getmembers()))
                 # The archive was authored above from allow-listed relative source files.
                 # Python 3.11's initial tarfile API predates extraction filters.

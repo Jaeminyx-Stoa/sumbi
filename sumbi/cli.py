@@ -75,7 +75,16 @@ def parser() -> argparse.ArgumentParser:
     root.add_argument("--version", action="version", version="sumbi " + __version__)
     commands = root.add_subparsers(dest="command", required=True)
     configure_install(commands.add_parser("install", help="Inventory and seed repository practices offline"))
-    command = commands.add_parser("collect", help="Measure local session logs without transcripts")
+    configure_collection(commands.add_parser("collect", help="Measure local session logs without transcripts"))
+    command = commands.add_parser("deliver", help="Join a dispatch ledger with offline outcomes and sessions")
+    configure_collection(command, deliver=True)
+    command.add_argument("--ledger", type=Path, required=True)
+    command.add_argument("--outcomes", type=Path, required=True)
+    command.add_argument("--follow-up-days", type=idle, default=7.0)
+    return root
+
+
+def configure_collection(command, *, deliver=False):
     command.add_argument("--since", type=utc, required=True)
     command.add_argument("--until", type=utc, required=True)
     command.add_argument("--home", type=Path, default=Path.home())
@@ -83,10 +92,12 @@ def parser() -> argparse.ArgumentParser:
     for option in ("--project", "--match-origin", "--match-path"):
         command.add_argument(option, action=RuleAction)
     command.add_argument("--idle-minutes", type=idle, default=5.0)
-    command.add_argument("--json", default="out/collect.json", metavar="OUT")
-    command.add_argument("--local-review", type=Path, metavar="OUT")
+    command.add_argument("--json", default="out/deliver.json" if deliver else "out/collect.json", metavar="OUT")
+    if not deliver:
+        command.add_argument("--local-review", type=Path, metavar="OUT")
+    else:
+        command.set_defaults(local_review=None)
     command.add_argument("--salt-file", type=Path, help="Local pseudonym key file (overrides SUMBI_SALT)")
-    return root
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -113,6 +124,30 @@ def main(argv: list[str] | None = None) -> int:
     sources = [args.home / ".claude" / "projects", args.home / ".codex" / "sessions"]
     if any(p.is_relative_to(source.resolve()) for p in resolved for source in sources):
         root.error("Output destinations must be outside session-log directories")
+    if args.command == "deliver":
+        if any(p == args.ledger.resolve() or p.is_relative_to(args.outcomes.resolve()) for p in resolved):
+            root.error("Deliver output must not overwrite ledger or outcome fixtures")
+        from sumbi.deliver import deliver, text_summary as deliver_summary
+        from sumbi.outcomes import FixtureOutcomes
+        try:
+            salt = read_salt(args.salt_file)
+            report = deliver(args.home, window, args.ledger, FixtureOutcomes(args.outcomes),
+                             agents=agents, rules=rules, idle_minutes=args.idle_minutes,
+                             salt=salt, follow_up_days=args.follow_up_days)
+            data = json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
+            if args.json == "-":
+                print(data, end="")
+            else:
+                atomic_write(Path(args.json), data)
+        except ValueError as exc:
+            # These modules emit fixed field diagnostics, never input values.
+            print(str(exc), file=sys.stderr)
+            return 1
+        except OSError:
+            print("Deliver collection or output failed; no source was modified.", file=sys.stderr)
+            return 1
+        print(deliver_summary(report), file=sys.stderr if args.json == "-" else sys.stdout)
+        return 0
     try:
         salt = read_salt(args.salt_file)
         report, review = collect(args.home, window, agents=agents, rules=rules,

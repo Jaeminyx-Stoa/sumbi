@@ -4,6 +4,7 @@ from pathlib import Path
 import re
 
 from sumbi.evidence import tool_evidence
+from sumbi.deliver_evidence import branch, branch_query, tool_refs
 from sumbi.model import (Coverage, Session, Window, epoch, integer, label, mapping,
                          records, timestamp)
 
@@ -40,11 +41,13 @@ def exit_code(payload: dict) -> int | None:
     return None
 
 
-def collect(home: Path, window: Window, coverage: Coverage, *, local_review: bool = False) -> list[Session]:
+def collect(home: Path, window: Window, coverage: Coverage, *, local_review: bool = False,
+            collect_links: bool = False) -> list[Session]:
     root = home / ".codex" / "sessions"
     sessions: dict[str, Session] = {}
     snapshots: dict[str, list] = {}
     contexts: dict[str, list] = {}
+    tool_names = {}
     for path in sorted(root.rglob("rollout-*.jsonl")):
         session = None
         meta_seen = False
@@ -78,6 +81,9 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
             if kind in ("session_meta", "turn_context") and not inherited_meta:
                 session.cwd(payload.get("cwd"), when)
                 session.context(when, order, payload.get("cwd"))
+                if collect_links and when:
+                    session.deliverable_events.append((when, order, "context",
+                        (branch(payload.get("branch") or mapping(payload.get("git")).get("branch")), payload.get("cwd"))))
             if kind == "turn_context":
                 contexts.setdefault(session.raw_id, []).append((when, payload.get("model"), payload.get("effort")))
             if kind == "compacted":
@@ -106,9 +112,16 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                     if subtype == "exec_command_begin":
                         cwd, paths = tool_evidence("exec_command", payload)
                         session.tool_paths(when, order, cwd, paths)
+                        if collect_links and when:
+                            tool_names[session.raw_id, identity] = ("exec_command", branch_query("exec_command", payload))
+                            session.deliverable_events.append((when, order, "refs", tool_refs("exec_command", payload)))
                     session.count("tool_calls", identity, when, window)
                     session.interval("tool", identity, when, None)
                 elif subtype in ("exec_command_end", "mcp_tool_call_end"):
+                    if collect_links and when:
+                        name, query = tool_names.get((session.raw_id, identity), (None, False))
+                        session.deliverable_events.append((when, order, "refs", tool_refs(
+                            name, payload.get("output"), output=True, query=query)))
                     session.count("tool_results", identity, when, window)
                     if exit_code(payload) not in (None, 0):
                         session.count("tool_errors", identity, when, window)
@@ -133,6 +146,9 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                     if item_type in ("CommandExecution", "FileChange"):
                         cwd, paths = tool_evidence(item_type, item)
                         session.tool_paths(start or when, order, cwd, paths)
+                        if collect_links and (start or when):
+                            session.deliverable_events.append((start or when, order, "refs",
+                                tool_refs(item_type, item)))
                     if item_type == "AgentMessage":
                         session.local_text(item.get("content"), when, window, local_review)
                 elif subtype == "error":
@@ -148,11 +164,20 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                     cwd, paths = tool_evidence(payload.get("name", subtype),
                                                payload.get("arguments", payload.get("input", payload.get("action"))))
                     session.tool_paths(when, order, cwd, paths)
+                    if collect_links and when:
+                        tool_names[session.raw_id, identity] = (payload.get("name", subtype), branch_query(
+                            payload.get("name", subtype), payload.get("arguments", payload.get("input", payload.get("action")))))
+                        session.deliverable_events.append((when, order, "refs", tool_refs(
+                            payload.get("name", subtype), payload.get("arguments", payload.get("input", payload.get("action"))))))
                     session.count("tool_calls", identity, when, window)
                     session.interval("tool", identity, when, None)
                     if str(payload.get("name", "")).split(".")[-1] in ("request_user_input", "request_user_input_async"):
                         session.count("user_input_requests", identity, when, window)
                 elif subtype in ("function_call_output", "custom_tool_call_output"):
+                    if collect_links and when:
+                        name, query = tool_names.get((session.raw_id, identity), (None, False))
+                        session.deliverable_events.append((when, order, "refs", tool_refs(
+                            name, payload.get("output"), output=True, query=query)))
                     session.count("tool_results", identity, when, window)
                     if exit_code(payload) not in (None, 0):
                         session.count("tool_errors", identity, when, window)

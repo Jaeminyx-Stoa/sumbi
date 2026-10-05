@@ -311,6 +311,8 @@ class Session:
     counted: set[tuple[str, str]] = field(default_factory=set)
     review: set[str] = field(default_factory=set)
     attribution_events: list[tuple] = field(default_factory=list)
+    # Bounded branch/PR evidence, enabled only by the deliver command.
+    deliverable_events: list[tuple] = field(default_factory=list)
 
     def id(self):
         return pseudonym("session", self.agent + ":" + self.raw_id)
@@ -349,16 +351,15 @@ class Session:
         if when is not None:
             self.attribution_events.append((when, order, "usage", (values, cwd, paths)))
 
-    def allocations(self, window, attributor, idle_minutes):
+    def event_allocations(self, window, attributor, idle_minutes):
         from sumbi.evidence import resolve_path
 
-        rows = {}
         context_cwd = None
         command_cwd = None
         turn_paths = set()
         previous = None
         previous_when = None
-        for when, _, kind, data in sorted(self.attribution_events, key=lambda e: (e[0], e[1])):
+        for when, order, kind, data in sorted(self.attribution_events, key=lambda e: (e[0], e[1])):
             if when >= window.until:
                 break
             if kind == "context":
@@ -399,6 +400,11 @@ class Session:
             previous, previous_when = link, when
             if not window.contains(when):
                 continue
+            yield when, order, values, link, evidence, cwd
+
+    def allocations(self, window, attributor, idle_minutes):
+        rows = {}
+        for when, order, values, link, evidence, cwd in self.event_allocations(window, attributor, idle_minutes):
             identity = link["bucket"], link["project_key"], link["rule"]
             row = rows.setdefault(identity, {**link, "events": 0, "tokens": dict.fromkeys(TOKEN_KINDS),
                                             "evidence_counts": dict.fromkeys(EVIDENCE_TYPES, 0),

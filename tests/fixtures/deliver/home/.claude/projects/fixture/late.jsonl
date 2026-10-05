@@ -1,0 +1,1 @@
+{"type": "assistant", "sessionId": "late", "timestamp": "2030-01-11T00:01:00Z", "message": {"id": "late", "content": [], "usage": {"input_tokens": 10, "cache_creation_input_tokens": 2, "cache_read_input_tokens": 3, "output_tokens": 5}}, "cwd": "/synthetic/sample/Dfollow"}

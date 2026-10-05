@@ -1,0 +1,7 @@
+id,dispatched_at,acceptance,repos,prs,branches,state_override,accepted_by_human,notes
+D1,2030-01-01T00:00:00Z,Synthetic acceptance,example/sample,example/sample#1,work/D1,,,
+Dfail,2030-01-01T00:00:00Z,Synthetic acceptance,example/sample,,work/Dfail,abandoned@2030-01-02T00:00:00Z,,
+Drev,2030-01-01T00:00:00Z,Synthetic acceptance,example/sample,example/sample#2,work/Drev,,,
+Dimm,2030-01-01T00:00:00Z,Synthetic acceptance,example/sample,example/sample#3,work/Dimm,,,
+Dsplit,2030-01-01T00:00:00Z,Synthetic acceptance,example/sample,example/sample#4;example/sample#5,work/Dsplit,,y,
+Dfollow,2030-01-01T00:00:00Z,Synthetic acceptance,example/sample,example/sample#6,work/Dfollow,,,
