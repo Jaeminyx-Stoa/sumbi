@@ -60,7 +60,7 @@ def _paths(root: Path, patterns: tuple[str, ...]) -> tuple[list[str], list[dict]
     counts = dict.fromkeys(patterns, 0)
     git = GitIgnore(root)
     contexts = {root: git}
-    nested, ignored = [], set()
+    nested, ignored = [], set(git.ignored) if git.available else set()
     ignored_count = 0
     if git.versioned is False:
         warnings.append({"kind": "root-not-versioned"})
@@ -75,10 +75,11 @@ def _paths(root: Path, patterns: tuple[str, ...]) -> tuple[list[str], list[dict]
             candidate = GitIgnore(base)
             contexts[base] = candidate
             context_root, context = base, candidate
+            if candidate.available:
+                ignored.update((base.relative_to(root) / p).as_posix()
+                               for p in candidate.ignored)
             if candidate.versioned:
                 nested.append(base.relative_to(root).as_posix())
-        ignored.update((context_root.relative_to(root) / p).as_posix()
-                       for p in context.ignored if context.available)
         kept = []
         for name in sorted(dirs):
             path = base / name

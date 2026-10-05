@@ -67,6 +67,7 @@ The ordinary `tmp` directory remains eligible source.
 
 Within git work trees, inventory also prunes ignored paths using git's standard
 rules: `.gitignore`, `.git/info/exclude` and the configured global excludes file.
+Inventory disables repository-configured git programs.
 Tracked files remain eligible even when an ignore pattern matches them. Nested
 repositories use their own ignore rules. Ignored roots are counted separately
 as `gitignore_count` and included in the total exclusion count, without counting

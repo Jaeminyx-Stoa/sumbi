@@ -91,7 +91,8 @@ class GitIgnore:
     def _run(self, *arguments: str, data: bytes | None = None):
         try:
             return subprocess.run(
-                ["git", "-C", str(self.root), *arguments], input=data,
+                ["git", "-C", str(self.root), "-c", "core.fsmonitor=false",
+                 "-c", "core.untrackedCache=false", *arguments], input=data,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                 env={**os.environ, "LC_ALL": "C"}, timeout=30, check=False,
             )

@@ -64,6 +64,30 @@ class InventoryBoundaryTests(OfflineTest):
         self.assertEqual(inventory(self.root)["instructions"]["agents"]["paths"], ["tmp/AGENTS.md"])
 
     @unittest.skipUnless(shutil.which("git"), "Local git is unavailable.")
+    def test_inventory_and_plan_disable_repository_fsmonitor(self):
+        self.git(self.root, "init", "--quiet")
+        self.write("tracked.txt", "Synthetic source.\n")
+        self.git(self.root, "add", "tracked.txt")
+        # Git for Windows also runs shebang hooks through its bundled shell.
+        hook = self.root / ".git/fsmonitor-hook"
+        hook.write_bytes(b"#!/bin/sh\nprintf marker > fsmonitor-marker\n")
+        hook.chmod(0o755)
+        self.git(self.root, "config", "core.fsmonitor", hook.as_posix())
+        marker = self.root / "fsmonitor-marker"
+        self.git(self.root, "ls-files", "--others", "--exclude-standard")
+        if not marker.exists():
+            self.skipTest("Local git cannot run the synthetic fsmonitor hook.")
+        marker.unlink()
+
+        report = inventory(self.root)
+        self.assertTrue(report["versioning"]["root_versioned"])
+        self.assertNotIn({"kind": "gitignore-unavailable"}, report["warnings"])
+        self.assertFalse(marker.exists())
+        plan = build_plan(self.root, select=["instruction-map"])
+        self.assertTrue(plan.changes)
+        self.assertFalse(marker.exists())
+
+    @unittest.skipUnless(shutil.which("git"), "Local git is unavailable.")
     def test_git_ignored_files_are_pruned_before_reading(self):
         self.git(self.root, "init", "--quiet")
         self.write(".gitignore", "scratch/\n")
