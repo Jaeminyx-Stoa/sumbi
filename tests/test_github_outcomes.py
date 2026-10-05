@@ -16,8 +16,8 @@ import urllib.error
 import urllib.parse
 
 from sumbi.cli import main
-from sumbi.deliver import judge
-from sumbi.github_outcomes import GitHubOutcomes, NoRedirect, github_token
+from sumbi.deliver import deliverable_basis, judge
+from sumbi.github_outcomes import GitHubOutcomes, NoRedirect, PLAN_UNAVAILABLE, github_token
 from sumbi.ledger import COLUMNS, Deliverable, read_ledger
 from sumbi.outcomes import FixtureOutcomes
 from test_deliver import START, WINDOW, REPO, time, pull
@@ -185,11 +185,12 @@ class GitHubTests(unittest.TestCase):
         self.adapter()
         self.assertGreater(self.open.call_count, 0)
 
-    def test_current_rules_cannot_prove_required_checks_at_merge(self):
+    def test_no_required_policy_uses_all_visible(self):
         pr = self.adapter().pull(REPO + "#1")
-        self.assertEqual(pr.checks, "unknown")
+        self.assertEqual(pr.checks, "green")
+        self.assertEqual(pr.checks_basis, "all_visible")
         self.assertEqual(pr.observed_checks, "green")
-        self.assertFalse(any("protection" in r.full_url or "rules" in r.full_url for r in self.calls))
+        self.assertTrue(any("rules/branches" in r.full_url for r in self.calls))
 
     def test_check_runs_and_statuses_green_red_and_missing(self):
         for conclusion, state, expected in (("success", "success", "green"), ("failure", "success", "red"), ("success", "failure", "red")):
@@ -294,7 +295,12 @@ class GitHubTests(unittest.TestCase):
                            "--home", str(self.root / "home"), "--since", time(1), "--until", time(10), "--json", "-"])
         self.assertEqual(result, 0, stderr.getvalue())
         report = json.loads(stdout.getvalue())
-        self.assertEqual(report["deliverables"][0]["pr_outcomes"][0]["required_checks_at_merge"], "unknown")
+        row = report["deliverables"][0]
+        self.assertEqual(row["pr_outcomes"][0]["checks_at_merge"], "green")
+        self.assertEqual(row["pr_outcomes"][0]["checks_basis"], "all_visible")
+        self.assertEqual(row["checks_basis"], "all_visible")
+        self.assertEqual(report["checks_basis_counts"], {"historical": 0, "current_policy": 0, "all_visible": 1, "unknown": 0})
+        self.assertIn("all_visible 1", stderr.getvalue())
         for value in ("synthetic-token-canary", "Synthetic", "Fix #1", "private-acceptance", "private-notes", REPO, str(self.root)):
             self.assertNotIn(value, stdout.getvalue() + stderr.getvalue())
 
@@ -370,6 +376,251 @@ class GitHubTests(unittest.TestCase):
         self.routes[path]["total_count"] = 101
         with self.assertRaisesRegex(ValueError, "capture is incomplete"):
             self.adapter().pull(REPO + "#1")
+
+    def policy_case(self, contexts=(), checks=(), rules=(), enabled=True, enforcement="non_admins"):
+        self.routes["/repos/example/sample/branches/main"] = {"protected": enabled, "protection": {
+            "enabled": enabled, "required_status_checks": {"enforcement_level": enforcement,
+            "contexts": list(contexts), "checks": list(checks)}}}
+        self.routes["/repos/example/sample/rules/branches/main"] = list(rules)
+        self.routes["/repos/example/sample/commits"] = []
+        self.routes["/repos/example/sample/pulls"] = self.routes["/repos/example/sample/pulls"][:1]
+
+    def policy_pull(self):
+        cache = self.root / ("case-" + str(len(list(self.root.iterdir()))))
+        adapter = GitHubOutcomes(self.ledger(), cache=cache)
+        return adapter, adapter.pull(REPO + "#1")
+
+    def run_at_merge(self, **changes):
+        route = "/repos/example/sample/commits/" + f"{101:040x}" + "/check-runs"
+        run = self.routes[route]["check_runs"][0]
+        run.update(changes)
+        return run
+
+    def rule(self, context, integration_id=None):
+        return {"type": "required_status_checks", "parameters": {"required_status_checks": [
+            {"context": context, "integration_id": integration_id}]}}
+
+    def test_classic_optional_red_is_ignored(self):
+        self.policy_case(contexts=["test"])
+        route = "/repos/example/sample/commits/" + f"{101:040x}" + "/check-runs"
+        self.routes[route]["check_runs"].append({**self.run_at_merge(), "name": "optional", "conclusion": "failure"})
+        self.routes[route]["total_count"] = 2
+        adapter, pr = self.policy_pull()
+        self.assertEqual((pr.checks, pr.checks_basis, pr.observed_checks), ("green", "current_policy", "red"))
+        self.assertEqual(judge(self.ledger()[0], adapter)["state"], "success")
+
+    def test_classic_required_red_pending_missing(self):
+        for changes, expected, reason in (({"conclusion": "failure"}, "red", "checks_red"),
+                ({"completed_at": time(3)}, "red", "checks_red"),
+                ({"status": "in_progress", "completed_at": None, "conclusion": None}, "red", "checks_red"),
+                ({"name": "optional"}, "unknown", "checks_missing_required")):
+            with self.subTest(changes=changes):
+                self.policy_case(contexts=["test"])
+                self.run_at_merge(name="test", status="completed", completed_at=time(2), conclusion="success")
+                self.run_at_merge(**changes)
+                adapter, pr = self.policy_pull()
+                self.assertEqual((pr.checks, pr.checks_basis, pr.checks_reason), (expected, "current_policy", reason))
+                self.assertEqual(judge(self.ledger()[0], adapter)["reason"], reason)
+
+    def test_ruleset_requirements_and_classic_union(self):
+        self.policy_case(rules=[self.rule("test")])
+        self.assertEqual(self.policy_pull()[1].checks, "green")
+        self.policy_case(contexts=["classic"], rules=[self.rule("test")])
+        self.assertEqual(self.policy_pull()[1].checks_reason, "checks_missing_required")
+        self.run_at_merge(conclusion="failure")
+        self.assertEqual(self.policy_pull()[1].checks, "red")
+
+    def test_classic_check_objects_without_contexts(self):
+        self.policy_case(checks=[{"context": "test", "app_id": None}])
+        self.assertEqual(self.policy_pull()[1].checks_basis, "current_policy")
+        self.assertEqual(self.policy_pull()[1].checks, "green")
+
+    def test_app_pinned_requirements(self):
+        for source in ("classic", "ruleset"):
+            with self.subTest(source=source):
+                kwargs = {"contexts": ["test"], "checks": [{"context": "test", "app_id": 7}]} if source == "classic" else {"rules": [self.rule("test", 7)]}
+                self.policy_case(**kwargs)
+                self.run_at_merge(app={"id": 8})
+                self.assertEqual(self.policy_pull()[1].checks_reason, "checks_missing_required")
+                self.routes["/repos/example/sample/commits/" + f"{101:040x}" + "/statuses"] = [
+                    {"context": "test", "updated_at": time(2), "state": "success"}]
+                self.assertEqual(self.policy_pull()[1].checks, "unknown")
+                self.run_at_merge(app={"id": 7})
+                self.assertEqual(self.policy_pull()[1].checks, "green")
+                self.run_at_merge(conclusion="failure")
+                self.assertEqual(self.policy_pull()[1].checks, "red")
+                self.run_at_merge(conclusion="success")
+
+    def test_pinned_green_ignores_other_app_and_status_red(self):
+        self.policy_case(contexts=["test"], checks=[{"context": "test", "app_id": 7}])
+        route = "/repos/example/sample/commits/" + f"{101:040x}"
+        self.run_at_merge(app={"id": 7})
+        self.routes[route + "/check-runs"]["check_runs"].append({**self.run_at_merge(), "app": {"id": 8}, "conclusion": "failure"})
+        self.routes[route + "/check-runs"]["total_count"] = 2
+        self.routes[route + "/statuses"] = [{"context": "test", "state": "failure", "updated_at": time(2)}]
+        pr = self.policy_pull()[1]
+        self.assertEqual((pr.checks, pr.observed_checks), ("green", "red"))
+
+    def test_unpinned_same_name_sources_must_all_pass(self):
+        self.policy_case(contexts=["test"])
+        self.run_at_merge(app={"id": 7})
+        self.routes["/repos/example/sample/commits/" + f"{101:040x}" + "/statuses"] = [
+            {"context": "test", "state": "pending", "updated_at": time(2)}]
+        self.assertEqual(self.policy_pull()[1].checks, "red")
+
+    def test_any_app_sentinel_and_exact_name_matching(self):
+        self.policy_case(checks=[{"context": "test", "app_id": -1}])
+        self.assertEqual(self.policy_pull()[1].checks, "green")
+        for name in ("Test", "test ", "workflow / test"):
+            self.run_at_merge(name=name)
+            self.assertEqual(self.policy_pull()[1].checks, "unknown")
+
+    def test_enforcement_off_all_visible_green_red_none(self):
+        self.policy_case(contexts=["missing"], enforcement="off")
+        self.assertEqual((self.policy_pull()[1].checks, self.policy_pull()[1].checks_basis), ("green", "all_visible"))
+        self.run_at_merge(conclusion="failure")
+        self.assertEqual(self.policy_pull()[1].checks, "red")
+        for path in self.routes:
+            if path.endswith("/check-runs"):
+                self.routes[path] = {"total_count": 0, "check_runs": []}
+            if path.endswith("/statuses"):
+                self.routes[path] = []
+        adapter, pr = self.policy_pull()
+        self.assertEqual((pr.checks, pr.checks_basis, pr.checks_reason), ("unknown", "all_visible", "no_checks"))
+        self.assertEqual(judge(self.ledger()[0], adapter)["reason"], "checks_none")
+
+    def test_disabled_classic_and_active_rules(self):
+        self.policy_case(contexts=["missing"], enabled=False, rules=[self.rule("test")])
+        self.assertEqual((self.policy_pull()[1].checks, self.policy_pull()[1].checks_basis), ("green", "current_policy"))
+
+    def test_documented_branch_shape_without_enabled(self):
+        self.policy_case(contexts=["test"])
+        del self.routes["/repos/example/sample/branches/main"]["protection"]["enabled"]
+        self.assertEqual(self.policy_pull()[1].checks_basis, "current_policy")
+
+    def test_policy_http_errors_are_narrow_and_cached(self):
+        cases = (("rules", 403, PLAN_UNAVAILABLE, "all_visible"),
+                 ("rules", 403, PLAN_UNAVAILABLE + " extra", "unknown"),
+                 ("rules", 403, "Resource not accessible by integration", "unknown"),
+                 ("rules", 404, PLAN_UNAVAILABLE, "unknown"),
+                 ("branches", 403, PLAN_UNAVAILABLE, "unknown"),
+                 ("branches", 404, "Not Found", "unknown"))
+        for endpoint, code, message, basis in cases:
+            with self.subTest(endpoint=endpoint, code=code, message=message):
+                self.policy_case(enabled=False, enforcement="off")
+                match = "/rules/branches/" if endpoint == "rules" else "/branches/"
+
+                def response(request, **kwargs):
+                    path = urllib.parse.urlsplit(request.full_url).path
+                    if match in path and (endpoint == "rules" or "/rules/" not in path):
+                        raise urllib.error.HTTPError(request.full_url, code, "private", {},
+                                                     io.BytesIO(json.dumps({"message": message}).encode()))
+                    return self.respond(request, **kwargs)
+
+                self.open.side_effect = response
+                adapter, pr = self.policy_pull()
+                self.assertEqual(pr.checks_basis, basis)
+                self.assertEqual(pr.checks, "green" if basis == "all_visible" else "unknown")
+                if basis == "unknown":
+                    self.assertEqual(judge(self.ledger()[0], adapter)["reason"], "checks_policy_unreadable")
+                self.open.side_effect = AssertionError("Policy error cache must be offline")
+                replay = GitHubOutcomes(self.ledger(), cache=adapter.cache)
+                self.assertEqual(replay.pull(REPO + "#1"), pr)
+                self.assertEqual(replay.requests, 0)
+
+    def test_policy_endpoint_cache_and_record_allowlist(self):
+        self.policy_case(contexts=["test"], rules=[self.rule("test")])
+        self.routes["/repos/example/sample/branches/main"]["name"] = "private-branch"
+        self.routes["/repos/example/sample/rules/branches/main"][0]["ruleset_source"] = "private-source"
+        self.run_at_merge(app={"id": 7, "name": "private-app"})
+        first = self.adapter(record=self.root / "record")
+        pr = first.pull(REPO + "#1")
+        text = "".join(p.read_text(encoding="utf-8") for p in self.root.rglob("*.json"))
+        for private in ("private-branch", "private-source", "private-app"):
+            self.assertNotIn(private, text)
+        self.assertTrue(any("/branches/main" in r.full_url for r in self.calls))
+        self.assertTrue(any("/rules/branches/main" in r.full_url for r in self.calls))
+        self.open.side_effect = AssertionError("Replay must be offline")
+        self.assertEqual(FixtureOutcomes(self.root / "record").pull(REPO + "#1"), pr)
+        second = self.adapter()
+        self.assertEqual(second.pull(REPO + "#1"), pr)
+        self.assertEqual(second.requests, 0)
+
+    def test_historical_snapshot_wins_over_current_policy(self):
+        self.policy_case(contexts=["missing"])
+        adapter = self.adapter()
+        entry = adapter._entries[REPO + "#1"]
+        entry["checks_at_merge"] = pull(1)["checks_at_merge"]
+        # A recorded historical snapshot must also override contradictory policy evidence.
+        entry["checks_policy_at_merge"] = {"required": [{"context": "missing", "app_id": None}], "results": None}
+        from dataclasses import replace
+        adapter.pulls[REPO + "#1"] = replace(adapter.pulls[REPO + "#1"], checks="green", checks_basis="historical", checks_reason="")
+        pr = adapter.pull(REPO + "#1")
+        self.assertEqual((pr.checks, pr.checks_basis), ("green", "historical"))
+        self.assertFalse(any("/branches/" in r.full_url for r in self.calls))
+        adapter._recordings[REPO]["pulls"] = [entry]
+        recorded = self.root / "historical"
+        recorded.mkdir()
+        (recorded / "fixture.json").write_text(json.dumps(adapter._recordings[REPO]), encoding="utf-8")
+        self.assertEqual(FixtureOutcomes(recorded).pull(REPO + "#1"), pr)
+
+    def test_deliverable_weakest_basis_includes_repairs(self):
+        self.policy_case(contexts=["test"])
+        adapter, pr = self.policy_pull()
+        from dataclasses import replace
+        fixture = FixtureOutcomes.__new__(FixtureOutcomes)
+        fixture.pulls = dict(adapter.pulls)
+        for basis, expected in (("historical", "current_policy"), ("all_visible", "all_visible"), ("unknown", "unknown")):
+            fixture.pulls[REPO + "#2"] = replace(pr, id=REPO + "#2", checks_basis=basis)
+            self.assertEqual(deliverable_basis([REPO + "#1", REPO + "#2"], fixture), expected)
+        fixture.pulls[REPO + "#2"] = replace(pr, id=REPO + "#2", merged_at=None, checks_basis="unknown")
+        self.assertEqual(deliverable_basis([REPO + "#1", REPO + "#2"], fixture), "current_policy")
+        self.assertEqual(deliverable_basis([], fixture), "unknown")
+        self.assertEqual(deliverable_basis([REPO + "#1", REPO + "#3"], fixture), "unknown")
+
+    def test_rules_pagination_preserves_other_rule_counts(self):
+        self.policy_case()
+
+        def response(request, **kwargs):
+            parsed = urllib.parse.urlsplit(request.full_url)
+            if "/rules/branches/" in parsed.path:
+                rows = [{"type": "deletion", "ruleset_source": "private"}] * 100 if urllib.parse.parse_qs(parsed.query)["page"] == ["1"] else [self.rule("test")]
+                return io.BytesIO(json.dumps(rows).encode())
+            return self.respond(request, **kwargs)
+
+        self.open.side_effect = response
+        self.assertEqual(self.policy_pull()[1].checks_basis, "current_policy")
+
+    def test_malformed_policy_cannot_become_all_visible(self):
+        for changes in ({"enforcement_level": "unsupported"}, {"enforcement_level": None}, {"contexts": None}):
+            self.policy_case(contexts=["test"])
+            checks = self.routes["/repos/example/sample/branches/main"]["protection"]["required_status_checks"]
+            checks.update(changes)
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                self.policy_pull()
+
+    def test_ruleset_negative_app_id_cannot_remove_pin(self):
+        self.policy_case(rules=[self.rule("test", -1)])
+        with self.assertRaisesRegex(ValueError, "required check was malformed"):
+            self.policy_pull()
+
+    def test_live_policy_names_and_ids_stay_out_of_output(self):
+        self.policy_case(contexts=["private-check-canary"])
+        self.run_at_merge(name="private-check-canary", app={"id": 700007})
+        ledger = self.root / "ledger.csv"
+        with ledger.open("w", encoding="utf-8", newline="") as stream:
+            writer = csv.writer(stream)
+            writer.writerow(COLUMNS)
+            writer.writerow(["D1", time(1), "private-acceptance", REPO, REPO + "#1", "", "", "", ""])
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            result = main(["deliver", "--ledger", str(ledger), "--outcomes", "github", "--cache", str(self.root / "cache"),
+                           "--home", str(self.root / "home"), "--since", time(1), "--until", time(10), "--json", "-"])
+        self.assertEqual(result, 0)
+        output = stdout.getvalue() + stderr.getvalue()
+        for secret in ("private-check-canary", "700007", "synthetic-token-canary", REPO, str(self.root)):
+            self.assertNotIn(secret, output)
+        self.assertEqual(json.loads(stdout.getvalue())["deliverables"][0]["checks_basis"], "current_policy")
 
 
 class RoleTests(unittest.TestCase):

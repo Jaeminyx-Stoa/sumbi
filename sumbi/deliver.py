@@ -15,6 +15,7 @@ from sumbi.privacy import current_key, pseudonym, pseudonym_key, read_salt
 from sumbi.report import ADAPTERS
 
 STATES = ("success", "failed", "in_progress", "immature")
+CHECKS_BASES = ("historical", "current_policy", "all_visible", "unknown")
 LINKS = ("deliverable_id", "tool_reference", "project_time_weak", "ambiguous", "unallocated", "unassigned", "other")
 
 
@@ -75,7 +76,8 @@ def judge(deliverable: Deliverable, outcomes: Outcomes, days=7):
             results.append(result)
             descendants.extend([follow.id, *result[4]])
         if pr.checks != "green":
-            return "in_progress", False, pr.merged_at, "checks_" + pr.checks, descendants
+            reason = "checks_none" if pr.checks_reason == "no_checks" else pr.checks_reason
+            return "in_progress", False, pr.merged_at, reason, descendants
         # A merged repair following every revert can recover eventual success.
         if reverts and not any(p.merged_at and p.merged_at > max(reverts) for p in repairs):
             return "failed", False, pr.merged_at, "reverted", descendants
@@ -288,11 +290,14 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
             merges = [outcomes.pull(p).merged_at for p in j["attempt_prs"] if outcomes.pull(p) and outcomes.pull(p).merged_at]
             elapsed_end = j["closed_at"] if j["state"] == "failed" else max(merges, default=None)
             rows.append({"id": d.id, "state": j["state"], "reason": j["reason"],
+                         "checks_basis": deliverable_basis(j["attempt_prs"], outcomes),
                          "first_pass_success": j["first_pass_success"], "eventual_success": j["state"] == "success",
                          "prs": [pseudonym("pr", p) for p in j["attempt_prs"]],
                          "pr_outcomes": [{"id": pseudonym("pr", p), "merged": bool(outcomes.pull(p).merged_at),
                               "role": d.role(p) if p in d.prs else "followup",
                               "head_sha": outcomes.pull(p).head_sha, "required_checks_at_merge": outcomes.pull(p).checks,
+                              "checks_at_merge": outcomes.pull(p).checks, "checks_basis": outcomes.pull(p).checks_basis,
+                              "checks_reason": outcomes.pull(p).checks_reason,
                               "observed_checks_at_merge": outcomes.pull(p).observed_checks,
                               "follow_up_commit_count": len(getattr(outcomes, "commit_fixes", lambda pr, days: [])(
                                   outcomes.pull(p), follow_up_days)) if outcomes.pull(p).merged_at else 0,
@@ -306,6 +311,7 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
                    "algorithm": "hmac-sha256" if current_key() is not None else "sha256"},
                 "window": {"since": window.since.isoformat(), "until": window.until.isoformat(), "bounds": "[since,until)"},
                 "follow_up_days": follow_up_days, "states": {s: sum(j["state"] == s for j in judgments.values()) for s in STATES},
+                "checks_basis_counts": {basis: sum(row["checks_basis"] == basis for row in rows) for basis in CHECKS_BASES},
                 "success_rate": wilson(len(successes), len(ledger)),
                 "first_pass_success_rate": wilson(sum(j["first_pass_success"] for j in judgments.values()), len(ledger)),
                 "cost": {"operational": cost(operational_tokens, len(operational_successes)),
@@ -333,8 +339,17 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
                 "deliverables": rows, "links": sorted(links.values(), key=lambda r: (r["session_id"], r["deliverable_id"] or "", r["evidence"]))}
 
 
+def deliverable_basis(identities, outcomes):
+    pulls = [outcomes.pull(p) for p in identities]
+    bases = [p.checks_basis for p in pulls if p and p.merged_at]
+    if any(p is None for p in pulls) or not bases:
+        return "unknown"
+    return max(bases, key=CHECKS_BASES.index)
+
+
 def text_summary(report):
     lines = ["sumbi deliver", "States: " + "; ".join(f"{s} {n}" for s, n in report["states"].items())]
+    lines.append("Checks bases (deliverables): " + "; ".join(f"{b} {n}" for b, n in report["checks_basis_counts"].items()))
     for label in ("success_rate", "first_pass_success_rate"):
         rate = report[label]
         interval = rate["wilson_95"]
@@ -352,7 +367,7 @@ def text_summary(report):
         lines.append(f"Lifetime scan {bucket}: {tokens['total']} reported tokens")
     for row in report["deliverables"]:
         elapsed = str(row["elapsed_seconds"]) if row["elapsed_seconds"] is not None else "not reported"
-        lines.append(f"Deliverable {row['id']}: {row['state']}; {row['reason']}; elapsed seconds {elapsed}; tokens {row['tokens']['total']}")
+        lines.append(f"Deliverable {row['id']}: {row['state']}; {row['reason']}; checks basis {row['checks_basis']}; elapsed seconds {elapsed}; tokens {row['tokens']['total']}")
     lines.append("Link evidence events: " + "; ".join(f"{k} {v}" for k, v in report["coverage"]["evidence_counts"].items()))
     for agent, coverage in report["coverage"]["adapters"].items():
         lines.append(f"Coverage {agent}: files {coverage['files_scanned']}; sessions read {coverage['sessions_read']}; "
