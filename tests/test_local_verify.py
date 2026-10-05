@@ -7,12 +7,14 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from sumbi.adapters.claude_code import bash_exit_code
+from sumbi.adapters.claude_code import bash_exit_code, collect as collect_claude
+from sumbi.adapters.codex import collect as collect_codex
 from sumbi.cli import main
 from sumbi.local_compare import compare_local
 from sumbi.local_outcomes import deliver_local
-from sumbi.model import Window, timestamp
+from sumbi.model import Coverage, Window, execution_cwd, timestamp
 from sumbi.registration import read_registration
 from sumbi.verification import declared_commands, recognize
 
@@ -21,7 +23,7 @@ SCRIPT = "scripts/check.sh"
 
 class CommandTests(unittest.TestCase):
     def test_executed_program_shapes(self):
-        commands = ["./scripts/check.sh", "scripts/check.sh --quick", "bash scripts/check.sh",
+        commands = ["./scripts/check.sh", "bash scripts/check.sh",
                     "sh --login ./scripts/check.sh", "bash -l scripts/check.sh",
                     "bash -lc './scripts/check.sh'", "sh -l -c 'VAR=value bash scripts/check.sh'",
                     "VAR=value OTHER='two words' bash scripts/check.sh",
@@ -57,6 +59,32 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(recognize("bash elsewhere/check.sh", (SCRIPT,)), "other")
         self.assertEqual(recognize("bash scripts/check.sh.backup", (SCRIPT,)), "unmatched_shape")
 
+    def test_arguments_cannot_weaken_a_declared_verifier(self):
+        for flag in ("--help", "--quick", "--dry-run", "--filter", "synthetic-test", "-h", ""):
+            for command in (["bash", SCRIPT, flag], [SCRIPT, flag],
+                            ["pwsh", "-Command", f"bash {SCRIPT} '{flag}'"]):
+                with self.subTest(command=command):
+                    self.assertEqual(recognize(command, (SCRIPT,)), "unmatched_shape")
+        self.assertEqual(recognize(["bash", SCRIPT], (SCRIPT,)), "matched")
+
+    def test_strict_local_windows_file_uri_identity(self):
+        self.assertEqual(execution_cwd("file:///C:/fixture/workspace"), execution_cwd("C:/fixture/workspace"))
+        self.assertEqual(execution_cwd("file:///c:/FIXTURE/WORKSPACE"), execution_cwd("C:/fixture/workspace"))
+        self.assertEqual(execution_cwd("file:///C:/fixture/space%20workspace"), execution_cwd("C:/fixture/space workspace"))
+        invalid = ["file://remote/C:/fixture/workspace", "file://localhost/C:/fixture/workspace",
+                   "file:///C:/fixture/workspace?", "file:///C:/fixture/workspace#",
+                   "file:///C:/fixture/workspace?other=1", "file:///C:/fixture/workspace#other",
+                   "file:///C:/fixture/workspace%00", "file:///C:/fixture/workspace%ZZ",
+                   "file:///C:/fixture/workspace%FF", "file:///C:/fixture%2Fworkspace",
+                   "file:///C:/fixture/work\nspace", "file:///C:/fixture/work\tspace",
+                   "file:///C:/fixture/workspace%09", "file:///C:/fixture/workspace%0A",
+                   "file:///C:/fixture%5Cworkspace", "file:///fixture/workspace",
+                   "file:C:/fixture/workspace", "https://fixture.invalid/C:/fixture/workspace",
+                   "file:///C:/fixture\\workspace", "file:///C:/fixture/workspace\x00"]
+        for value in invalid:
+            with self.subTest(value=value):
+                self.assertIsNone(execution_cwd(value))
+
     def test_config_and_cli_declarations(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -85,7 +113,7 @@ class UnitTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.home = Path(self.temporary.name) / "home"
-        self.repo = Path(self.temporary.name) / "repo"
+        self.repo = (Path(self.temporary.name) / "repo").resolve()
         self.repo.mkdir()
         self.codex = self.home / ".codex/sessions"
         self.codex.mkdir(parents=True)
@@ -127,11 +155,11 @@ class UnitTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("".join(json.dumps(r) + "\n" for r in records), encoding="utf-8")
 
-    def write_claude(self, identity="child", start="2030-01-01T02:00:00Z", code=0):
+    def write_claude(self, identity="child", start="2030-01-01T02:00:00Z", code=0, *, background=False):
         at = timestamp(start)
         records = []
         for seconds, role, block in [(0, "assistant", {"type": "tool_use", "name": "Edit", "id": "edit", "input": {"file_path": "synthetic.py"}}),
-                                     (1, "assistant", {"type": "tool_use", "name": "Bash", "id": "run", "input": {"command": "bash " + SCRIPT}}),
+                                     (1, "assistant", {"type": "tool_use", "name": "Bash", "id": "run", "input": {"command": "bash " + SCRIPT, "run_in_background": background}}),
                                      (2, "user", {"type": "tool_result", "tool_use_id": "run", "is_error": code != 0,
                                                   "content": "Exit code 2\nsynthetic failure" if code else "synthetic output"})]:
             event = {"type": role, "sessionId": "parent", "agentId": identity, "timestamp": (at + timedelta(seconds=seconds)).isoformat(),
@@ -143,6 +171,7 @@ class UnitTests(unittest.TestCase):
                 event["toolUseResult"] = {"stdout": "synthetic", "stderr": "", "interrupted": False}
             records.append(event)
         self.save(self.home / ".claude/projects/fixture/parent/subagents" / ("agent-" + identity + ".jsonl"), records)
+        return records
 
     def report(self, **kwargs):
         return deliver_local(self.home, self.window, self.repo, verify=[SCRIPT], **kwargs)
@@ -196,6 +225,73 @@ class UnitTests(unittest.TestCase):
         self.assertIsNone(report["units"][0]["tokens"]["total"])
         self.assertFalse(report["units"][0]["tokens_complete"])
 
+    def test_input_background_launch_without_result_task_id_is_unknown(self):
+        self.write_claude(background=True)
+        report = self.report()
+        self.assertEqual(report["states"]["unverified"], 1)
+        self.assertEqual(report["coverage"]["commands"]["unknown_exit_code"], 1)
+        self.assertEqual(report["units"][0]["reason"], "last_check_exit_unknown")
+
+    def test_codex_verification_does_not_infer_numeric_exit_from_output(self):
+        for identity, legacy, code in (("item-envelope", False, None), ("legacy-envelope", True, None),
+                                       ("boolean-code", False, True)):
+            records = self.write_codex(identity, legacy=legacy)
+            execution = next(r for r in records if r.get("payload", {}).get("type") in ("item_completed", "exec_command_end"))
+            payload = execution["payload"] if legacy else execution["payload"]["item"]
+            payload["exit_code"] = code
+            payload["output"] = "Process exited with code 0\n"
+            self.save(self.codex / ("rollout-" + identity + ".jsonl"), records)
+        report = self.report()
+        self.assertEqual(report["states"]["unverified"], 3)
+        self.assertEqual(report["coverage"]["commands"]["unknown_exit_code"], 3)
+
+    def test_earlier_claude_metadata_preserves_earliest_cwd_and_start_provenance(self):
+        for identity, first in (("metadata-first", True), ("metadata-late", False)):
+            records = self.write_claude(identity=identity)
+            metadata = {"type": "queue-operation", "sessionId": "parent", "agentId": identity,
+                        "timestamp": "2030-01-01T01:59:00Z", "uuid": identity + "metadata"}
+            records.insert(0, metadata) if first else records.append(metadata)
+            self.save(self.home / ".claude/projects/fixture/parent/subagents" / ("agent-" + identity + ".jsonl"), records)
+        sessions = collect_claude(self.home, self.window, Coverage())
+        self.assertEqual(len(sessions), 2)
+        for session in sessions:
+            self.assertEqual(session.start_at, timestamp("2030-01-01T01:59:00Z"))
+            self.assertEqual(session.start_cwd, str(self.repo))
+            self.assertEqual(session.start_evidence, "first-observed-cwd")
+        self.write_codex("header")
+        session = collect_codex(self.home, self.window, Coverage())[0]
+        self.assertEqual(session.start_evidence, "session-header")
+        self.assertEqual(self.report()["states"]["success"], 3)
+        self.assertNotIn("start_evidence", json.dumps(self.report()))
+
+    def test_excluded_scope_counts_only_sessions_observed_in_scan(self):
+        outside = str((Path(self.temporary.name) / "other").resolve())
+        for identity, start in (("old-outside", "2029-12-01T01:00:00Z"), ("current-outside", "2030-01-01T01:00:00Z")):
+            records = self.write_codex(identity, start=start, edits=False, verify=False)
+            for event in records:
+                if event["type"] in ("session_meta", "turn_context"):
+                    event["payload"]["cwd"] = outside
+            self.save(self.codex / ("rollout-" + identity + ".jsonl"), records)
+        self.assertEqual(self.report()["coverage"]["excluded_scope"], {"other": 1})
+
+    def test_uri_cwd_confirms_full_target_and_keeps_other_paths_unverified(self):
+        target = "C:/fixture/workspace"
+        repository = Path(self.temporary.name) / "standin"
+        # Exercise the state gate without making a host-specific fixture tree.
+        from sumbi.local_outcomes import state
+        from sumbi.model import CommandExecution, Session
+        at = timestamp("2030-01-01T01:00:00Z")
+        session = Session("codex", "synthetic")
+        session.times.update((at, at + timedelta(seconds=4)))
+        session.edit("edit", at + timedelta(seconds=1))
+        for cwd, expected in (("file:///C:/fixture/workspace", "success"),
+                              ("file:///C:/fixture/other", "unverified"),
+                              ("file://remote/C:/fixture/workspace", "unverified")):
+            session.commands["run"] = CommandExecution("codex", "synthetic", at + timedelta(seconds=4),
+                ["bash", SCRIPT], 0, at + timedelta(seconds=2), cwd)
+            with patch.object(Path, "resolve", return_value=Path(target)):
+                self.assertEqual(state(session, self.window, (SCRIPT,), 5, repository)[0], expected)
+
     def test_missing_edit_or_execution_timestamp_does_not_preserve_success(self):
         for identity, kind in (("unknown-edit-time", "response_item"), ("unknown-check-time", "event_msg")):
             records = self.write_codex(identity)
@@ -247,6 +343,31 @@ class UnitTests(unittest.TestCase):
         self.assertEqual(report["arms"]["after"]["candidate_states"]["unverified"], 1)
         self.assertEqual(report["cost_basis"], "retained_worker_lifetime_only")
         self.assertFalse(next(f for f in report["flags"] if f["name"] == "dispatch_overhead_excluded")["blocking"])
+
+    def test_origin_only_other_checkout_is_fixed_unit_but_blocks_comparison(self):
+        self.write_codex("before")
+        records = self.write_codex("after", start="2030-01-02T01:00:00Z")
+        records[0]["payload"]["cwd"] = str((Path(self.temporary.name) / "other-checkout").resolve())
+        self.save(self.codex / "rollout-after.jsonl", records)
+        with patch("sumbi.model.RepositoryAttributor.origin", return_value=("example.test/owner/project", "origin")):
+            report = compare_local(self.home, self.repo, self.registration(), verify=[SCRIPT], resamples=100)
+        self.assertEqual(report["arms"]["after"]["n"], 1)
+        self.assertEqual(report["arms"]["after"]["units"][0]["state"], "success")
+        self.assertEqual(report["arms"]["after"]["units"][0]["start_scope"], "same_origin_other_checkout")
+        self.assertEqual(report["verdict"]["proposal"], "withhold")
+        self.assertIn("unit_start_scope_mismatch", report["verdict"]["reasons"])
+
+    def test_subdirectory_start_can_verify_root_without_scope_mismatch(self):
+        self.write_codex("before")
+        subdirectory = self.repo / "package"
+        subdirectory.mkdir()
+        records = self.write_codex("after", start="2030-01-02T01:00:00Z")
+        records[0]["payload"]["cwd"] = str(subdirectory)
+        self.save(self.codex / "rollout-after.jsonl", records)
+        report = compare_local(self.home, self.repo, self.registration(), verify=[SCRIPT], resamples=100)
+        self.assertEqual(report["arms"]["after"]["units"][0]["state"], "success")
+        self.assertEqual(report["arms"]["after"]["units"][0]["start_scope"], "repository_subdirectory")
+        self.assertNotIn("unit_start_scope_mismatch", [f["name"] for f in report["flags"]])
 
     def test_compare_source_coverage_and_metadata_gates(self):
         self.write_codex("before")

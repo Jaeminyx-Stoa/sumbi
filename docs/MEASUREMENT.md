@@ -875,11 +875,16 @@ Adapters retain an agent-neutral `CommandExecution` event locally: agent,
 session, completion time, command and exit code, with start time and cwd evidence
 for safe interpretation. Codex recognizes Desktop `item_completed` /
 `CommandExecution`, item start times and older `exec_command_begin/end` pairs.
+Codex verification completion requires a numeric `exit_code` machine field;
+anchored text in output can inform legacy friction counters but never supplies a
+verification outcome.
 Claude Code pairs `Bash` tool uses and results by ID. The foreground result
 envelope with `interrupted: false`, string stdout/stderr and `is_error: false`
 means exit zero even where no numeric exit field is logged. An error's anchored
 `Exit code N` envelope or numeric machine field supplies nonzero codes. Missing,
 interrupted, deferred/background, unpaired or unsupported results remain unknown.
+The tool-use input `run_in_background: true` forces an unknown exit even if its
+result omits a task ID or resembles a successful foreground envelope.
 Text inside stdout never supplies an exit code. Commands, stdout and edit payloads
 are never included in public JSON or text summaries.
 
@@ -887,9 +892,18 @@ Recognition accepts a single executed repository-relative script, including
 `./scripts/check.sh`, `bash`/`sh`, `-l`/`--login`, quoted `-c`/`-lc` scripts,
 environment assignment prefixes, PowerShell's `&` and quoted shell executable,
 and `pwsh`/`powershell -Command` wrappers. It matches the entire normalized script
-path rather than a basename. Execution cwd must establish that the declared
+path rather than a basename. Only a bare script invocation counts: trailing
+arguments, including help, filters and dry-run options, are `unmatched_shape`.
+There is no permitted-argument configuration in this alpha. Compound environment
+assignment or export preludes remain unmatched even when their final statement
+mentions the script; they cannot establish positive evidence.
+Execution cwd must establish that the declared
 script is the target repository's script. A same-named script in a different cwd
-does not pass. Reads (`Get-Content`, `cat`, `type`, `rg`, `grep`, `Select-String`,
+does not pass. Empty-authority local `file:` URIs with an absolute Windows drive
+path are strictly decoded to the same full-path identity. Remote authorities,
+malformed escapes/UTF-8, control characters, queries, fragments and encoded separators are
+unsupported; there is no basename or broad URI-prefix fallback.
+Reads (`Get-Content`, `cat`, `type`, `rg`, `grep`, `Select-String`,
 `sed`, `head`, `tail`) do not count, including quoted mentions. Shell syntax-only
 checks (`-n`/`--noexec`) do not execute the verifier. Conditional commands,
 pipelines, background execution, redirects, substitutions and unsupported options
@@ -904,6 +918,20 @@ the cohort independently of whether the worker edits anything or runs a check.
 Sessions starting outside the dispatch window cannot enter merely because they
 verify inside it. Parent orchestrators are separately reported as dispatch
 overhead, even if they span the intervention.
+Claude's earliest timestamp and earliest cwd-bearing event are preserved
+separately; an earlier metadata event without cwd does not erase that cwd.
+Local-only start provenance distinguishes session headers from first-observed
+cwd evidence. Excluded-scope counts include only sessions observed in the scan.
+
+Each unit reports a bounded start-scope label. Starts at the configured root or
+its physical subdirectories belong to this workspace; subdirectory workers can
+verify the declared script by executing it from the configured root. The outcome
+cwd rule remains exact-root. A clone or worktree physically outside that workspace
+may be admitted as a candidate by shared git-origin evidence, but remains a fixed
+unit with `same_origin_other_checkout` scope and blocks comparison with
+`unit_start_scope_mismatch`. This alpha does not claim equivalent verification
+roots for other checkouts and never substitutes a shared origin for positive cwd
+evidence. A change in worktree placement cannot silently change comparable rates.
 
 Known edit tools are Codex `apply_patch`/`FileChange` and Claude
 `Edit`/`Write`/`MultiEdit`/`NotebookEdit`. The five states are:

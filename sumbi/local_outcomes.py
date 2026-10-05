@@ -4,7 +4,7 @@ from collections import Counter
 from datetime import timedelta
 from pathlib import Path
 
-from sumbi.model import Coverage, RepositoryAttributor, TOKEN_KINDS, Window, normalize_path
+from sumbi.model import Coverage, RepositoryAttributor, TOKEN_KINDS, Window, execution_cwd
 from sumbi.privacy import current_key, pseudonym_key, read_salt
 from sumbi.report import ADAPTERS
 from sumbi.verification import declared_commands, recognize
@@ -59,7 +59,7 @@ def state(session, scan, declared, active_minutes, repository):
             result, reason = "unverified", "no_check_after_last_edit"
         elif any(e.started_at is None or e.started_at <= last_edit or e.started_at > e.at for e in last):
             result, reason = "unverified", "check_start_not_after_last_edit"
-        elif any(not e.cwd or normalize_path(e.cwd) != normalize_path(str(repository.resolve())) for e in last):
+        elif any(execution_cwd(e.cwd) != execution_cwd(str(repository.resolve())) for e in last):
             result, reason = "unverified", "verification_cwd_unconfirmed"
             coverage["verification_cwd_unconfirmed"] += 1
         elif None in codes or len(codes) != 1:
@@ -79,7 +79,7 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
     scan = Window(window.since, scan_until or window.until)
     with pseudonym_key(salt if salt is not None else read_salt()):
         attributor = RepositoryAttributor(repository)
-        units, overhead, excluded_scope = [], [], Counter()
+        units, overhead, excluded_scope, start_scopes = [], [], Counter(), Counter()
         adapters, command_coverage = {}, Counter()
         for agent in agents if agents is not None else ADAPTERS:
             measured = Coverage()
@@ -90,9 +90,11 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                     if session.in_window(scan):
                         excluded_scope["missing_start_metadata"] += 1
                     continue
-                link = attributor.link(session.start_cwd)
+                start_cwd = execution_cwd(session.start_cwd)
+                link = attributor.link(start_cwd) if start_cwd else {"bucket": "unassigned"}
                 if link["bucket"] != "project":
-                    excluded_scope[link["bucket"]] += 1
+                    if session.in_window(scan):
+                        excluded_scope[link["bucket"]] += 1
                     continue
                 if not session.is_worker:
                     if session.in_window(scan):
@@ -102,6 +104,10 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                     continue
                 if not window.contains(session.start_at):
                     continue
+                target = execution_cwd(str(repository.resolve()))
+                start_scope = ("repository_root" if start_cwd == target else "repository_subdirectory"
+                               if start_cwd.startswith(target + "/") else "same_origin_other_checkout")
+                start_scopes[start_scope] += 1
                 lifetime = Window(session.start_at, scan.until)
                 tokens, complete, observed = token_measurement(session, lifetime)
                 outcome, reason, coverage, latest = state(session, lifetime, declared, active_minutes, repository)
@@ -109,6 +115,7 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                 units.append({"id": session.id(), "agent": agent, "parent_id":
                     session.as_dict(lifetime, attributor, active_minutes)["parent_id"],
                     "dispatched_at": session.start_at.isoformat(), "last_at": latest.isoformat() if latest else None,
+                    "start_scope": start_scope,
                     "state": outcome, "reason": reason, "task_type": None,
                     "tokens": tokens, "tokens_complete": complete, "observed_total": observed,
                     "elapsed_seconds": (latest - session.start_at).total_seconds() if latest else None,
@@ -132,6 +139,7 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                     "observed_total": sum(r["observed_total"] for r in overhead)},
                 "excluded_worker_spend": {"observed_total": sum(r["observed_total"] for r in units if r not in retained)},
                 "coverage": {"adapters": adapters, "commands": dict(sorted(command_coverage.items())),
+                             "start_scope_counts": dict(sorted(start_scopes.items())),
                              "excluded_scope": dict(sorted(excluded_scope.items()))},
                 "limitations": ["agent_triggered_machine_check", "no_human_acceptance_or_revert_window",
                                 "shell_edits_invisible", "worker_costs_exclude_dispatch_overhead",
@@ -145,6 +153,8 @@ def text_summary(report):
     lines.append(f"Retained success: {rate['numerator']}/{rate['denominator']}; Wilson 95% {rate['wilson_95']}")
     lines.append(f"Dispatch overhead sessions: {report['dispatch_overhead']['sessions']}; observed tokens {report['dispatch_overhead']['observed_total']}")
     lines.append("Cost scope: retained worker sessions only")
+    lines.append("Unit start scopes: " + "; ".join(f"{scope} {count}"
+                 for scope, count in report["coverage"]["start_scope_counts"].items()))
     for metric in ("total", "time"):
         cost = report["cost"]["per_success"][metric]
         lines.append(f"Worker {metric} per success: {cost['numerator']}/{cost['denominator']} = {cost['value']}; descriptive only")

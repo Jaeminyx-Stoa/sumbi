@@ -15,6 +15,9 @@ basis: historical requirements, current policy, or all visible results when no
 checks are required. Unreadable policy remains unknown. M2 adds `sumbi compare`:
 pre-registered dispatch cohorts, score intervals, deterministic cost bootstraps,
 confounder flags and verdict proposals. Propagation remains planned.
+Local verification additionally measures fixed dispatched-worker units using
+declared script exit evidence; its weaker acceptance and worker-only cost scope
+are explicit.
 
 ## Quickstart
 
@@ -35,6 +38,9 @@ sumbi deliver --ledger deliverables.csv --outcomes recorded-outcomes \
   --since 2030-01-01T00:00Z --until 2030-01-08T00:00Z
 sumbi compare --registration registration.json --ledger deliverables.csv \
   --outcomes recorded-outcomes
+sumbi deliver --outcome-source local-verify --repository . --verify scripts/check.sh \
+  --since 2030-01-01T00:00Z --until 2030-01-08T00:00Z \
+  --scan-until 2030-01-09T00:00Z
 ```
 
 Replace the example UTC bounds with your measurement window. Collection prints
@@ -45,6 +51,11 @@ Comparison windows, margin, sample size and follow-up days come from the
 [documented pre-registration schema](docs/MEASUREMENT.md#registration-json-schema).
 Use `SUMBI_SALT` or `--salt-file FILE` for keyed pseudonyms before sharing reports;
 without either, output explicitly identifies keys as unsalted.
+For local verification, pre-register `outcome_source: local-verify` and use
+`sumbi compare --registration local-registration.json --repository .` with the
+same bare verification declaration. It measures worker costs, with dispatch
+overhead separate, and cannot certify human acceptance or later reverts. See
+[local verification limits](docs/MEASUREMENT.md#local-verification-fixed-worker-session-outcomes).
 
 `sumbi --help` lists the subcommands, `sumbi --version` prints the version, and
 `python -m sumbi` runs the same CLI from a checkout. See
@@ -67,7 +78,7 @@ without either, output explicitly identifies keys as unsalted.
 
 ## Principles
 
-1. Success is judged by outside signals per deliverable, never by an agent's own report.
+1. Success uses a declared machine outcome source: external acceptance per deliverable or the explicitly weaker local check per dispatched worker. Agent completion prose does not establish success.
 2. Cost per success includes failures, retries and waiting.
 3. Every harness change is an intervention: write the prediction first, then compare like with like.
 4. No verdict ever weakens an approval, a review or a safety gate.

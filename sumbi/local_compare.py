@@ -33,6 +33,10 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
         flags, mixes = [], {}
         def flag(name, blocking, evidence):
             flags.append({"name": name, "blocking": blocking, "evidence": evidence})
+        scope_mismatches = {arm: dict(Counter(r["start_scope"] for r in rows
+                            if r["start_scope"] == "same_origin_other_checkout")) for arm, rows in candidates.items()}
+        if any(scope_mismatches.values()):
+            flag("unit_start_scope_mismatch", True, scope_mismatches)
         for arm, rows in candidates.items():
             arms[arm], excluded = [], []
             for row in rows:

@@ -41,6 +41,12 @@ def exit_code(payload: dict) -> int | None:
     return None
 
 
+def verification_exit_code(payload: dict) -> int | None:
+    """Verification completion requires a numeric machine field, not output text."""
+    value = payload.get("exit_code")
+    return value if type(value) is int else None
+
+
 def collect(home: Path, window: Window, coverage: Coverage, *, local_review: bool = False,
             collect_links: bool = False) -> list[Session]:
     root = home / ".codex" / "sessions"
@@ -78,6 +84,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                 continue
             when = timestamp(event.get("timestamp"))
             if kind == "session_meta" and not inherited_meta:
+                session.start_evidence = "session-header"
                 if session.start_at is None or when is not None and when < session.start_at:
                     session.start_at = when
                     session.start_cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else None
@@ -143,7 +150,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                     if subtype == "exec_command_end":
                         started, cwd = execution_context.get((session.raw_id, identity), (None, None))
                         session.execution(identity, when, payload.get("command", commands.get((session.raw_id, identity))),
-                                          exit_code(payload), started_at=started, cwd=cwd)
+                                          verification_exit_code(payload), started_at=started, cwd=cwd)
                     if collect_links and when:
                         name, query = tool_names.get((session.raw_id, identity), (None, False))
                         session.deliverable_events.append((when, order, "refs", tool_refs(
@@ -174,7 +181,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                                 item.get("cwd", current_cwds.get(session.raw_id)))
                         if subtype == "item_completed":
                             started, cwd = execution_context.get((session.raw_id, identity), (None, None))
-                            session.execution(identity, when, item.get("command"), exit_code(item),
+                            session.execution(identity, when, item.get("command"), verification_exit_code(item),
                                 started_at=start or started,
                                 cwd=item.get("cwd", cwd or current_cwds.get(session.raw_id)))
                     if item_type == "FileChange" and subtype == "item_completed":

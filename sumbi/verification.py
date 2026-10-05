@@ -105,7 +105,7 @@ def recognize(command, declared):
         if program in READS:
             return "read"
         if parts and normalize(parts[0]) in declared:
-            return "matched"
+            return "matched" if len(parts) == 1 else "unmatched_shape"
         return "unmatched_shape" if mentions(value) else "other"
 
     return inspect(command)
