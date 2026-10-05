@@ -10,16 +10,17 @@ sumbi is a self-improving harness for coding agents. Seed a sensible harness in 
 
 ## What it will do
 
-- **Measure.** Read agent session logs (Claude Code and Codex first) and outcomes (CI runs, pull requests, reverts). It emits counts, durations, labels and IDs — never transcripts.
+- **Install (`sumbi install`).**
+  - Takes stock of the harness a repository already has (instructions, skills, hooks, CI gates) and finds the gaps.
+  - Applies proven practices from a curated catalog that distills Superpowers, gstack, gajae code and two in-house harness labs.
+  - Discovering new candidates on GitHub only produces proposals for review; nothing is installed from the internet.
+- **Measure (`sumbi collect`).** Read agent session logs (Claude Code and Codex first) and outcomes (CI runs, pull requests, reverts). It emits counts, durations, labels and IDs — never transcripts.
 - **Judge.**
   - Count success per deliverable by outside signals.
   - Compare rounds on cost per success: time, and tokens split into new input, cache writes, cache reads and output.
   - Flag confounders, and decline to judge when the data is incomplete.
 - **Propagate.** Deliver short notices to every agent through standard hooks and `AGENTS.md`, scoped by repository.
-- **Seed.** Starter kits for a harness lab and for product repositories:
-  - a short `AGENTS.md` table of contents
-  - brief and handoff templates
-  - a retro skill in the Agent Skills format
+- **Seed a lab.** A starter kit for the harness lab itself, including a retro skill in the Agent Skills format.
 
 ## Principles
 
