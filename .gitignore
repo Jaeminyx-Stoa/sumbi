@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+.coverage
+# Local measurement output and real logs never belong here
+/out/
+/local/
+*.jsonl
+!tests/fixtures/**/*.jsonl
