@@ -23,6 +23,7 @@ class BuildTests(unittest.TestCase):
                 metadata = archive.read(sumbi_build.INFO + "/METADATA").decode()
                 self.assertIn("Requires-Python: >=3.11", metadata)
                 self.assertNotIn("Requires-Dist:", metadata)
+                self.assertEqual(archive.read(sumbi_build.INFO + "/LICENSE"), (sumbi_build.ROOT / "LICENSE").read_bytes())
                 self.assertIn("sumbi = sumbi.cli:main", archive.read(sumbi_build.INFO + "/entry_points.txt").decode())
                 self.assertIn("sumbi/adapters/codex.py", archive.namelist())
                 self.assertFalse(any(name.startswith("tests/") for name in archive.namelist()))

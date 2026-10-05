@@ -20,8 +20,10 @@ def metadata():
         "METADATA": ("Metadata-Version: 2.1\n" + "Name: " + PROJECT["name"] + "\n"
                      + "Version: " + PROJECT["version"] + "\n"
                      + "Summary: " + PROJECT["description"] + "\n"
-                     + "Requires-Python: " + PROJECT["requires-python"] + "\n\n").encode(),
+                     + "Requires-Python: " + PROJECT["requires-python"] + "\n"
+                     + "License: " + PROJECT["license"]["text"] + "\n\n").encode(),
         "WHEEL": b"Wheel-Version: 1.0\nGenerator: sumbi_build\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+        "LICENSE": (ROOT / "LICENSE").read_bytes(),
         "entry_points.txt": ("[console_scripts]\n" + "".join(
             name + " = " + entry + "\n" for name, entry in PROJECT["scripts"].items())).encode(),
     }
@@ -66,7 +68,7 @@ def build_sdist(sdist_directory, config_settings=None):
     filename = STEM + ".tar.gz"
     destination = Path(sdist_directory)
     destination.mkdir(parents=True, exist_ok=True)
-    sources = [ROOT / p for p in ("pyproject.toml", "sumbi_build.py", "README.md")]
+    sources = [ROOT / p for p in ("pyproject.toml", "sumbi_build.py", "README.md", "LICENSE")]
     for directory in ("sumbi", "tests", "docs"):
         sources.extend(p for p in sorted((ROOT / directory).rglob("*"))
                        if p.is_file() and p.suffix in (".py", ".md", ".jsonl"))
