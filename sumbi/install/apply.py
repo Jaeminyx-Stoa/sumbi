@@ -121,8 +121,10 @@ def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = Non
                     "provenance": p["provenance"], "utc_time": utc,
                     "baseline": baseline_result, "judgment_policy": load_judgment_policy()} for p in plan.practices]
         # Register predictions in the recovery manifest before changing targets.
-        manifest = {"status": "prepared", "records": records,
+        applied = {c.path: c.after for c in plan.changes}
+        manifest = {"version": 1, "status": "prepared", "records": records,
                     "files": [{"path": name, "before_hash": digest(data), "mode": modes[name],
+                               "applied_hash": digest(applied.get(name)) if name in applied else None,
                                "absent": data is None} for name, data in originals.items()]}
         for name, data in originals.items():
             destination = safe_path(root, backup_relative + "/files/" + name)
@@ -154,8 +156,13 @@ def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = Non
                 parent = parent.parent
             _write(root, name, originals[name], data, modes[name])
             written.append((name, data))
+        completed = {**manifest, "status": "applied"}
+        relative_manifest = backup_relative + "/manifest.json"
+        _write(root, relative_manifest, read_bytes(root, relative_manifest),
+               (json.dumps(completed, indent=2) + "\n").encode(), 0o600)
         return {"applied": [p["id"] for p in plan.practices],
-                "baseline": baseline_result, "backup": backup_relative}
+                "baseline": baseline_result, "backup": backup_relative,
+                "backup_id": backup_relative.rsplit("/", 1)[1]}
     except BaseException as error:
         rollback_failed = False
         for name, data in reversed(written):
