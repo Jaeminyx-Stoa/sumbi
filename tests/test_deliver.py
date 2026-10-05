@@ -322,7 +322,7 @@ class DeliverTests(unittest.TestCase):
             results = entry["checks_at_merge"]
             results["required"] = []
             entry["checks_at_merge"] = None
-            entry["checks_policy_at_merge"] = {"required": required, "results": results}
+            entry["current_policy_evidence"] = {"required": required, "results": results}
         self.outcomes(raw)
         report = self.report()
         self.assertEqual(report["checks_basis_counts"], {

@@ -226,7 +226,7 @@ class GitHubOutcomes(FixtureOutcomes):
                             time.sleep(step)
                             delay -= step
                         continue
-                    if policy and code in (403, 404):
+                    if policy and code in (403, 404) and not limited:
                         # Match the exact plan message only on the rules endpoint.
                         try:
                             plan_unavailable = (code == 403 and "/rules/branches/" in path
@@ -319,7 +319,7 @@ class GitHubOutcomes(FixtureOutcomes):
                                             (pr.head_sha, pr.merge_sha))[0]
                 if entry["checks_at_merge"] is None:
                     evidence = {"required": self._policy(identity), "results": results}
-                    entry["checks_policy_at_merge"] = evidence
+                    entry["current_policy_evidence"] = evidence
                     checks, basis, reason = self._policy_checks(evidence, pr.merged_at, (pr.head_sha, pr.merge_sha))
                 else:
                     checks, basis, reason = pr.checks, pr.checks_basis, pr.checks_reason

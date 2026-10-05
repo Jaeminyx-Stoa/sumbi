@@ -281,6 +281,7 @@ Errors name the row and field, never echo input values or private paths.
 | `state_override` | Blank, `abandoned`, or `abandoned@<UTC timestamp>`. No override can declare success. Abandonment may be recorded without a PR. A timestamp cannot precede dispatch. |
 | `accepted_by_human` | Blank means human acceptance is not required. `n` means required and pending; `y` means required and accepted. |
 | `notes` | Optional local text; validated then discarded. |
+| `task_type` | Optional tenth column, after `notes`; blank is not reported. Same 1-64 character label charset as `id`; appears in deliver and compare reports. The original nine-column header remains valid. |
 
 Keep real ledgers and recorded API responses outside version control: acceptance,
 notes, branch names, PR titles/bodies and commit messages may contain private text.
@@ -382,9 +383,10 @@ repairs (`historical` > `current_policy` > `all_visible` > `unknown`). Missing P
 or no merged attempts give `unknown`; unmerged retries supply no merge basis.
 JSON `checks_basis_counts` and the text summary count deliverables per basis,
 including unknown. Other check reasons distinguish `checks_red` and
-`checks_missing_required`. `required_checks_at_merge` is retained as a compatibility
-alias for the checks verdict; consumers must read its accompanying basis.
-Rounds compared later must use the same basis; M2 will enforce this.
+`checks_missing_required`. `checks_at_merge` is the sole checks verdict field;
+the misleading `required_checks_at_merge` alias has been removed.
+M2 requires the same checks basis across both arms. Mixed bases are not comparable,
+including different bases among one deliverable's merged attempts.
 
 Endpoint shapes are verified against GitHub's REST documentation for
 [Get a branch](https://docs.github.com/en/rest/branches/branches#get-a-branch),
@@ -446,7 +448,7 @@ Each commit response needs `sha`, `commit.message`, and `commit.committer.date`,
 within `[coverage_start, observed_at)`.
 PR entries may also carry `observed_checks_at_merge` (`green`, `red`, or
 `unknown`); it is diagnostic and never substitutes for `checks_at_merge`.
-Live recordings additionally retain `checks_policy_at_merge`, an object with
+Live recordings additionally retain `current_policy_evidence`, an object with
 exactly `required` and `results`. `required` is null for unreadable policy or an
 array of `{ "context": "test", "app_id": null }` requirements (empty for
 `all_visible`). `results` is null when no pre-merge results exist, or the snapshot
@@ -587,4 +589,248 @@ Zero successes produce null costs per success. Each rate includes numerator,
 denominator and a Wilson 95% interval; denominators include failed, immature and
 ongoing rows, so immature cohorts must not be treated as final verdicts. A zero
 denominator yields a null rate and interval. M1d always reports savings verdict
-`not_evaluated`; M2 will establish completeness thresholds and comparison rules.
+`not_evaluated`; M2 applies the completeness thresholds and comparison rules below.
+
+## M2: pre-registered comparison and verdict proposals
+
+`sumbi compare` compares dispatch cohorts before and after **one** intervention.
+It reads the same ledger, adapters and recorded/live GitHub outcomes as `deliver`.
+It never applies an intervention or decides for the owner. All tests use authored
+synthetic fixtures and block network calls.
+
+```sh
+sumbi compare --registration registration.json --ledger deliverables.csv \
+  --outcomes recorded-outcomes --home local-log-home --agents codex \
+  --seed 1729 --resamples 5000 --json out/compare.json
+```
+
+Windows and follow-up days come solely from the registration. Other collection
+options, including project matching, the pseudonym salt, and live GitHub
+`--cache`/`--record`, work as in `deliver`. JSON defaults to `out/compare.json`.
+The text summary goes to stderr for `--json -`, otherwise stdout. Output cannot
+overwrite the registration, ledger, outcome fixtures, salt, or session logs.
+The normalized outcome recording now uses `current_policy_evidence`; old files
+using the former policy-field name must be renamed before replay. Exhausting
+403/429 rate-limit retries fails capture, including on policy endpoints, and
+never caches that transient failure as an unreadable policy.
+
+### Registration JSON schema
+
+The top-level object has exactly the required fields below, plus optional
+`confounders`. Duplicate keys and unknown fields are rejected. Numbers must be
+finite JSON numbers, not booleans. All times are UTC ISO strings ending in `Z`
+or `+00:00`. This file is local evidence: sumbi validates its contents, but does
+not authenticate its timestamp or prevent an owner from editing it retrospectively.
+
+```json
+{
+  "intervention_id": "round-01",
+  "applied_at": "2030-01-08T00:00:00Z",
+  "registered_at": "2029-12-31T00:00:00Z",
+  "predictions": [
+    {"metric": "tokens_per_success", "direction": "decrease", "rough_size_percent": 15}
+  ],
+  "non_inferiority_margin_pp": 5,
+  "sample_size_per_arm": 1570,
+  "follow_up_days": 7,
+  "before": {"since": "2030-01-01T00:00:00Z", "until": "2030-01-08T00:00:00Z"},
+  "after": {"since": "2030-01-08T00:00:00Z", "until": "2030-01-15T00:00:00Z"},
+  "confounders": [{"at": "2030-01-09T00:00:00Z", "label": "runner_change"}]
+}
+```
+
+- `intervention_id` and prediction `metric` use the ledger ID label charset.
+  `predictions` is a nonempty array. Direction is `increase` or `decrease`;
+  `rough_size_percent` is nonnegative. An optional string `condition` from a
+  catalog prediction is accepted locally and discarded from public output.
+- The prediction may be copied from `.sumbi/interventions.jsonl`'s `prediction`;
+  that install record's `practice_id` and `utc_time` can supply the intervention
+  ID and applied time. It does **not** provide margin, sample size, windows, or
+  a full registration. Register these before application; do not treat an
+  intervention record written later as independent proof of pre-registration.
+- Margin is strictly between 0 and 100 **absolute percentage points** of success
+  rate. Five means 0.05, not five percent of the baseline. Sample size is a
+  positive integer per arm; follow-up days is positive and finite.
+- Both windows are `[since, until)`, nonempty, equal in length. Before must end
+  at or before `applied_at`; after starts at or after it. A gap is allowed.
+- A registration after application **or** after after-window start is late and
+  produces `withhold: not_preregistered`. Equality is accepted. Late dates are
+  valid input so their withheld result remains reviewable.
+- Each optional confounder is exactly `{at, label}`, where `label` uses the ID
+  charset. Labels are public-safe categories, never event descriptions or host
+  names. `runner`, `model`, `effort`, or `cli`, alone or followed by `_...` or
+  `-...`, identify blocking events. Other labels are informational.
+
+### Arms, exposure, completeness and comparability
+
+Dispatch assigns the candidate arm. Only dispatches inside the two windows enter
+the comparison. The lifetime scan begins at before-window start and extends to
+the latest repository observation, including retries and failures beyond either
+dispatch window. Outcome evidence must cover each cohort's complete dispatch
+window; missing PRs, missing repository observations, incomplete PR/commit
+enumeration, or session parsing/token errors withhold at the coverage gate.
+Unknown record types also block coverage. Duplicates successfully removed by the
+adapters are counted and do not block. A run with no observed sessions withholds.
+No local reader can prove that a deleted log was ever present: reported coverage
+and the unlinked threshold expose observed gaps, not historical completeness.
+
+A deliverable's linked sessions must all be on its dispatch arm's side of
+`applied_at`. The boundary belongs to after. Both first and last observed session
+timestamps are checked, including context and nonbillable records; a shared or
+resumed session spanning application is conservatively mixed. This does not
+assert event-specific harness versions that the logs cannot establish.
+
+Mixed deliverables are excluded from both arms and counted by originating arm.
+Unlinked deliverables are also excluded. A row with only weak project/time
+evidence, or any weak allocation alongside stronger links, counts as unlinked;
+weak allocation cannot support exposure or lifetime cost. The combined excluded
+and unlinked share **over 10% in either candidate arm** blocks comparability.
+Exactly 10% does not. Excluded work never silently becomes a failure or success
+in the reported retained arm. At dispatch, put the deliverable ID in the
+worktree folder or branch name: the existing evidence rules read those fields
+to establish strong links.
+
+Unattributed lifetime spend is `(unallocated + unassigned + weak-linked) /
+(linked + unallocated + unassigned + weak-linked)`. Here `linked` means strong
+linked tokens; the scan's linked bucket already contains weak-linked tokens,
+so those tokens are counted once in the denominator. `unassigned` remains a
+conservative inclusion because it may belong to this project. Spend confidently
+attributed to `other` projects is excluded from both numerator and denominator
+and reported separately as context. Shares **over 5%** block comparability.
+The numerator and denominator are reported. Zero relevant observed tokens give
+an undefined share, not a claimed zero share.
+
+The checks basis must be identical across the retained arms. Every merged attempt,
+including follow-up repairs, contributes its basis: historical snapshots cannot
+be compared to current-policy or all-visible checks. A mixture inside a single
+deliverable also blocks. Unknown merged checks block. Abandoned work and closed
+unmerged PRs do not claim a checks-at-merge basis.
+
+Mixes use unique linked sessions per arm, with one observation per distinct
+session metadata value (several values in a session contribute several
+observations). They are not weighted by tokens. Models, efforts and CLI versions
+use collect's bounded labels/pseudonyms. Session metadata includes the agent.
+Observability is assessed per agent and dimension over the retained sessions:
+
+- If no session of an agent in either arm reports a dimension, an informational
+  `<kind>_unobservable` flag lists that agent. Its sessions are left out of that
+  dimension's mix. Changes in an unobservable dimension can only be caught by
+  registered confounder events, which block comparison.
+- If some sessions of an agent report the dimension and others in the same arm
+  do not, `<kind>_metadata_partial` blocks comparison and lists the agents.
+- If an agent reports the dimension in one arm only,
+  `<kind>_metadata_asymmetric` blocks comparison and lists the agents.
+
+The mix-shift rule applies to the remaining reported session values. Tied
+dominant values are reported as a set. A change in that dominant set, or total variation distance `0.5 * sum(abs(after_share - before_share))`
+**over 0.2**, is blocking for each metadata dimension.
+
+Registered runner/model/effort/CLI events inside either dispatch window block.
+Events at an excluded window end do not. Other registered events are
+informational. Arm sizes differing by more than 50% relative to the smaller arm,
+and task-type mix total variation distance over 0.2, are informational. Task mix
+uses deliverable counts, including an explicit missing category distinct from a
+literal `not_reported` task label. Task breakdowns are descriptive: rates and
+costs are shown, with no per-type verdict or multiple-comparison claims.
+
+### Statistical methods
+
+For eventual success, each retained arm reports successes / all retained
+deliverables and the existing Wilson 95% interval. Immature and in-progress
+deliverables remain in this descriptive denominator, but block a verdict.
+The after-minus-before interval is Newcombe's hybrid score **method 10**, without
+continuity correction. If the two Wilson intervals are `[La, Ua]` and `[Lb, Ub]`,
+with rates `pa` and `pb`, the difference `d = pa - pb` has limits
+`d - sqrt((pa-La)^2 + (Ub-pb)^2)` and
+`d + sqrt((Ua-pa)^2 + (pb-Lb)^2)`.
+Non-inferiority holds only when the lower limit is strictly above `-margin/100`;
+inferiority holds only when the upper limit is strictly below it. Equality is
+inconclusive. Empty arms have unreported rates and difference intervals.
+See [Newcombe (1998), Statistics in Medicine 17:873-890](https://doi.org/10.1002/(SICI)1097-0258(19980430)17:8%3C873::AID-SIM779%3E3.0.CO;2-I).
+Tests reproduce all eight method-10 worked contrasts in its Table II to the
+published four decimal places and reuse the existing Wilson worked numbers.
+
+The needed sample per arm is the equal-arm unpooled normal approximation
+`ceil(2*p*(1-p)*(z(0.975)+z(0.8))^2 / (margin/100)^2)`, using the observed before
+rate `p`, one-sided alpha 0.025, power 0.8, and true difference zero.
+`statistics.NormalDist` supplies the quantiles. This is a planning approximation,
+not an exact power calculation for the Newcombe interval; see
+[the non-inferiority sample-size derivation](https://pmc.ncbi.nlm.nih.gov/articles/PMC2701110/).
+The registered, estimated needed, and actual per-arm sizes appear together.
+Actual sizes must reach the **registered** size. The diagnostic estimate never
+rewrites that pre-registration after seeing outcomes. At baseline 0 or 1, this
+approximation degenerates to zero; the report warns, and still enforces the
+positive registered size. An empty before arm gives an unreported estimate.
+
+Tokens per success sum each arm's **lifetime linked spend**, including failures,
+retries, and repairs, then divide by eventual successes. Kinds and the total are
+shown; the total excludes the reasoning subset. Time per success sums all arm
+deliverables' dispatch-to-final-merge/abandonment elapsed seconds and divides by
+successes. This is summed deliverable waiting time, not summed session activity.
+Any retained final deliverable without an elapsed measurement blocks coverage.
+Required token fields missing from billable events also block coverage; Codex's
+structurally unsupported cache-write field and optional reasoning subset remain
+unreported without blocking its reported total. Per-kind aggregates require a
+reported value for every deliverable; partial aggregates are never zero-filled.
+
+Bootstrap whole deliverables independently **within each arm**, with replacement
+at its actual sample size. Every draw resamples success indicators and all
+associated spend/time together, then recomputes cost per success and the
+after/before ratio. One set of draws is reused across token kinds and time. The
+default is seeded `random.Random(1729)` with 5000 draws; `--seed` and
+`--resamples` (integer, at least 100) are recorded. Deliverables are sorted by
+ledger ID before resampling, making input row order irrelevant. The 95% interval
+uses the 2.5th and 97.5th empirical percentiles, linearly interpolated at
+`(resamples-1)*q`. See [Efron and Tibshirani (1986), Statistical Science](https://doi.org/10.1214/ss/1177013815).
+Intervals are also reported for each arm's aggregate cost per success.
+
+A zero-success draw or zero before-cost denominator yields an undefined ratio.
+Undefined draws are counted. If **any** draw is undefined, that metric's interval
+is unreported and classification is uncertain; finite draws are never silently
+conditioned on success. All-zero after cost with positive before cost is a real
+zero ratio. Unreported cost stays null. A ratio is `improved` only if its point
+estimate is <= 0.90 and its upper bound < 1.00; `worse` only if its lower bound
+> 1.00; otherwise `uncertain`. Only **total tokens** and time drive the verdict;
+per-kind ratios are descriptive.
+
+### Decision order and public output
+
+The catalog's `judgment_policy.decision_order` governs four stages:
+
+1. Coverage: incomplete evidence proposes `withhold`, listing specific reasons.
+2. Comparability: late registration or blocking flags propose `withhold`, with
+   `not_preregistered` and/or `not_comparable` plus named flags.
+3. Success: immature/in-progress work, undersized arms, and inconclusive success
+   propose `withhold`; inferior success proposes `reject`.
+4. Time and total tokens, once success is non-inferior:
+   - Significant success improvement (difference lower bound > 0) with any
+     worse cost proposes `owner_decides`, even if both costs worsen.
+   - One improved cost and the other worse proposes `owner_decides`.
+   - Both costs worse otherwise proposes `reject`.
+   - One cost worse and the other uncertain, without significant success
+     improvement, proposes `reject: tokens_worse_without_offset` or
+     `reject: time_worse_without_offset`.
+   - Neither cost worse and at least one improved proposes `adopt`.
+   - Otherwise propose `withhold: no_detectable_change`.
+
+Every verdict is explicitly a **proposal**. Earlier gates cannot be bypassed by
+a later rejection. The owner remains responsible for approval and independent
+review; no result modifies a gate. Predictions remain hypotheses and do not
+select additional tests or per-type verdicts after seeing outcomes.
+
+JSON contains numerator, denominator, estimate and interval for each inferred
+rate/ratio, and per-success numerator/denominator/interval for cost and time.
+The difference embeds both success-rate components. Accounting fractions carry
+`interval_95: null` with `not_applicable_census`; bookkeeping counts, seeds,
+thresholds and registered parameters have no sampling interval. Task cost
+breakdowns explicitly use `not_estimated_descriptive`. Null means unreported or
+undefined, never zero. The text summary reports the same components and labels.
+Coverage counters, link evidence, pseudonymous session metadata, exclusions and
+flag evidence make each allocation inspectable.
+
+Compare additionally pseudonymizes deliverable and intervention IDs. PR,
+repository and session IDs follow deliver's pseudonym policy. Task/event/metric
+labels must be public-safe categories. Acceptance, notes, branches, prompts,
+commands, outcome prose, paths, host names and prediction conditions are absent.
+Use a local salt before sharing. See the authored
+[round calculations and verdict cases](../tests/fixtures/compare/ROUND.md).

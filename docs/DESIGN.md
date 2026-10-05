@@ -48,7 +48,7 @@ Self-improvement that is not filtered by outcomes can make things worse. Context
 
    Changes in model, effort, CLI version or runner setup during the window mark the comparison as *not comparable*.
 6. **Verdicts:** adopt, reject, owner decides, or withhold.
-   - Adopt only when non-inferiority holds, neither time nor tokens get worse, and at least one improves by more than 10%.
+   - Adopt only when non-inferiority holds, neither time nor tokens get worse, and at least one improves by at least 10% with its ratio interval strictly below 1.
    - Cost ratios carry bootstrap intervals; success rates carry numerator, denominator and an interval.
 7. **Safety.**
    - No verdict weakens an approval, a cross-family review or a money-path gate. A gate-change detector watches for it.
@@ -153,6 +153,12 @@ Windows are `[start, end)` everywhere. Errors, caps and unsupported fields are r
 - **Comparison:** by cohort, with breakdowns by task type.
 - **Confounder flags:** model, effort and CLI mix; runner setup; exposure version; volume and difficulty shifts.
 - **Verdicts are proposals.** The retro session and the owner decide.
+- **Implemented in M2:** pre-registration validation, equal dispatch windows,
+  mixed-exposure exclusions, Wilson and Newcombe method-10 score intervals,
+  sample-size diagnostics, deterministic deliverable bootstrap cost ratios,
+  descriptive task-type breakdowns and ordered coverage/comparability gates.
+  Both arms must use the same checks basis, including all merged attempts.
+  See [M2 measurement rules](MEASUREMENT.md#m2-pre-registered-comparison-and-verdict-proposals).
 
 ### 3. Propagate — `sumbi notice sync`
 
@@ -201,6 +207,7 @@ Windows are `[start, end)` everywhere. Errors, caps and unsupported fields are r
   - Scope: join sessions with a minimal `deliverables.csv` and recorded GitHub responses to report the four deliverable states and cost per success.
   - Accept: matches hand-computed truths, including a failure with no pull request.
 - **M2 — minimal judging.**
+  - Status: implemented as `sumbi compare`; verdicts are proposals for review.
   - Scope: cohort comparison, non-inferiority margin and sample size, intervals on cost ratios, task-type breakdown, confounder flags.
   - Accept: reproduces a hand-built round table, or explains every difference.
 - **M3 — real connections.**

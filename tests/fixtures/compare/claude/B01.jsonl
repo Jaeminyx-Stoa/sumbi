@@ -1,0 +1,1 @@
+{"type": "assistant", "sessionId": "synthetic-claude-B01", "timestamp": "2030-01-01T00:00:03Z", "cwd": "Z:/synthetic/sample/B01", "version": "1.0", "message": {"id": "synthetic-message-B01", "model": "synthetic-model", "content": [], "usage": {"input_tokens": 60, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 20, "output_tokens": 20}}}
