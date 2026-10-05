@@ -272,6 +272,11 @@ class EventAttributionTests(unittest.TestCase):
                              self.token(1, 10, 3, 2, ordinal=2)])
         self.assertEqual(self.rows(self.report())["alpha"]["tokens"], 12)
 
+    def test_same_timestamp_and_ordinal_use_accepted_record_order(self):
+        self.write("codex", [self.context(0, self.a, ordinal=1), self.token(1, 10, 3, 2, ordinal=2),
+                             self.context(1, self.b, ordinal=2)])
+        self.assertEqual(self.rows(self.report())["alpha"]["tokens"], 12)
+
     def test_origin_scope_never_falls_back_to_a_matching_tool_path(self):
         self.rules = [ProjectRule("alpha", origins=["example.test/team/allowed"], paths=["*"])]
         subprocess.run(["git", "-C", str(self.b), "remote", "add", "origin",
@@ -320,6 +325,16 @@ class PathEvidenceTests(unittest.TestCase):
         self.assertEqual(tool_evidence("exec_command", "not json"), (None, []))
         self.assertIsNone(resolve_path("~/.private"))
         self.assertIsNone(resolve_path("relative.txt"))
+
+    def test_git_operations_inside_quoted_arguments_are_not_evidence(self):
+        for command in ("echo '; git -C /synthetic/beta'", 'echo "x && git -C /synthetic/beta"',
+                        "echo x # ; git -C /synthetic/beta", r"echo x\; git -C /synthetic/beta",
+                        "echo x^& git -C /synthetic/beta", "echo $x; git -C /synthetic/beta"):
+            self.assertEqual(shell_paths(command), [])
+
+    def test_relative_git_operand_after_leading_cd_uses_that_directory(self):
+        self.assertEqual(shell_paths("cd /synthetic/beta && git -C src status"),
+                         ["/synthetic/beta", "/synthetic/beta/src"])
 
     def test_patch_targets_are_extracted_without_patch_content(self):
         _, paths = tool_evidence("apply_patch", "*** Begin Patch\n*** Add File: /synthetic/a\n+private\n"

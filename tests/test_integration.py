@@ -142,6 +142,7 @@ class IntegrationTests(unittest.TestCase):
                                          "sessions_selected": 3, "sessions_excluded": 1})
         self.assertEqual(len({s["project"]["project_key"] for s in report["sessions"]}), 1)
         self.assertTrue(all(s["project"]["bucket"] == "project" for s in report["sessions"]))
+        self.assertTrue(all("links" in s["project"] for s in report["sessions"]))
 
     def test_baseline_exact_normalized_origin_and_no_wrong_origin_fallback(self):
         self.git_repository("repository", "https://example.test/team/fixture[one].git")

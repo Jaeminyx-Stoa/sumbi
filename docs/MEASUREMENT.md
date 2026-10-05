@@ -151,7 +151,8 @@ not mined. Paths and commands are retained in memory only.
 A Codex delta spanning a working-directory change belongs entirely to the
 project in force at its closing snapshot. Cumulative counters provide no measured
 split within that interval; proportional splitting would invent precision. Equal
-timestamps use logged ordinals when available, otherwise accepted record order.
+timestamps use logged ordinals when available, with accepted record order as the
+tie breaker and as the fallback when an ordinal is absent.
 The counter baseline and attribution state include pre-window events. Neither
 future directories nor future tool calls can change an earlier delta's link.
 Claude's selected streaming snapshot supplies both usage and its own evidence.

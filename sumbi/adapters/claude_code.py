@@ -36,7 +36,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
             if not session.accept(event, coverage):
                 continue
             when = timestamp(event.get("timestamp"))
-            order = len(session.seen)
+            order = (len(session.seen), len(session.seen))
             session.cwd(event.get("cwd"), when)
             if event.get("version"):
                 session.versions.add(label(event["version"], "version"))

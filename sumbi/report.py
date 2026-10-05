@@ -68,7 +68,8 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
                     continue
                 row["allocations"] = selected
                 if selected:
-                    row["project"] = {k: selected[0][k] for k in ("bucket", "project_key", "rule", "evidence")}
+                    row["project"] = {**row["project"], **{k: selected[0][k]
+                        for k in ("bucket", "project_key", "rule", "evidence")}}
                     for kind in (*TOKEN_KINDS, "total"):
                         reported = [a["tokens"][kind] for a in selected if a["tokens"][kind] is not None]
                         row["tokens"][kind] = sum(reported) if reported else None

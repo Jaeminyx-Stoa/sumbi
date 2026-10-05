@@ -72,7 +72,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                 continue
             when = timestamp(event.get("timestamp"))
             order = integer(event.get("ordinal"))
-            order = order if order is not None else len(session.seen)
+            order = (order if order is not None else len(session.seen), len(session.seen))
             if kind not in KNOWN:
                 coverage.unknown(kind)
             if kind in ("session_meta", "turn_context") and not inherited_meta:
@@ -95,9 +95,8 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                                 or values["cached_input_tokens"] > values["input_tokens"]:
                             coverage.invalid_token_records += 1
                         else:
-                            order = integer(event.get("ordinal"))
                             snapshots.setdefault(session.raw_id, []).append(
-                                (when, order if order is not None else len(session.seen), values))
+                                (when, order, values))
                 elif subtype in ("task_started", "task_complete", "task_completed"):
                     start = epoch(payload.get("started_at"))
                     end = epoch(payload.get("completed_at"))

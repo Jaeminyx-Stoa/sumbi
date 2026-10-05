@@ -8,6 +8,7 @@ import json
 import ntpath
 import posixpath
 import re
+import shlex
 
 from sumbi.model import mapping, normalize_path
 
@@ -42,12 +43,33 @@ def shell_paths(command):
             return []
     if not isinstance(command, str):
         return []
+    # These forms need shell-specific evaluation, beyond literal operand extraction.
+    if "$" in command or "`" in command or re.search(r"[\\^][;&|]", command):
+        return []
+    try:
+        lexer = shlex.shlex(command, posix=False, punctuation_chars=";&|")
+        lexer.whitespace_split = True
+        words = list(lexer)
+    except ValueError:
+        return []
     paths = []
     leading = re.match(r"^\s*cd\s+(?:/d\s+|--\s+)?" + PATH_WORD + r"(?=\s*(?:&&|;|$))", command, re.I)
     if leading:
         paths.append(leading[1].strip("\"'"))
-    for match in re.finditer(r"(?:^|[;&|]\s*)\s*git\s+-C\s+" + PATH_WORD, command):
-        paths.append(match[1].strip("\"'"))
+    segments = [[]]
+    for word in words:
+        if word in (";", "&&", "||", "|"):
+            segments.append([])
+        else:
+            segments[-1].append(word)
+    for segment in segments:
+        if len(segment) >= 3 and segment[:2] == ["git", "-C"]:
+            operand = segment[2].strip("\"'")
+            if leading and not ntpath.isabs(operand) and not operand.startswith("/"):
+                base = leading[1].strip("\"'")
+                module = ntpath if ntpath.splitdrive(base)[0] else posixpath
+                operand = module.join(base, operand)
+            paths.append(operand)
     return paths
 
 
