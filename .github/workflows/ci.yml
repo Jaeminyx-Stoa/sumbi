@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit tests
+        run: |
+          if [ -d tests ]; then python -m unittest discover -s tests -v; else echo "no tests yet"; fi
+
+  leak-check:
+    # The repository will be public. A maintainer-held secret lists internal names that must
+    # never appear here; forks and clones without the secret skip this job.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: No internal names
+        env:
+          LEAK_PATTERNS: ${{ secrets.LEAK_PATTERNS }}
+        run: |
+          if [ -z "$LEAK_PATTERNS" ]; then echo "LEAK_PATTERNS is not set; skipping"; exit 0; fi
+          if git grep -lIiE "$LEAK_PATTERNS" -- . ':!LICENSE'; then
+            echo "Internal names found in the files listed above."
+            exit 1
+          fi

@@ -34,4 +34,4 @@ The design is in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## License
 
-To be decided before the first public release.
+[Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for credits.
