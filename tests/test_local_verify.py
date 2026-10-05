@@ -322,6 +322,128 @@ class UnitTests(unittest.TestCase):
         self.assertEqual(report["coverage"]["commands"]["unknown_execution_start"], 1)
         self.assertEqual(report["coverage"]["commands"]["verification_cwd_unconfirmed"], 1)
 
+    def test_inherited_history_cannot_supply_worker_edits_checks_or_elapsed(self):
+        own = timestamp("2030-01-02T01:00:00Z")
+        old = own - timedelta(days=1)
+        inherited = [
+            {"type": "session_meta", "timestamp": old.isoformat(), "payload": {"id": "parent", "cwd": str(self.repo)}},
+            {"type": "response_item", "timestamp": (old + timedelta(seconds=1)).isoformat(), "payload": {
+                "type": "custom_tool_call", "name": "apply_patch", "call_id": "parent-edit", "input": "synthetic"}},
+            {"type": "event_msg", "timestamp": (old + timedelta(seconds=3)).isoformat(), "payload": {
+                "type": "item_completed", "started_at_ms": int((old + timedelta(seconds=2)).timestamp() * 1000),
+                "item": {"type": "CommandExecution", "id": "parent-check", "command": ["bash", SCRIPT],
+                         "cwd": str(self.repo), "exit_code": 0}}},
+        ]
+        for identity, edits, verify in (("unchanged-child", False, False), ("own-check-only", False, True),
+                                        ("own-edit-only", True, False), ("own-work", True, True)):
+            records = self.write_codex(identity, start=own.isoformat(), edits=edits, verify=verify)
+            records[1:1] = inherited
+            self.save(self.codex / ("rollout-" + identity + ".jsonl"), records)
+        report = self.report()
+        self.assertEqual(len(report["units"]), 4)
+        self.assertEqual(report["states"], {"success": 1, "failed": 0, "unverified": 1, "in_progress": 0, "no_change": 2})
+        self.assertEqual(report["success_rate"]["denominator"], 2)
+        self.assertEqual(report["coverage"]["commands"]["matched"], 2)
+        self.assertTrue(all(row["elapsed_seconds"] >= 0 for row in report["units"]))
+        self.assertTrue(all(timestamp(row["last_at"]) >= own for row in report["units"]))
+
+    def test_activity_and_checks_obey_both_lifetime_bounds(self):
+        from sumbi.local_outcomes import state
+        from sumbi.model import Session
+        start = timestamp("2030-01-02T01:00:00Z")
+        lifetime = Window(start, start + timedelta(minutes=1))
+        session = Session("codex", "synthetic")
+        session.times.add(start - timedelta(seconds=1))
+        session.edit("old-edit", start - timedelta(seconds=3))
+        session.execution("old-check", start - timedelta(seconds=1), ["bash", SCRIPT], 0,
+                          started_at=start - timedelta(seconds=2), cwd=str(self.repo))
+        result = state(session, lifetime, (SCRIPT,), 5, self.repo)
+        self.assertEqual(result[0], "no_change")
+        self.assertIsNone(result[3])
+        self.assertNotIn("matched", result[2])
+        # Upper-bound events also cannot replace the genuine worker check.
+        session.edit("own-edit", start + timedelta(seconds=1))
+        session.execution("own-check", start + timedelta(seconds=3), ["bash", SCRIPT], 0,
+                          started_at=start + timedelta(seconds=2), cwd=str(self.repo))
+        session.times.add(start + timedelta(seconds=4))
+        session.edit("future-edit", lifetime.until)
+        session.execution("future-check", lifetime.until, ["bash", SCRIPT], 2,
+                          started_at=lifetime.until, cwd=str(self.repo))
+        session.times.add(lifetime.until)
+        self.assertEqual(state(session, lifetime, (SCRIPT,), 0, self.repo)[0], "success")
+
+    def test_check_crossing_dispatch_does_not_preserve_an_earlier_success(self):
+        records = self.write_codex("crossing")
+        start = timestamp(records[0]["timestamp"])
+        records.append({"type": "event_msg", "timestamp": (start + timedelta(seconds=7)).isoformat(), "payload": {
+            "type": "item_completed", "started_at_ms": int((start - timedelta(seconds=1)).timestamp() * 1000),
+            "item": {"type": "CommandExecution", "id": "crossing-check", "command": ["bash", SCRIPT],
+                     "cwd": str(self.repo), "exit_code": 0}}})
+        self.save(self.codex / "rollout-crossing.jsonl", records)
+        report = self.report()
+        self.assertEqual(report["states"]["unverified"], 1)
+        self.assertEqual(report["units"][0]["reason"], "check_start_not_after_last_edit")
+
+    def test_completion_only_cwd_comes_from_execution_start_not_completion(self):
+        other = str(self.repo / "other")
+        for identity, before, after, explicit, expected in (
+                ("wrong-at-start", other, str(self.repo), None, "unverified"),
+                ("root-at-start", str(self.repo), other, None, "success"),
+                ("explicit-root", other, other, str(self.repo), "success"),
+                ("explicit-other", str(self.repo), str(self.repo), other, "unverified")):
+            records = self.write_codex(identity)
+            start = timestamp(records[0]["timestamp"])
+            records.extend({"type": "turn_context", "timestamp": (start + timedelta(seconds=seconds)).isoformat(),
+                            "payload": {"cwd": cwd}} for seconds, cwd in ((2.5, before), (3.5, after)))
+            completion = next(r for r in records if r.get("payload", {}).get("type") == "item_completed")
+            if explicit is not None:
+                completion["payload"]["item"]["cwd"] = explicit
+            self.save(self.codex / ("rollout-" + identity + ".jsonl"), records)
+            session = next(s for s in collect_codex(self.home, self.window, Coverage()) if s.raw_id == identity)
+            self.assertEqual(session.commands["check-1"].cwd, explicit if explicit is not None else before)
+        self.assertEqual(self.report()["states"]["success"], 2)
+        self.assertEqual(self.report()["states"]["unverified"], 2)
+
+    def test_paired_start_and_legacy_begin_keep_execution_cwd(self):
+        for identity, legacy, explicit in (("paired", False, True), ("paired-inferred", False, False),
+                                            ("legacy", True, False)):
+            records = self.write_codex(identity, legacy=legacy)
+            start = timestamp(records[0]["timestamp"])
+            if not legacy:
+                item = {"type": "CommandExecution", "id": "check-1", "command": ["bash", SCRIPT]}
+                if explicit:
+                    item["cwd"] = str(self.repo)
+                    records.append({"type": "turn_context", "timestamp": (start + timedelta(seconds=2.5)).isoformat(),
+                                    "payload": {"cwd": str(self.repo / "other")}})
+                index = next(i for i, r in enumerate(records) if r.get("payload", {}).get("type") == "item_completed")
+                records.insert(index, {"type": "event_msg", "timestamp": (start + timedelta(seconds=3)).isoformat(),
+                                       "payload": {"type": "item_started", "item": item}})
+            records.append({"type": "turn_context", "timestamp": (start + timedelta(seconds=3.5)).isoformat(),
+                            "payload": {"cwd": str(self.repo / "other")}})
+            self.save(self.codex / ("rollout-" + identity + ".jsonl"), records)
+        self.assertEqual(self.report()["states"]["success"], 3)
+
+    def test_inferred_cwd_rejects_ambiguous_untimed_or_pre_dispatch_context(self):
+        for identity, kind in (("ambiguous-context", "ambiguous"), ("untimed-context", "untimed"),
+                               ("pre-dispatch-context", "old"), ("no-execution-start", "missing")):
+            records = self.write_codex(identity)
+            start = timestamp(records[0]["timestamp"])
+            if kind == "ambiguous":
+                records.extend({"type": "turn_context", "timestamp": (start + timedelta(seconds=2.5)).isoformat(),
+                                "payload": {"cwd": cwd}} for cwd in (str(self.repo), str(self.repo / "other")))
+            elif kind == "untimed":
+                records.append({"type": "turn_context", "timestamp": "invalid", "payload": {"cwd": str(self.repo)}})
+            elif kind == "old":
+                records.append({"type": "turn_context", "timestamp": (start - timedelta(seconds=1)).isoformat(),
+                                "payload": {"cwd": str(self.repo / "other")}})
+            else:
+                next(r for r in records if r.get("payload", {}).get("type") == "item_completed")["payload"].pop("started_at_ms")
+            self.save(self.codex / ("rollout-" + identity + ".jsonl"), records)
+        report = self.report()
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(report["states"]["unverified"], 3)
+        self.assertEqual(report["coverage"]["commands"]["unknown_execution_cwd"], 3)
+
     def registration(self, **changes):
         data = json.loads((Path(__file__).parent / "fixtures/compare/registration.json").read_text())
         data.update(outcome_source="local-verify", sample_size_per_arm=1,

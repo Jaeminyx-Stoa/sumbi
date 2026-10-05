@@ -27,8 +27,8 @@ def token_measurement(session, scan):
 
 
 def state(session, scan, declared, active_minutes, repository):
-    edits = [t for t in session.edits.values() if t < scan.until]
-    executions = sorted((e for e in session.commands.values() if e.at < scan.until), key=lambda e: e.at)
+    edits = [t for t in session.edits.values() if scan.contains(t)]
+    executions = sorted((e for e in session.commands.values() if scan.contains(e.at)), key=lambda e: e.at)
     coverage = Counter()
     coverage.update(session.local_evidence_gaps)
     matches = []
@@ -40,7 +40,7 @@ def state(session, scan, declared, active_minutes, repository):
             coverage["unknown_execution_start"] += execution.started_at is None
             coverage["unknown_execution_cwd"] += execution.cwd is None
             matches.append(execution)
-    times = [t for t in session.times if t < scan.until]
+    times = [t for t in session.times if scan.contains(t)]
     latest = max(times, default=None)
     if not edits and not session.local_evidence_gaps.get("edit_timestamp_missing"):
         result, reason = "no_change", "no_known_edit"
@@ -57,7 +57,8 @@ def state(session, scan, declared, active_minutes, repository):
         codes = {e.exit_code for e in last}
         if not last:
             result, reason = "unverified", "no_check_after_last_edit"
-        elif any(e.started_at is None or e.started_at <= last_edit or e.started_at > e.at for e in last):
+        elif any(e.started_at is None or not scan.contains(e.started_at)
+                 or e.started_at <= last_edit or e.started_at > e.at for e in last):
             result, reason = "unverified", "check_start_not_after_last_edit"
         elif any(execution_cwd(e.cwd) != execution_cwd(str(repository.resolve())) for e in last):
             result, reason = "unverified", "verification_cwd_unconfirmed"

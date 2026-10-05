@@ -878,6 +878,12 @@ for safe interpretation. Codex recognizes Desktop `item_completed` /
 Codex verification completion requires a numeric `exit_code` machine field;
 anchored text in output can inform legacy friction counters but never supplies a
 verification outcome.
+Execution cwd comes from the execution's explicit field, a paired start's field,
+or unambiguous own-session header/turn context in force at its recorded start.
+A later context cannot retroactively confirm cwd. Completion-only records with
+a valid start time can use historical context; unknown start times, ambiguous
+or undated contexts remain unknown. Unrelated tool workdirs and pre-dispatch
+replayed context do not prove the worker's execution cwd.
 Claude Code pairs `Bash` tool uses and results by ID. The foreground result
 envelope with `interrupted: false`, string stdout/stderr and `is_error: false`
 means exit zero even where no numeric exit field is logged. An error's anchored
@@ -918,6 +924,10 @@ the cohort independently of whether the worker edits anything or runs a check.
 Sessions starting outside the dispatch window cannot enter merely because they
 verify inside it. Parent orchestrators are separately reported as dispatch
 overhead, even if they span the intervention.
+Edits, completed executions and activity used for a worker outcome are bounded
+to `[dispatch, scan-until)`. A verification start must also fall in that lifetime
+and strictly after its last known edit. Inherited pre-dispatch edits and checks
+cannot make an unchanged child successful or give it negative elapsed time.
 Claude's earliest timestamp and earliest cwd-bearing event are preserved
 separately; an earlier metadata event without cwd does not erase that cwd.
 Local-only start provenance distinguishes session headers from first-observed

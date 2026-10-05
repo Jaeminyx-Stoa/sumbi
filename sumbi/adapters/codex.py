@@ -47,6 +47,19 @@ def verification_exit_code(payload: dict) -> int | None:
     return value if type(value) is int else None
 
 
+def _cwd_at_start(history, started_at, own_start):
+    """Use only unambiguous own-session context in force at execution start."""
+    if started_at is None or any(at is None for at, _ in history):
+        return None
+    eligible = [(at, cwd) for at, cwd in history if at <= started_at
+                and (own_start is None or at >= own_start)]
+    if not eligible:
+        return None
+    latest = max(at for at, _ in eligible)
+    values = {cwd for at, cwd in eligible if at == latest}
+    return next(iter(values)) if len(values) == 1 else None
+
+
 def collect(home: Path, window: Window, coverage: Coverage, *, local_review: bool = False,
             collect_links: bool = False) -> list[Session]:
     root = home / ".codex" / "sessions"
@@ -56,7 +69,8 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
     tool_names = {}
     commands = {}
     execution_context = {}
-    current_cwds = {}
+    cwd_contexts = {}
+    pending_cwds = {}
     for path in sorted(root.rglob("rollout-*.jsonl")):
         session = None
         meta_seen = False
@@ -98,8 +112,9 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
             if kind not in KNOWN:
                 coverage.unknown(kind)
             if kind in ("session_meta", "turn_context") and not inherited_meta:
-                if isinstance(payload.get("cwd"), str):
-                    current_cwds[session.raw_id] = payload["cwd"]
+                if "cwd" in payload:
+                    cwd_contexts.setdefault(session.raw_id, []).append((when,
+                        payload["cwd"] if isinstance(payload["cwd"], str) else None))
                 session.cwd(payload.get("cwd"), when)
                 session.context(when, order, payload.get("cwd"))
                 if collect_links and when:
@@ -138,7 +153,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                     if subtype == "exec_command_begin":
                         commands[session.raw_id, identity] = payload.get("command", payload.get("cmd"))
                         execution_context[session.raw_id, identity] = (when,
-                            payload.get("cwd", payload.get("workdir", current_cwds.get(session.raw_id))))
+                            payload.get("cwd", payload.get("workdir")), "cwd" in payload or "workdir" in payload)
                         cwd, paths = tool_evidence("exec_command", payload)
                         session.tool_paths(when, order, cwd, paths)
                         if collect_links and when:
@@ -148,9 +163,14 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                     session.interval("tool", identity, when, None)
                 elif subtype in ("exec_command_end", "mcp_tool_call_end"):
                     if subtype == "exec_command_end":
-                        started, cwd = execution_context.get((session.raw_id, identity), (None, None))
+                        started, cwd, explicit = execution_context.get((session.raw_id, identity), (None, None, False))
                         session.execution(identity, when, payload.get("command", commands.get((session.raw_id, identity))),
                                           verification_exit_code(payload), started_at=started, cwd=cwd)
+                        key = session.raw_id, str(identity)
+                        if not explicit:
+                            pending_cwds[key] = started
+                        else:
+                            pending_cwds.pop(key, None)
                     if collect_links and when:
                         name, query = tool_names.get((session.raw_id, identity), (None, False))
                         session.deliverable_events.append((when, order, "refs", tool_refs(
@@ -178,12 +198,19 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                         session.cwd(item.get("cwd"), when)
                         if subtype == "item_started":
                             execution_context[session.raw_id, identity] = (start or when,
-                                item.get("cwd", current_cwds.get(session.raw_id)))
+                                item.get("cwd"), "cwd" in item)
                         if subtype == "item_completed":
-                            started, cwd = execution_context.get((session.raw_id, identity), (None, None))
+                            started, cwd, explicit = execution_context.get((session.raw_id, identity), (None, None, False))
+                            resolved_start = start or started
+                            paired_cwd = explicit and started is not None and started == resolved_start
+                            resolved_cwd = item.get("cwd") if "cwd" in item else cwd if paired_cwd else None
                             session.execution(identity, when, item.get("command"), verification_exit_code(item),
-                                started_at=start or started,
-                                cwd=item.get("cwd", cwd or current_cwds.get(session.raw_id)))
+                                started_at=resolved_start, cwd=resolved_cwd)
+                            key = session.raw_id, str(identity)
+                            if "cwd" not in item and not paired_cwd:
+                                pending_cwds[key] = resolved_start
+                            else:
+                                pending_cwds.pop(key, None)
                     if item_type == "FileChange" and subtype == "item_completed":
                         session.edit(identity, when)
                     if item_type in ("CommandExecution", "FileChange"):
@@ -232,6 +259,13 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                     session.interval("tool", identity, None, when)
                 if subtype in ("message", "agent_message"):
                     session.local_text(payload.get("content"), when, window, local_review)
+    # Resolve after all streams are read: log ordering must not make a later
+    # context retroactively prove cwd, or hide a prior context recorded late.
+    for (raw_id, identity), started in pending_cwds.items():
+        session = sessions[raw_id]
+        execution = session.commands.get(identity)
+        if execution is not None:
+            execution.cwd = _cwd_at_start(cwd_contexts.get(raw_id, []), started, session.start_at)
     for raw_id, entries in contexts.items():
         eligible = [(t, model, effort) for t, model, effort in entries if t and t < window.until]
         prior = [entry for entry in eligible if entry[0] < window.since]
