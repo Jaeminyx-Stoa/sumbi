@@ -1,8 +1,8 @@
 # sumbi
 
-> **숨비 (sumbi)** — the breath a Korean *haenyeo* diver lets out when she surfaces from a long dive. She catches her breath, then dives again, a little better.
+> **sumbi** (Korean *숨비*) — the breath a Korean *haenyeo* diver lets out when she surfaces from a long dive. She catches her breath, then dives again, a little better.
 >
-> 숨비 — 코딩 에이전트에게 숨 고를 틈을.
+> sumbi gives coding agents room to catch their breath.
 
 sumbi is a self-improving harness for coding agents. Seed a sensible harness in any repository, watch the friction and waste in how your agents work, and keep only the changes that verifiably raise the task success rate while cutting the time and tokens each success costs.
 

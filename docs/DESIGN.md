@@ -2,7 +2,7 @@
 
 sumbi seeds a sensible harness, watches the friction and waste in how coding agents work, and improves the harness itself, so that task success rises while the time and tokens per success fall. It is meant to be planted in any repository and to serve any coding agent. It generalizes two harness labs that were run by hand in 2026.
 
-The first draft was reviewed by a model from a different family. This draft addresses its findings; see «Review record» at the end.
+The first draft was reviewed by a model from a different family. This draft addresses its findings; see [Review record](#review-record) at the end.
 
 ## Why another tool
 
@@ -165,12 +165,12 @@ A model from a different family reviewed draft 1. Verdict: proceed with changes 
 | Finding | Where draft 2 addresses it |
 |---|---|
 | P0: no deliverable registry or observation window | Invariants 1 and 3 |
-| P0: completeness of attributed spend | Invariant 4, «Data model and linking contract» |
-| P1: time definitions | «Time» under the linking contract |
+| P0: completeness of attributed spend | Invariant 4, [Data model and linking contract](#data-model-and-linking-contract) |
+| P1: time definitions | "Time" under the linking contract |
 | P1: parity with old collectors is not correctness | M1 acceptance (hand-computed truths) |
 | P1: overstated certainty | Invariants 5 and 6, M5 |
-| P1: privacy boundary | Invariant 7, «Risks» |
-| P1: propagation scope and gates | «Propagate» |
+| P1: privacy boundary | Invariant 7, [Risks](#risks) |
+| P1: propagation scope and gates | [Propagate](#3-propagate--sumbi-notice-sync) |
 | P1: milestone order | Measurement moved before propagation |
 | P1: unfair prediction baseline | Kept in the lab ledger, outside this repository |
 | P2: reuse standards, mark unverified claims | Standards reused; the support matrix marks each claim |
