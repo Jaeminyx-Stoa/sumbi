@@ -1,0 +1,14 @@
+[build-system]
+requires = []
+build-backend = "sumbi_build"
+backend-path = ["."]
+
+[project]
+name = "sumbi"
+version = "0.1.0"
+description = "Read-only session-log measurement for coding agents"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+sumbi = "sumbi.cli:main"

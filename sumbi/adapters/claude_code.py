@@ -1,0 +1,99 @@
+"""Claude Code JSONL: one maximal usage snapshot per assistant message."""
+
+from pathlib import Path
+
+from sumbi.model import Coverage, Session, Window, integer, label, mapping, records, timestamp
+
+KNOWN = {"assistant", "user", "system", "progress", "attachment", "summary",
+         "file-history-snapshot", "file-history-delta", "queue-operation", "pr-link",
+         "frame-link", "last-prompt", "custom-title", "agent-name", "agent-color",
+         "saved_hook_context", "worktree", "bridge_status", "legacy_bridge_status"}
+SYSTEM = {"compact_boundary", "api_error", "stop_hook_summary", "local_command",
+          "informational", "turn_duration", "request_start", "request_end"}
+FIELDS = {"new_input": "input_tokens", "cache_write": "cache_creation_input_tokens",
+          "cache_read": "cache_read_input_tokens", "output": "output_tokens"}
+
+
+def collect(home: Path, window: Window, coverage: Coverage, *, local_review: bool = False) -> list[Session]:
+    root = home / ".claude" / "projects"
+    sessions: dict[str, Session] = {}
+    messages: dict[str, dict] = {}
+    files = sorted(root.glob("*/*.jsonl")) + sorted(root.glob("*/**/subagents/**/*.jsonl"))
+    for path in dict.fromkeys(files):
+        parts = path.relative_to(root).parts
+        child = "subagents" in parts
+        index = parts.index("subagents") if child else None
+        parent_hint = parts[index - 1] if child else path.stem
+        agent_hint = (parts[index + 1] if child else path.stem).removesuffix(".jsonl").removeprefix("agent-")
+        session = None
+        for event in records(path, coverage):
+            if session is None:
+                parent = str(event.get("sessionId") or parent_hint)
+                raw_id = parent + ":subagent:" + str(event.get("agentId") or agent_hint) if child else parent
+                session = sessions.setdefault(raw_id, Session("claude-code", raw_id, parent if child else None))
+            raw_id = session.raw_id
+            if not session.accept(event, coverage):
+                continue
+            when = timestamp(event.get("timestamp"))
+            session.cwd(event.get("cwd"), when)
+            if event.get("version"):
+                session.versions.add(label(event["version"], "version"))
+            kind = event.get("type")
+            if kind not in KNOWN:
+                coverage.unknown(kind)
+            message = mapping(event.get("message"))
+            session.local_text(message.get("content"), when, window, local_review)
+            session.local_text(event.get("content"), when, window, local_review)
+            key = event.get("uuid") or len(session.seen)
+            if kind == "system":
+                subtype = event.get("subtype")
+                if subtype not in SYSTEM:
+                    coverage.unknown("system:" + str(subtype))
+                if subtype == "compact_boundary":
+                    session.count("compactions", key, when, window)
+                elif subtype == "api_error":
+                    session.count("api_errors", key, when, window)
+                elif subtype in ("request_start", "request_end"):
+                    session.interval("request", event.get("requestId") or key,
+                                     when if subtype == "request_start" else None,
+                                     when if subtype == "request_end" else None)
+            if kind == "assistant":
+                if message.get("model") and when and when < window.until:
+                    session.models.add(label(message["model"], "model"))
+                usage = mapping(message.get("usage"))
+                if usage:
+                    values = {k: integer(usage.get(v)) for k, v in FIELDS.items()}
+                    if when is None or values["output"] is None:
+                        coverage.invalid_token_records += 1
+                    else:
+                        # Streaming repeats input/cache and grows output. Choose largest output;
+                        # break ties by latest timestamp. Attribute the whole message to that event.
+                        identity = str(message.get("id") or event.get("uuid") or key)
+                        candidates = messages.setdefault(raw_id, {})
+                        previous = candidates.get(identity)
+                        rank = values["output"], when
+                        if previous is None or rank > previous[0]:
+                            candidates[identity] = rank, values
+            blocks = message.get("content")
+            if not isinstance(blocks, list):
+                continue
+            for index, block in enumerate(blocks):
+                if not isinstance(block, dict):
+                    continue
+                if kind == "assistant" and block.get("type") == "tool_use":
+                    identity = block.get("id") or str(key) + ":" + str(index)
+                    session.count("tool_calls", identity, when, window)
+                    session.interval("tool", identity, when, None)
+                    if block.get("name") == "AskUserQuestion":
+                        session.count("user_input_requests", identity, when, window)
+                elif kind == "user" and block.get("type") == "tool_result":
+                    identity = block.get("tool_use_id") or str(key) + ":" + str(index)
+                    session.count("tool_results", identity, when, window)
+                    if block.get("is_error") is True:
+                        session.count("tool_errors", identity, when, window)
+                    session.interval("tool", identity, None, when)
+    for raw_id, candidates in messages.items():
+        for (_, when), values in candidates.values():
+            if window.contains(when):
+                sessions[raw_id].add_tokens(values)
+    return list(sessions.values())

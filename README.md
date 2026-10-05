@@ -6,7 +6,12 @@
 
 sumbi is a self-improving harness for coding agents. Seed a sensible harness in any repository, watch the friction and waste in how your agents work, and keep only the changes that verifiably raise the task success rate while cutting the time and tokens each success costs.
 
-**Status:** early design. Nothing here is usable yet.
+**Status:** M1a provides read-only local session measurement for Claude Code and
+Codex. Outcomes, judging and propagation remain planned.
+
+Run `python -m sumbi.cli collect --since 2030-01-01T00:00Z --until 2030-01-02T00:00Z`
+from a checkout, or install the package to use `sumbi collect`. The command prints
+a summary and writes `out/collect.json`. See [measurement behavior and options](docs/MEASUREMENT.md).
 
 ## What it will do
 
