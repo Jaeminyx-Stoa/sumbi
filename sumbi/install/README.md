@@ -1,0 +1,147 @@
+# Offline install (M1b)
+
+Python 3.11 or later and the standard library are sufficient. The standalone
+namespace-package entry point works before integration with the shared CLI:
+
+```console
+python -m sumbi.install
+python -m sumbi.install --dry-run --json plan.json
+python -m sumbi.install --apply --select handoff,parallel-worktrees
+python -m sumbi.install --exclude 'samples/**' --exclude '**/generated'
+python -m unittest discover -s tests
+```
+
+`--root` selects a repository; the default is the current directory. Dry-run
+only reads unless `--json` explicitly requests a new plan file. JSON contains
+the full inventory, evidence, proposals, zero-context unified diffs, and hashes.
+Its destination must be repository-relative, have an existing parent, and not
+already exist or overlap a planned target or repository metadata.
+
+The default plan includes all candidate practices. Use `--select` to start
+with one to three practices for a later measured round. IDs that do not address
+a current gap produce no change. Unknown IDs fail before application.
+
+## Inventory and gaps
+
+Inventory never executes a repository command or loads a repository module.
+It reports paths, counts and parsed workflow job labels. Commands, prompts,
+permission values, MCP details and instruction text are not exported. Imports
+are resolved relative to their source file, only within the repository; cycles
+are bounded and external, missing and linked targets are visible without being
+read. Required checks and rulesets remain `unknown (offline)`.
+
+Instruction size is `ceil(characters / 4)` after normalizing line endings.
+Unique imported files count once
+per agent. Root instructions are reported separately from the largest inherited
+scope: siblings are never summed as if they loaded together. Nested instructions
+include ancestor instructions and their import closures. All rule files are
+included, so this remains an upper bound where rules are conditional, not a
+measurement of a particular task's loaded context. Dynamic/global configuration
+is not read. Skill-description estimates
+use UTF-8 text front matter, including common scalar and block descriptions.
+Every-prompt counts identify declared `UserPromptSubmit` hooks; sumbi does not
+claim that a configured hook actually ran.
+
+Files larger than 1 MiB, invalid UTF-8/configuration, unsupported workflow
+syntax and inaccessible directories produce diagnostics. Default exclusions
+prune `.git`, `.sumbi`, `node_modules`, `vendor`, `.venv`, `venv`, `dist`,
+`build` and `__pycache__` at any depth. A `fixtures` or `testdata` tree beneath
+any `tests` or `test` directory is excluded too. Other nested instruction files
+belong to the repository's own scopes, including instructions for test code.
+
+Repeat `--exclude GLOB` to add repository-relative exclusions, or configure:
+
+```toml
+# .sumbi/config.toml
+exclude = ["samples/**", "**/generated"]
+```
+
+The installer reads this optional file with `tomllib` before pruning `.sumbi`.
+Invalid configuration fails with a sanitized error. Defaults, configuration
+and command-line patterns are additive. `*`, `?` and character classes match
+within one path segment; `**` matches zero or more segments. Matching ignores
+case for consistent Windows and WSL behavior. A matched directory excludes
+its entire subtree. Use forward slashes, without absolute paths or traversal.
+The report gives only patterns and counts of pruned roots (files or directories),
+not their paths or descendant counts. Imports into excluded trees are recorded
+as `excluded-not-read` without the target path; instructions in those trees
+cannot import back out because they are never scanned. Exclusions also govern
+cost scopes, convention evidence, catalog targets and apply-time plan validation.
+
+Links and Windows junctions are not followed. Workflow parsing supports block
+YAML with plain or quoted job IDs and scalar display names, without a YAML
+dependency. Flow mappings, anchors and multiline names have explicit unknown
+diagnostics; this is not a complete YAML parser.
+
+Convention detection is a conservative text heuristic over agent entry files,
+rules, skills, commands, subagents and resolved Claude imports. Ordinary README,
+roadmap and design documents do not supply evidence unless actually imported
+as instructions. Markdown links alone do not load instructions. Only directives
+count; idea listings, examples, fenced snippets, metadata and explicit denials
+are ignored. Its evidence identifies files, not enforcement proof.
+CODEOWNERS alone does not establish a risk review gate. A configured test runner
+or a documented test command supplies test evidence; no test command is printed.
+
+## Additive application
+
+Each practice inserts a block bounded by:
+
+```markdown
+<!-- sumbi:begin practice-id -->
+Catalog text.
+<!-- sumbi:end practice-id -->
+```
+
+Existing bytes remain an exact prefix, including BOMs and newline style. New
+files contain managed blocks too. Existing blocks are never replaced, even if
+an owner edits their text. Malformed, nested or duplicate markers fail closed.
+An existing target without a final newline must be fixed manually: producing a
+correct diff for its last line would otherwise expose existing source text.
+These deliberately zero-context diffs show only catalog additions.
+
+The plan is rebuilt against the bundled catalog before application. Stale
+snapshots, linked or multiply linked targets, competing installs and oversized
+targets are rejected. New files are published exclusively via same-directory
+hard links; existing files are staged, rechecked, and atomically replaced with
+their original bytes plus new blocks. Filesystems without hard-link support
+fail safely. Existing file modes are preserved where the OS supports them;
+new practice files use mode 0644, local metadata and backup files use 0600,
+and the local metadata directory uses 0700. Windows permissions still depend
+on inherited ACLs.
+
+Before target writes, `.sumbi/backups/<UTC timestamp>/files/` holds original
+bytes and `manifest.json` records original modes, hashes and absent new files.
+The manifest also pre-registers the planned intervention predictions. Successful
+application appends one record per practice to `.sumbi/interventions.jsonl`;
+the existing ledger is backed up too. `content_hash` is SHA-256 of the canonical
+catalog practice object, including its template text and prediction. Records
+carry the catalog version, source IDs, touched paths, judgment policy and UTC
+time. A second run with the same selection adds no files, backups or records.
+
+Write failures trigger rollback without clobbering concurrent changes. Backup
+files remain for recovery and are not deleted automatically. A process killed
+during application can leave `install.lock` and a prepared manifest: compare
+the manifest's hashes with local files, restore the listed originals or remove
+listed newly created files, and remove the lock only after resolving the
+transaction. If another writer changed a target, recovery needs owner attention.
+Do not commit `.sumbi` backups: they contain original repository bytes and are
+local recovery data. This command never stages or commits files.
+
+Instruction-budget guidance does not trim existing content. The testing
+practice leaves the exact command to the owner. Those gaps remain visible until
+the owner completes setup, even though the same blocks are not proposed again.
+Review guidance is text only; it does not establish required checks or a ruleset.
+
+## Optional baseline integration
+
+The integration point is `sumbi.collect.baseline(*, repository: pathlib.Path)`.
+Dry-run probes for this callable but does not invoke it. Apply invokes it once,
+before target writes. The collect implementation must stay read-only and offline
+and own any aggregate baseline artifact. Its return value is never echoed or
+copied to the ledger. If the entry point is missing, output and interventions
+record `baseline: pending (collect not available)`. An import or execution failure
+in an available collector aborts application. Empty plans never run collection.
+
+No logs are collected by this milestone. Shared CLI wiring and distribution
+metadata (including catalog JSON and credits as package data) belong to the
+integration after the two milestones merge.
