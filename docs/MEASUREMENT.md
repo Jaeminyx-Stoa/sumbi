@@ -2,10 +2,13 @@
 
 `sumbi collect` reads local Claude Code and Codex JSONL logs. It uses Python 3.11
 or later and the standard library at runtime. Installation exposes the `sumbi`
-console command; running `python -m sumbi.cli` also works from a checkout.
+console command; running `python -m sumbi` also works from a checkout.
 The build backend also uses only the standard library. An existing pip installer
 can install this checkout offline with
 `python -m pip install --no-index --no-deps --no-build-isolation .`.
+The in-tree backend is retained for offline builds; wheels and source archives
+include the text catalog, its credits and all command modules. Runtime and
+build dependency lists remain empty.
 
 ```sh
 sumbi collect --since 2030-01-01T00:00Z --until 2030-01-02T00:00Z \
@@ -141,8 +144,16 @@ with several project keys, conflicting rules or insufficient cwd evidence is
 `other`. Both buckets count toward the unattributed spend share. Rules scope the
 spend breakdown rather than hiding other sessions from coverage.
 
-Session, parent and project IDs are stable SHA-256 pseudonyms. Pseudonymization is
-not anonymization against someone who already knows candidate origins or paths.
+Session, parent and project IDs are stable SHA-256 pseudonyms by default. Reports
+and summaries explicitly label these keys as unsalted. Set `SUMBI_SALT` or use
+`--salt-file FILE` on either subcommand to select HMAC-SHA256 pseudonyms instead.
+The file takes precedence over the environment variable; its bytes are used
+verbatim, including any trailing newline. Empty or unreadable keys fail with a
+sanitized error. Keep the key private and consistent across measurements that
+need matching IDs. Changing it changes session, parent, project and fingerprinted
+label IDs, while counts stay the same. Neither keys nor key-file paths enter
+reports. Pseudonymization is not anonymization against someone who already knows
+candidate origins or paths, especially when keys are unsalted.
 JSON and summaries contain only schema categories, counts, durations, machine
 labels, configured rule labels and IDs. They do not include cwd values, origins,
 file names, prompts, tool names, arguments, outputs or friction text. Unsupported
@@ -155,6 +166,26 @@ unknown types, unreadable files, invalid timestamps, invalid token records,
 inherited session metadata, sessions read, sessions in the window and reported
 spend shares. These are collection diagnostics, not an outcome or completeness
 verdict. The deliverable ledger and comparison command remain out of M1a scope.
+
+## Install baselines
+
+`sumbi install --apply` invokes `sumbi.collect.baseline` once before practice
+writes when the plan has changes. It collects `[now - 14 days, now)` in UTC,
+scoped to the target repository. A normalized Git origin, when available, matches
+other local clones of that repository exactly. Otherwise normalized paths match
+the repository root and its descendants, with one project key for subdirectories.
+A known different origin never falls back to a matching path; an unreadable or
+unsupported origin remains unassigned when the target has a usable origin.
+Mixed-repository sessions are excluded rather than allocating their full cost.
+
+The counts-only JSON is written exclusively to
+`.sumbi/baseline/<UTC timestamp>.json`. Coverage diagnostics describe all logs
+scanned; `scope` and adapter `sessions_selected` counts distinguish selected
+sessions from the wider window. The summary and session rows contain only the
+selected repository sessions. If none match, the status is `no sessions found`
+and an empty report is written. `--home DIR` selects the log home for fixtures
+or another local user home. Baseline files never overwrite existing files or
+source logs, and the installer ignores them in Git.
 
 ## Validation
 

@@ -5,6 +5,7 @@ import csv
 import hashlib
 import importlib.util
 import io
+import json
 from pathlib import Path
 import tarfile
 import tempfile
@@ -26,6 +27,9 @@ class BuildTests(unittest.TestCase):
                 self.assertEqual(archive.read(sumbi_build.INFO + "/LICENSE"), (sumbi_build.ROOT / "LICENSE").read_bytes())
                 self.assertIn("sumbi = sumbi.cli:main", archive.read(sumbi_build.INFO + "/entry_points.txt").decode())
                 self.assertIn("sumbi/adapters/codex.py", archive.namelist())
+                self.assertIn("sumbi/__main__.py", archive.namelist())
+                self.assertEqual(len(json.loads(archive.read("sumbi/catalog/practices.json"))["practices"]), 8)
+                self.assertIn("2026-10-05", archive.read("sumbi/catalog/CREDITS.md").decode())
                 self.assertFalse(any(name.startswith("tests/") for name in archive.namelist()))
                 records = list(csv.reader(io.StringIO(archive.read(sumbi_build.INFO + "/RECORD").decode())))
                 self.assertEqual({row[0] for row in records}, set(archive.namelist()))
@@ -54,7 +58,8 @@ class BuildTests(unittest.TestCase):
             spec = importlib.util.spec_from_file_location("rebuild_backend", source / "sumbi_build.py")
             backend = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(backend)
-            self.assertTrue((root / backend.build_wheel(root)).exists())
+            with zipfile.ZipFile(root / backend.build_wheel(root)) as archive:
+                self.assertEqual(len(json.loads(archive.read("sumbi/catalog/practices.json"))["practices"]), 8)
 
     def test_build_and_runtime_dependency_lists_are_empty(self):
         project = tomllib.loads((sumbi_build.ROOT / "pyproject.toml").read_text(encoding="utf-8"))

@@ -1,4 +1,4 @@
-"""Command-line entry point for the M1a collection core."""
+"""Shared command-line entry point for offline install and collection."""
 
 from __future__ import annotations
 
@@ -12,6 +12,9 @@ import sys
 import tempfile
 
 from sumbi.model import ProjectRule, Window, timestamp
+from sumbi import __version__
+from sumbi.install.__main__ import configure_parser as configure_install, run as run_install
+from sumbi.privacy import read_salt
 from sumbi.report import ADAPTERS, collect, text_summary
 
 
@@ -69,7 +72,9 @@ def atomic_write(path: Path, text: str, *, private: bool = False):
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="sumbi")
+    root.add_argument("--version", action="version", version="sumbi " + __version__)
     commands = root.add_subparsers(dest="command", required=True)
+    configure_install(commands.add_parser("install", help="Inventory and seed repository practices offline"))
     command = commands.add_parser("collect", help="Measure local session logs without transcripts")
     command.add_argument("--since", type=utc, required=True)
     command.add_argument("--until", type=utc, required=True)
@@ -80,12 +85,15 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--idle-minutes", type=idle, default=5.0)
     command.add_argument("--json", default="out/collect.json", metavar="OUT")
     command.add_argument("--local-review", type=Path, metavar="OUT")
+    command.add_argument("--salt-file", type=Path, help="Local pseudonym key file (overrides SUMBI_SALT)")
     return root
 
 
 def main(argv: list[str] | None = None) -> int:
     root = parser()
     args = root.parse_args(argv)
+    if args.command == "install":
+        return run_install(args)
     try:
         window = Window(args.since, args.until)
     except ValueError as exc:
@@ -100,12 +108,15 @@ def main(argv: list[str] | None = None) -> int:
     resolved = [p.resolve() for p in destinations]
     if len(set(resolved)) != len(resolved):
         root.error("JSON and local review must have distinct destinations")
+    if args.salt_file is not None and args.salt_file.resolve() in resolved:
+        root.error("Output destinations must not overwrite the pseudonym salt file")
     sources = [args.home / ".claude" / "projects", args.home / ".codex" / "sessions"]
     if any(p.is_relative_to(source.resolve()) for p in resolved for source in sources):
         root.error("Output destinations must be outside session-log directories")
     try:
+        salt = read_salt(args.salt_file)
         report, review = collect(args.home, window, agents=agents, rules=rules,
-                                 idle_minutes=args.idle_minutes, local_review=bool(args.local_review))
+                                 idle_minutes=args.idle_minutes, local_review=bool(args.local_review), salt=salt)
         data = json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
         if args.json == "-":
             print(data, end="")

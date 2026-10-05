@@ -1,6 +1,7 @@
 """Hand-written truths for synthetic harness repositories."""
 
 import json
+import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -17,6 +18,16 @@ INSTRUCTION_KEYS = ("agents", "claude", "claude_rules", "gemini", "copilot", "cu
 
 class OfflineTest(unittest.TestCase):
     def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        home = Path(temporary.name)
+        guard = patch.object(Path, "home", return_value=home)
+        guard.start()
+        self.addCleanup(guard.stop)
+        guard = patch.dict(os.environ, {}, clear=False)
+        guard.start()
+        self.addCleanup(guard.stop)
+        os.environ.pop("SUMBI_SALT", None)
         for name in ("socket.socket", "socket.create_connection", "socket.getaddrinfo"):
             guard = patch(name, side_effect=AssertionError("Network access is forbidden."))
             guard.start()

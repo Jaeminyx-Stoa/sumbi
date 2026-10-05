@@ -1,13 +1,13 @@
 # Offline install (M1b)
 
-Python 3.11 or later and the standard library are sufficient. The standalone
-namespace-package entry point works before integration with the shared CLI:
+Python 3.11 or later and the standard library are sufficient. Use the shared CLI;
+`python -m sumbi.install` remains available for existing callers:
 
 ```console
-python -m sumbi.install
-python -m sumbi.install --dry-run --json plan.json
-python -m sumbi.install --apply --select handoff,parallel-worktrees
-python -m sumbi.install --exclude 'samples/**' --exclude '**/generated'
+sumbi install
+sumbi install --dry-run --json plan.json
+sumbi install --apply --select handoff,parallel-worktrees
+sumbi install --exclude 'samples/**' --exclude '**/generated'
 python -m unittest discover -s tests
 ```
 
@@ -124,24 +124,33 @@ during application can leave `install.lock` and a prepared manifest: compare
 the manifest's hashes with local files, restore the listed originals or remove
 listed newly created files, and remove the lock only after resolving the
 transaction. If another writer changed a target, recovery needs owner attention.
-Do not commit `.sumbi` backups: they contain original repository bytes and are
-local recovery data. This command never stages or commits files.
+On first apply, `.sumbi/.gitignore` excludes `backups/`, `baseline/` and
+`install.lock`; `interventions.jsonl` stays committable. Existing ignore-file
+bytes are preserved, with the local exclusions appended if needed. Protection
+is written before collection and backup creation and stays in place if later
+application fails. Do not commit backups: they contain original repository
+bytes and are local recovery data. This command never stages or commits files.
 
 Instruction-budget guidance does not trim existing content. The testing
 practice leaves the exact command to the owner. Those gaps remain visible until
 the owner completes setup, even though the same blocks are not proposed again.
 Review guidance is text only; it does not establish required checks or a ruleset.
 
-## Optional baseline integration
+## Baseline integration
 
-The integration point is `sumbi.collect.baseline(*, repository: pathlib.Path)`.
+The integration point is `sumbi.collect.baseline(*, repository: pathlib.Path,
+home: pathlib.Path | None = None, salt: bytes | None = None)`.
 Dry-run probes for this callable but does not invoke it. Apply invokes it once,
 before target writes. The collect implementation must stay read-only and offline
-and own any aggregate baseline artifact. Its return value is never echoed or
-copied to the ledger. If the entry point is missing, output and interventions
-record `baseline: pending (collect not available)`. An import or execution failure
-in an available collector aborts application. Empty plans never run collection.
+and own its aggregate baseline artifact. Apply passes `--home DIR` and the local
+pseudonym key selected by `SUMBI_SALT` or `--salt-file FILE`. The collector reads
+the previous 14 UTC days, keeping sessions attributed to the target repository
+by normalized origin or a path fallback. It writes counts-only JSON to
+`.sumbi/baseline/<UTC timestamp>.json` and returns `recorded` or `no sessions found`.
+The installer copies only a recognized status, validated relative artifact ID
+and session count to the ledger, never arbitrary collector text. Empty reports
+are valid baselines. See [measurement scope](../../docs/MEASUREMENT.md).
 
-No logs are collected by this milestone. Shared CLI wiring and distribution
-metadata (including catalog JSON and credits as package data) belong to the
-integration after the two milestones merge.
+If the entry point is missing, output and interventions retain the compatibility
+status `pending (collect not available)`. An import or execution failure in an
+available collector aborts application. Empty plans never run collection.

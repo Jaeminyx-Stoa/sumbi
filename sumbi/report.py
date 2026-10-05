@@ -6,7 +6,8 @@ from pathlib import Path
 
 from sumbi import SCHEMA_VERSION
 from sumbi.adapters import claude_code, codex
-from sumbi.model import Attributor, COUNT_KINDS, Coverage, ProjectRule, TOKEN_KINDS, Window
+from sumbi.model import Attributor, COUNT_KINDS, Coverage, ProjectRule, RepositoryAttributor, TOKEN_KINDS, Window
+from sumbi.privacy import current_key, pseudonym_key, read_salt
 
 ADAPTERS = {"claude-code": claude_code, "codex": codex}
 
@@ -40,8 +41,16 @@ def totals(sessions: list[dict], idle_minutes: float = 5) -> dict:
 
 def collect(home: Path, window: Window, *, agents: list[str] | None = None,
             rules: list[ProjectRule] | None = None, idle_minutes: float = 5,
-            local_review: bool = False) -> tuple[dict, str]:
-    attributor = Attributor(rules or [])
+            local_review: bool = False, salt: bytes | None = None,
+            repository: Path | None = None) -> tuple[dict, str]:
+    with pseudonym_key(salt if salt is not None else read_salt()):
+        return _collect(home, window, agents=agents, rules=rules, idle_minutes=idle_minutes,
+                        local_review=local_review, repository=repository)
+
+
+def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
+             local_review, repository) -> tuple[dict, str]:
+    attributor = RepositoryAttributor(repository) if repository is not None else Attributor(rules or [])
     sessions = []
     coverage = {}
     reviews = []
@@ -50,9 +59,14 @@ def collect(home: Path, window: Window, *, agents: list[str] | None = None,
         found = ADAPTERS[agent].collect(home, window, measured, local_review=local_review)
         included = [s for s in found if s.in_window(window)]
         coverage[agent] = {**measured.as_dict(), "sessions_read": len(found), "sessions_in_window": len(included)}
-        sessions.extend(s.as_dict(window, attributor, idle_minutes) for s in included)
         for session in included:
+            row = session.as_dict(window, attributor, idle_minutes)
+            if repository is not None and row["project"]["bucket"] != "project":
+                continue
+            sessions.append(row)
             reviews.extend(session.id() + " " + text for text in sorted(session.review))
+        if repository is not None:
+            coverage[agent]["sessions_selected"] = sum(s["agent"] == agent for s in sessions)
     sessions.sort(key=lambda s: (s["agent"], s["id"]))
     summary = totals(sessions, idle_minutes)
     spend = {}
@@ -72,7 +86,9 @@ def collect(home: Path, window: Window, *, agents: list[str] | None = None,
         row["share"] = row["tokens"] / all_tokens if all_tokens else 0.0
         row["measurement"] = "observed"
     unattributed = sum(row["tokens"] for row in spend.values() if row["bucket"] != "project")
+    salted = current_key() is not None
     report = {"schema_version": SCHEMA_VERSION,
+              "pseudonyms": {"salted": salted, "algorithm": "hmac-sha256" if salted else "sha256"},
               "window": {"since": window.since.isoformat().replace("+00:00", "Z"),
                          "until": window.until.isoformat().replace("+00:00", "Z"), "bounds": "[since,until)"},
               "summary": summary, "by_agent": {agent: totals([s for s in sessions if s["agent"] == agent], idle_minutes)
@@ -82,6 +98,10 @@ def collect(home: Path, window: Window, *, agents: list[str] | None = None,
                            "unattributed_share": unattributed / all_tokens if all_tokens else 0.0,
                            "spend_basis": "reported_tokens", "verdict": "not_evaluated"},
               "sessions": sessions}
+    if repository is not None:
+        scanned = sum(c["sessions_in_window"] for c in coverage.values())
+        report["scope"] = {"kind": "repository", "sessions_in_window": scanned,
+                           "sessions_selected": len(sessions), "sessions_excluded": scanned - len(sessions)}
     return report, "\n".join(reviews) + ("\n" if reviews else "")
 
 
@@ -91,6 +111,8 @@ def text_summary(report: dict) -> str:
     lines = ["sumbi collect", "Window: " + report["window"]["since"] + " to " + report["window"]["until"] + " [since,until)",
              f"Sessions in window: {summary['sessions']}",
              f"Reported tokens (observed): {summary['tokens']['total']}"]
+    lines.append("Pseudonym keys: " + ("salted (HMAC-SHA256)" if report["pseudonyms"]["salted"]
+                                      else "unsalted (SHA-256)"))
     for agent, values in report["by_agent"].items():
         tokens = values["tokens"]
         lines.append(f"{agent}: sessions {values['sessions']}; tokens {tokens['total']} (observed)")

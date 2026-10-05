@@ -29,7 +29,7 @@ class CliTests(OfflineTest):
         result, output, errors = self.run_cli(["--root", str(root)])
         self.assertEqual(result, 0, errors)
         self.assertIn("--- a/AGENTS.md\n+++ b/AGENTS.md\n", output)
-        self.assertIn("baseline: pending (collect not available)", output)
+        self.assertIn("baseline: available (runs before apply)", output)
         self.assertNotIn("# Repository rules", output)
         self.assertNotIn("python -m unittest discover", output)
         self.assertNotIn(str(root), output)
@@ -96,7 +96,7 @@ class CliTests(OfflineTest):
     def test_available_baseline_is_only_run_before_apply(self):
         root = self.copy_fixture("empty")
         calls = []
-        def entry(*, repository):
+        def entry(*, repository, home=None):
             self.assertFalse((repository / "AGENTS.md").exists())
             calls.append(repository)
             return {"private_text": "SYNTHETIC_PRIVATE_BASELINE"}
@@ -117,7 +117,7 @@ class CliTests(OfflineTest):
     def test_baseline_failure_prevents_practice_writes(self):
         root = self.copy_fixture("empty")
         module = types.ModuleType("sumbi.collect")
-        def entry(*, repository):
+        def entry(*, repository, home=None):
             raise ValueError("SYNTHETIC_PRIVATE_ERROR")
         module.baseline = entry
         with patch.dict("sys.modules", {"sumbi.collect": module}):

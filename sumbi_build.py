@@ -49,7 +49,8 @@ def build_wheel(wheel_directory, config_settings=None, metadata_directory=None):
     filename = STEM + "-py3-none-any.whl"
     destination = Path(wheel_directory)
     destination.mkdir(parents=True, exist_ok=True)
-    entries = {p.relative_to(ROOT).as_posix(): p.read_bytes() for p in sorted((ROOT / "sumbi").rglob("*.py"))}
+    entries = {p.relative_to(ROOT).as_posix(): p.read_bytes() for p in sorted((ROOT / "sumbi").rglob("*"))
+               if p.is_file() and p.suffix in (".py", ".json", ".md")}
     entries.update({INFO + "/" + name: data for name, data in metadata().items()})
     record = io.StringIO(newline="")
     writer = csv.writer(record)
@@ -71,7 +72,7 @@ def build_sdist(sdist_directory, config_settings=None):
     sources = [ROOT / p for p in ("pyproject.toml", "sumbi_build.py", "README.md", "LICENSE")]
     for directory in ("sumbi", "tests", "docs"):
         sources.extend(p for p in sorted((ROOT / directory).rglob("*"))
-                       if p.is_file() and p.suffix in (".py", ".md", ".jsonl"))
+                       if p.is_file() and p.suffix in (".py", ".md", ".json", ".jsonl"))
     with tarfile.open(destination / filename, "w:gz") as archive:
         for path in sources:
             archive.add(path, arcname=STEM + "/" + path.relative_to(ROOT).as_posix(), recursive=False)
