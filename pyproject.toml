@@ -7,9 +7,22 @@ backend-path = ["."]
 name = "sumbi"
 version = "0.1.0"
 description = "Offline harness installation and session measurement for coding agents"
+readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 dependencies = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/Jaeminyx-Stoa/sumbi"
+Documentation = "https://github.com/Jaeminyx-Stoa/sumbi/tree/main/docs"
+Repository = "https://github.com/Jaeminyx-Stoa/sumbi"
+Issues = "https://github.com/Jaeminyx-Stoa/sumbi/issues"
 
 [project.scripts]
 sumbi = "sumbi.cli:main"
