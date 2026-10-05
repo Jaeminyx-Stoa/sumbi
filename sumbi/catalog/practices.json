@@ -1,0 +1,116 @@
+{
+  "version": "0.1.0",
+  "practices": [
+    {
+      "id": "instruction-map",
+      "title": "Keep the entry instructions short",
+      "gap_ids": ["missing-agents", "instruction-budget"],
+      "risk": "low",
+      "sources": ["lab"],
+      "files": [
+        {"path": "AGENTS.md", "mode": "managed-block", "text": "Keep this entry file brief. Open detailed guidance only when the task needs it. See [instruction maintenance](docs/sumbi/instructions.md)."},
+        {"path": "docs/sumbi/instructions.md", "mode": "managed-block", "text": "# Instruction maintenance\n\nKeep the entry file as a table of contents plus the rules that always apply. Put examples, background and specialized procedures in documents opened on demand.\n\nAn owner should review the token estimate, move optional detail, and confirm that approvals and review gates still reach every affected agent. sumbi only adds this guidance; it never trims existing instructions automatically."}
+      ],
+      "prediction": {"metric": "input_tokens_per_success", "direction": "decrease", "rough_size_percent": 15, "condition": "Owner removes optional always-loaded detail without weakening gates."},
+      "judgment": "Compare input tokens and success for matched task cohorts after the owner completes the move; withhold while instruction size is unchanged."
+    },
+    {
+      "id": "shared-instructions",
+      "title": "Share the repository rules across agents",
+      "gap_ids": ["missing-shared-import"],
+      "risk": "low",
+      "sources": ["lab"],
+      "files": [
+        {"path": "CLAUDE.md", "mode": "managed-block", "text": "@AGENTS.md"}
+      ],
+      "prediction": {"metric": "instruction_divergence_followups_per_deliverable", "direction": "decrease", "rough_size_percent": 10, "condition": "Both agents read the shared instructions."},
+      "judgment": "Count follow-up fixes attributed to conflicting guidance across matched multi-agent deliverables; preserve any stronger agent-specific rule."
+    },
+    {
+      "id": "test-and-verify",
+      "title": "Make test evidence part of completion",
+      "gap_ids": ["missing-test-command"],
+      "risk": "low",
+      "sources": ["superpowers"],
+      "files": [
+        {"path": "AGENTS.md", "mode": "managed-block", "text": "Before claiming completion, run the task's relevant checks and report their results. See [test evidence](docs/sumbi/testing.md)."},
+        {"path": "docs/sumbi/testing.md", "mode": "managed-block", "text": "# Test evidence\n\nOwner setup: record the repository's exact test command here, together with any required environment. Until then, the missing-command gap remains unresolved.\n\nFor a behavior change, first show a focused check that exposes the problem, then make it pass. Run the required checks for the final change. State the command, result and any untested boundary in the local handoff. Do not turn an intended check into a claim that it ran."}
+      ],
+      "prediction": {"metric": "followup_fixes_per_deliverable", "direction": "decrease", "rough_size_percent": 15, "condition": "Owner documents a runnable test command and agents use it."},
+      "judgment": "Use outside check results and follow-up fixes within identical windows; compare time and tokens including failing attempts."
+    },
+    {
+      "id": "review-gates",
+      "title": "Scale review to the risk of the change",
+      "gap_ids": ["missing-risk-review"],
+      "risk": "medium",
+      "sources": ["gstack", "lab", "superpowers"],
+      "files": [
+        {"path": "AGENTS.md", "mode": "managed-block", "text": "Risky paths need review before release. Preserve existing approvals and require independent review for security, permissions and money paths. See [review levels](docs/sumbi/review.md)."},
+        {"path": "docs/sumbi/review.md", "mode": "managed-block", "text": "# Review levels\n\n| Work size or risk | Evidence and review |\n| --- | --- |\n| Small wording or local configuration | Read the resulting change and check the affected behavior. |\n| Behavior across several components | Ask an independent engineering reviewer; include targeted test evidence. |\n| Security, permissions, money, or irreversible operations | Require owner approval and a reviewer from a different model family; include the applicable security and release checks. |\n\nThe owner must map risky repository paths to these roles. A role is a review responsibility, not a claim that a tool enforces it. Existing stronger gates remain in force. If review is unavailable, leave the risky action pending."}
+      ],
+      "prediction": {"metric": "risk_related_followups_per_deliverable", "direction": "decrease", "rough_size_percent": 15, "condition": "Owner assigns paths and reviewers; required gates are actually observed."},
+      "judgment": "Audit review evidence and risk-related fixes by matched risk class; never accept a cost saving obtained by weakening a gate."
+    },
+    {
+      "id": "plan-and-approval",
+      "title": "Resolve the brief before a costly change",
+      "gap_ids": ["missing-plan-approval"],
+      "risk": "low",
+      "sources": ["gajae-code", "superpowers"],
+      "files": [
+        {"path": "AGENTS.md", "mode": "managed-block", "text": "For substantial changes, resolve missing requirements, write a plan with acceptance criteria, and critique it before implementation. Follow the existing approval policy. See [planning](docs/sumbi/planning.md)."},
+        {"path": "docs/sumbi/planning.md", "mode": "managed-block", "text": "# Planning\n\nAsk only for information that blocks a correct implementation. Record the deliverable, acceptance criteria, constraints and likely failure cases. Critique the plan against those criteria before making a substantial change. Keep small reversible edits proportionate.\n\nPrepare a concrete reviewable result before requesting a final approval. Existing approvals still govern destructive or external actions. Do not treat silence as approval, and do not ask again when the requested scope is already authorized."}
+      ],
+      "prediction": {"metric": "rework_time_per_success", "direction": "decrease", "rough_size_percent": 10, "condition": "Planning resolves real uncertainty without adding repeated approvals."},
+      "judgment": "Compare rework and total elapsed time for similarly sized tasks, including planning and owner waiting time."
+    },
+    {
+      "id": "handoff",
+      "title": "Leave a useful continuation record",
+      "gap_ids": ["missing-handoff"],
+      "risk": "low",
+      "sources": ["lab"],
+      "files": [
+        {"path": "AGENTS.md", "mode": "managed-block", "text": "Leave a handoff document when work changes hands: acceptance criteria, evidence, remaining work and the next action. See [handoffs](docs/sumbi/handoff.md)."},
+        {"path": "docs/sumbi/handoff.md", "mode": "managed-block", "text": "# Handoff convention\n\nKeep each live handoff in a local location approved by the repository owner. Do not commit session transcripts, secrets or machine paths.\n\nRecord the deliverable ID and acceptance criteria, current state, files changed, checks actually run, unresolved risks, and the next action. Separate observations from assumptions. A successor should be able to resume without repeating the investigation."}
+      ],
+      "prediction": {"metric": "restart_time_per_success", "direction": "decrease", "rough_size_percent": 15, "condition": "A successor uses the handoff instead of repeating investigation."},
+      "judgment": "Compare resumed deliverables with similar scope; include time spent writing and reading the handoff."
+    },
+    {
+      "id": "friction-line",
+      "title": "Record harness obstacles consistently",
+      "gap_ids": ["missing-friction-line"],
+      "risk": "low",
+      "sources": ["lab"],
+      "files": [
+        {"path": "AGENTS.md", "mode": "managed-block", "text": "End a work report with `Harness friction: none` or one short description of the harness obstacle. Keep sensitive details in local notes. See [friction feedback](docs/sumbi/friction.md)."},
+        {"path": "docs/sumbi/friction.md", "mode": "managed-block", "text": "# Friction feedback\n\nUse the final friction line to identify an instruction, tool or check that blocked or repeated work. Describe the failing layer and its consequence briefly; do not include prompts, transcripts, secrets or machine identifiers in shared output.\n\nReview repeated obstacles before adding more instructions. Prefer a reliable check or a simpler workflow when it addresses the cause. A report is evidence to investigate, not proof that the proposed fix saves cost."}
+      ],
+      "prediction": {"metric": "unclassified_harness_obstacles", "direction": "decrease", "rough_size_percent": 20, "condition": "Reports use the convention and an owner reviews recurring obstacles."},
+      "judgment": "Compare obstacle classification coverage first, then matched success and cost after a separate corrective intervention."
+    },
+    {
+      "id": "parallel-worktrees",
+      "title": "Give parallel agents separate working copies",
+      "gap_ids": ["missing-worktree-rule"],
+      "risk": "low",
+      "sources": ["superpowers", "lab"],
+      "files": [
+        {"path": "AGENTS.md", "mode": "managed-block", "text": "Parallel agents use separate worktrees and explicit file ownership. Do not edit another agent's working copy. See [parallel work](docs/sumbi/parallel.md)."},
+        {"path": "docs/sumbi/parallel.md", "mode": "managed-block", "text": "# Parallel work\n\nAssign each parallel agent a separate branch and worktree, plus an explicit set of files it owns. Agree on shared interfaces before editing. Check the working copy and branch before making changes.\n\nIntegrate through reviewed changes. Preserve another agent's uncommitted work, and resolve overlaps with its owner. Never remove a worktree or branch merely because a task appears finished."}
+      ],
+      "prediction": {"metric": "conflict_recovery_time_per_success", "direction": "decrease", "rough_size_percent": 20, "condition": "Parallel work has non-overlapping ownership and reviewed integration."},
+      "judgment": "Compare parallel deliverables of similar size; include integration and conflict recovery time, not just worker elapsed time."
+    }
+  ],
+  "judgment_policy": {
+    "status": "Predictions are hypotheses, not measured savings.",
+    "non_inferiority_margin": "Owner must pre-register before evaluation.",
+    "sample_size": "Owner must pre-register before evaluation.",
+    "decision_order": ["coverage", "comparability", "success_non_inferiority", "time_and_tokens"],
+    "comparison": "Matched cohorts, lifetime costs including retries, identical follow-up windows; withhold with incomplete attribution or changed model, effort, CLI or runner.",
+    "adoption": "Adopt only when success is non-inferior, time and tokens do not worsen, and at least one improves by more than 10 percent. Preserve approvals and cross-family review."
+  }
+}
