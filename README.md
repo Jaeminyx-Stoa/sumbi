@@ -34,4 +34,6 @@ The design is in [docs/DESIGN.md](docs/DESIGN.md).
 
 ## License
 
-[Apache License 2.0](LICENSE). See [NOTICE](NOTICE) for credits.
+[MIT](LICENSE). The license does not cover the sumbi name or logo.
+
+The install catalog distills practices from Superpowers, gstack and gajae code (all MIT); the catalog credits them.
