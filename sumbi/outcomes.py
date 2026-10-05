@@ -89,7 +89,7 @@ class FixtureOutcomes:
             raise ValueError("Outcomes: pulls and commits must be arrays")
         for entry in raw["pulls"]:
             if (not isinstance(entry, dict) or not {"response", "checks_at_merge"} <= set(entry)
-                    or set(entry) - {"response", "checks_at_merge", "observed_checks_at_merge", "checks_policy_at_merge"}):
+                    or set(entry) - {"response", "checks_at_merge", "observed_checks_at_merge", "current_policy_evidence"}):
                 raise ValueError("Outcomes: each pull needs response and checks_at_merge")
             pr = entry["response"]
             number = pr["number"]
@@ -115,7 +115,7 @@ class FixtureOutcomes:
             basis = "historical" if entry["checks_at_merge"] is not None else "unknown"
             reason = "" if checks == "green" else "checks_red" if checks == "red" else "checks_missing_required"
             if basis == "unknown":
-                checks, basis, reason = self._policy_checks(entry.get("checks_policy_at_merge"), merged, (head, merge))
+                checks, basis, reason = self._policy_checks(entry.get("current_policy_evidence"), merged, (head, merge))
             observed = entry.get("observed_checks_at_merge", "unknown")
             if observed not in ("unknown", "green", "red"):
                 raise ValueError("Outcomes: invalid observed check label")

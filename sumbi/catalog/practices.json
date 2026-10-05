@@ -111,6 +111,6 @@
     "sample_size": "Owner must pre-register before evaluation.",
     "decision_order": ["coverage", "comparability", "success_non_inferiority", "time_and_tokens"],
     "comparison": "Matched cohorts, lifetime costs including retries, identical follow-up windows; withhold with incomplete attribution or changed model, effort, CLI or runner.",
-    "adoption": "Adopt only when success is non-inferior, time and tokens do not worsen, and at least one improves by more than 10 percent. Preserve approvals and cross-family review."
+    "adoption": "Adopt only when success is non-inferior, time and tokens do not worsen, and at least one improves by at least 10 percent with its ratio interval strictly below 1. Preserve approvals and cross-family review."
   }
 }

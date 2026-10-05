@@ -83,18 +83,28 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--cache", type=Path, metavar="DIR", help="Private GitHub response cache outside repositories")
     command.add_argument("--record", type=Path, metavar="DIR", help="Record filtered GitHub responses for offline replay")
     command.add_argument("--follow-up-days", type=idle, default=7.0)
+    command = commands.add_parser("compare", help="Propose a verdict for one pre-registered intervention")
+    configure_collection(command, deliver=True, comparison=True)
+    command.add_argument("--ledger", type=Path, required=True)
+    command.add_argument("--outcomes", required=True, metavar="github|DIR")
+    command.add_argument("--cache", type=Path, metavar="DIR")
+    command.add_argument("--record", type=Path, metavar="DIR")
+    command.add_argument("--registration", type=Path, required=True)
+    command.add_argument("--seed", type=int, default=1729)
+    command.add_argument("--resamples", type=int, default=5000)
     return root
 
 
-def configure_collection(command, *, deliver=False):
-    command.add_argument("--since", type=utc, required=True)
-    command.add_argument("--until", type=utc, required=True)
+def configure_collection(command, *, deliver=False, comparison=False):
+    if not comparison:
+        command.add_argument("--since", type=utc, required=True)
+        command.add_argument("--until", type=utc, required=True)
     command.add_argument("--home", type=Path, default=Path.home())
     command.add_argument("--agents", default="claude-code,codex")
     for option in ("--project", "--match-origin", "--match-path"):
         command.add_argument(option, action=RuleAction)
     command.add_argument("--idle-minutes", type=idle, default=5.0)
-    command.add_argument("--json", default="out/deliver.json" if deliver else "out/collect.json", metavar="OUT")
+    command.add_argument("--json", default="out/compare.json" if comparison else "out/deliver.json" if deliver else "out/collect.json", metavar="OUT")
     if not deliver:
         command.add_argument("--local-review", type=Path, metavar="OUT")
     else:
@@ -108,7 +118,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "install":
         return run_install(args)
     try:
-        window = Window(args.since, args.until)
+        if args.command == "compare":
+            from sumbi.registration import read_registration
+            registration = read_registration(args.registration)
+            window = Window(registration.before.since, registration.after.until)
+        else:
+            window = Window(args.since, args.until)
     except ValueError as exc:
         root.error(str(exc))
     agents = args.agents.split(",")
@@ -126,13 +141,15 @@ def main(argv: list[str] | None = None) -> int:
     sources = [args.home / ".claude" / "projects", args.home / ".codex" / "sessions"]
     if any(p.is_relative_to(source.resolve()) for p in resolved for source in sources):
         root.error("Output destinations must be outside session-log directories")
-    if args.command == "deliver":
+    if args.command in ("deliver", "compare"):
         live = args.outcomes == "github"
         outcome_dir = None if live else Path(args.outcomes)
         if not live and (args.cache is not None or args.record is not None):
             root.error("Cache and record options require --outcomes github")
         if any(p == args.ledger.resolve() or (outcome_dir and p.is_relative_to(outcome_dir.resolve())) for p in resolved):
             root.error("Deliver output must not overwrite ledger or outcome fixtures")
+        if args.command == "compare" and args.registration.resolve() in resolved:
+            root.error("Compare output must not overwrite registration")
         from sumbi.deliver import deliver, text_summary as deliver_summary
         from sumbi.outcomes import FixtureOutcomes
         try:
@@ -145,6 +162,8 @@ def main(argv: list[str] | None = None) -> int:
                 for destination in resolved:
                     outside_repository(destination)
                 protected = [args.ledger.resolve(), *resolved]
+                if args.command == "compare":
+                    protected.append(args.registration.resolve())
                 if args.salt_file:
                     protected.append(args.salt_file.resolve())
                 if any(p.is_relative_to(store) for p in protected for store in stores) or any(
@@ -154,9 +173,15 @@ def main(argv: list[str] | None = None) -> int:
                 outcomes = GitHubOutcomes(read_ledger(args.ledger), cache=cache, record=args.record)
             else:
                 outcomes = FixtureOutcomes(outcome_dir)
-            report = deliver(args.home, window, args.ledger, outcomes,
-                             agents=agents, rules=rules, idle_minutes=args.idle_minutes,
-                             salt=salt, follow_up_days=args.follow_up_days)
+            if args.command == "compare":
+                from sumbi.compare import compare, text_summary as deliver_summary
+                report = compare(args.home, args.ledger, outcomes, args.registration,
+                                 agents=agents, rules=rules, idle_minutes=args.idle_minutes,
+                                 salt=salt, seed=args.seed, resamples=args.resamples)
+            else:
+                report = deliver(args.home, window, args.ledger, outcomes,
+                                 agents=agents, rules=rules, idle_minutes=args.idle_minutes,
+                                 salt=salt, follow_up_days=args.follow_up_days)
             data = json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
             if args.json == "-":
                 print(data, end="")

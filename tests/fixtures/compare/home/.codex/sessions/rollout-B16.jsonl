@@ -1,0 +1,3 @@
+{"type": "session_meta", "timestamp": "2030-01-01T00:00:01Z", "payload": {"id": "synthetic-B16", "cwd": "Z:/synthetic/sample/B16", "git": {"branch": "work/B16"}, "cli_version": "1.0"}}
+{"type": "turn_context", "timestamp": "2030-01-01T00:00:02Z", "payload": {"cwd": "Z:/synthetic/sample/B16", "git": {"branch": "work/B16"}, "model": "synthetic-model", "effort": "high"}}
+{"type": "event_msg", "timestamp": "2030-01-01T00:00:03Z", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 80, "cached_input_tokens": 20, "output_tokens": 20, "reasoning_output_tokens": 5}}}}

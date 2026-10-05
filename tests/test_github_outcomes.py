@@ -159,6 +159,18 @@ class GitHubTests(unittest.TestCase):
             self.adapter()
         sleep.assert_not_called()
 
+    def test_exhausted_policy_rate_limit_403_is_never_cached(self):
+        adapter = self.adapter()
+        before = {p.name for p in (self.root / "cache").glob("*.json")}
+        self.open.reset_mock()
+        self.open.side_effect = lambda *a, **k: (_ for _ in ()).throw(urllib.error.HTTPError(
+            "https://api.github.com", 403, "private", {"X-RateLimit-Remaining": "0"},
+            io.BytesIO(b'{"message":"API rate limit exceeded"}')))
+        with patch("sumbi.github_outcomes.time.sleep"), self.assertRaisesRegex(ValueError, "HTTP 403"):
+            adapter._get("/repos/example/sample/rules/branches/main", policy=True)
+        self.assertEqual(self.open.call_count, 4)
+        self.assertEqual({p.name for p in (self.root / "cache").glob("*.json")}, before)
+
     def test_cache_hit_is_offline_and_keeps_observation_time(self):
         first = self.adapter()
         first.pull(REPO + "#1")
@@ -552,7 +564,7 @@ class GitHubTests(unittest.TestCase):
         entry = adapter._entries[REPO + "#1"]
         entry["checks_at_merge"] = pull(1)["checks_at_merge"]
         # A recorded historical snapshot must also override contradictory policy evidence.
-        entry["checks_policy_at_merge"] = {"required": [{"context": "missing", "app_id": None}], "results": None}
+        entry["current_policy_evidence"] = {"required": [{"context": "missing", "app_id": None}], "results": None}
         from dataclasses import replace
         adapter.pulls[REPO + "#1"] = replace(adapter.pulls[REPO + "#1"], checks="green", checks_basis="historical", checks_reason="")
         pr = adapter.pull(REPO + "#1")

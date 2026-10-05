@@ -12,8 +12,9 @@ Install records a repository-scoped 14-day baseline before applying practices.
 M1d adds a deliverable ledger, recorded or read-only live GitHub pull-request
 outcomes, PR roles and token cost per success. Checks at merge use an explicit
 basis: historical requirements, current policy, or all visible results when no
-checks are required. Unreadable policy remains unknown. Comparison verdicts and
-propagation remain planned.
+checks are required. Unreadable policy remains unknown. M2 adds `sumbi compare`:
+pre-registered dispatch cohorts, score intervals, deterministic cost bootstraps,
+confounder flags and verdict proposals. Propagation remains planned.
 
 ## Quickstart
 
@@ -32,12 +33,16 @@ sumbi install --apply      # Apply additive practices and record a baseline
 sumbi collect --since 2030-01-01T00:00Z --until 2030-01-08T00:00Z
 sumbi deliver --ledger deliverables.csv --outcomes recorded-outcomes \
   --since 2030-01-01T00:00Z --until 2030-01-08T00:00Z
+sumbi compare --registration registration.json --ledger deliverables.csv \
+  --outcomes recorded-outcomes
 ```
 
 Replace the example UTC bounds with your measurement window. Collection prints
 a summary and writes `out/collect.json`. Install keeps its baseline and backups
 local through `.sumbi/.gitignore`; `.sumbi/interventions.jsonl` remains committable.
-Use `--home DIR` on either subcommand to select a local agent-log home.
+Use `--home DIR` on measurement subcommands to select a local agent-log home.
+Comparison windows, margin, sample size and follow-up days come from the
+[documented pre-registration schema](docs/MEASUREMENT.md#registration-json-schema).
 Use `SUMBI_SALT` or `--salt-file FILE` for keyed pseudonyms before sharing reports;
 without either, output explicitly identifies keys as unsalted.
 

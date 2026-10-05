@@ -220,11 +220,14 @@ def linked_events(session, scan, attributor, idle, ledger, judgments):
 
 
 def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *, agents=None,
-            rules=None, idle_minutes=5, salt=None, follow_up_days=7):
+            rules=None, idle_minutes=5, salt=None, follow_up_days=7, comparison_metadata=False,
+            dispatch_windows=None):
     if not math.isfinite(follow_up_days) or follow_up_days <= 0:
         raise ValueError("Follow-up days must be positive and finite")
     with pseudonym_key(salt if salt is not None else read_salt()):
         ledger = read_ledger(ledger_path)
+        if dispatch_windows is not None:
+            ledger = [d for d in ledger if any(w.contains(d.dispatched_at) for w in dispatch_windows)]
         try:
             judgments = {d.id: judge(d, outcomes, follow_up_days) for d in ledger}
         except OverflowError:
@@ -237,6 +240,8 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
         period = {k: empty_tokens() for k in ("linked", "unallocated", "unassigned", "other")}
         lifetime = {k: empty_tokens() for k in period}
         by_deliverable = {d.id: empty_tokens() for d in ledger}
+        tokens_complete = dict.fromkeys(by_deliverable, True)
+        session_metadata = {}
         evidence_counts, evidence_tokens = Counter(), Counter()
         missing_tokens = {scope: dict.fromkeys(TOKEN_KINDS, 0) for scope in ("period", "lifetime_scan")}
         coverage, links, project_spend = {}, {}, {}
@@ -247,6 +252,13 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
                                "sessions_in_period": sum(s.in_window(window) for s in found),
                                "sessions_in_lifetime_scan": sum(s.in_window(scan) for s in found)}
             for session in found:
+                if comparison_metadata:
+                    times = [t for t in session.times if t < scan.until]
+                    session_metadata[session.id()] = {"id": session.id(),
+                        "first_at": min(times).isoformat() if times else None,
+                        "last_at": max(times).isoformat() if times else None,
+                        "model": sorted(session.models), "effort": sorted(session.efforts),
+                        "cli_version": sorted(session.versions)}
                 for when, values, selected, bucket, evidence, repo in linked_events(session, scan, attributor,
                                                 idle_minutes, ledger, judgments):
                     add_tokens(lifetime[bucket], values)
@@ -254,6 +266,8 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
                         missing_tokens["lifetime_scan"][kind] += values.get(kind) is None
                     if selected:
                         add_tokens(by_deliverable[selected], values)
+                        required = ("new_input", "cache_read", "output") + (("cache_write",) if agent == "claude-code" else ())
+                        tokens_complete[selected] &= all(values.get(k) is not None for k in required)
                     if window.contains(when):
                         add_tokens(period[bucket], values)
                         for kind in TOKEN_KINDS:
@@ -289,13 +303,13 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
             j = judgments[d.id]
             merges = [outcomes.pull(p).merged_at for p in j["attempt_prs"] if outcomes.pull(p) and outcomes.pull(p).merged_at]
             elapsed_end = j["closed_at"] if j["state"] == "failed" else max(merges, default=None)
-            rows.append({"id": d.id, "state": j["state"], "reason": j["reason"],
+            rows.append({"id": d.id, "task_type": d.task_type, "state": j["state"], "reason": j["reason"],
                          "checks_basis": deliverable_basis(j["attempt_prs"], outcomes),
                          "first_pass_success": j["first_pass_success"], "eventual_success": j["state"] == "success",
                          "prs": [pseudonym("pr", p) for p in j["attempt_prs"]],
                          "pr_outcomes": [{"id": pseudonym("pr", p), "merged": bool(outcomes.pull(p).merged_at),
                               "role": d.role(p) if p in d.prs else "followup",
-                              "head_sha": outcomes.pull(p).head_sha, "required_checks_at_merge": outcomes.pull(p).checks,
+                              "head_sha": outcomes.pull(p).head_sha,
                               "checks_at_merge": outcomes.pull(p).checks, "checks_basis": outcomes.pull(p).checks_basis,
                               "checks_reason": outcomes.pull(p).checks_reason,
                               "observed_checks_at_merge": outcomes.pull(p).observed_checks,
@@ -306,7 +320,8 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
                                   if outcomes.pull(p).merged_at else None)} for p in j["attempt_prs"] if outcomes.pull(p)],
                          "elapsed_seconds": (elapsed_end - d.dispatched_at).total_seconds() if elapsed_end else None,
                          "elapsed_measurement": "observed" if elapsed_end else "not_reported",
-                         "tokens": by_deliverable[d.id]})
+                         "tokens": by_deliverable[d.id],
+                         **({"tokens_complete": tokens_complete[d.id]} if comparison_metadata else {})})
         return {"schema_version": "deliver-1.0", "pseudonyms": {"salted": current_key() is not None,
                    "algorithm": "hmac-sha256" if current_key() is not None else "sha256"},
                 "window": {"since": window.since.isoformat(), "until": window.until.isoformat(), "bounds": "[since,until)"},
@@ -336,7 +351,8 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
                              "unattributed_period_share": unattributed / total if total else 0.0,
                              "savings_verdict": "not_evaluated", "lifetime_scan_seconds": (end - begin).total_seconds(),
                              "lifetime_scan_end": end.isoformat()},
-                "deliverables": rows, "links": sorted(links.values(), key=lambda r: (r["session_id"], r["deliverable_id"] or "", r["evidence"]))}
+                "deliverables": rows, "links": sorted(links.values(), key=lambda r: (r["session_id"], r["deliverable_id"] or "", r["evidence"])),
+                **({"session_metadata": sorted(session_metadata.values(), key=lambda r: r["id"])} if comparison_metadata else {})}
 
 
 def deliverable_basis(identities, outcomes):
@@ -367,7 +383,7 @@ def text_summary(report):
         lines.append(f"Lifetime scan {bucket}: {tokens['total']} reported tokens")
     for row in report["deliverables"]:
         elapsed = str(row["elapsed_seconds"]) if row["elapsed_seconds"] is not None else "not reported"
-        lines.append(f"Deliverable {row['id']}: {row['state']}; {row['reason']}; checks basis {row['checks_basis']}; elapsed seconds {elapsed}; tokens {row['tokens']['total']}")
+        lines.append(f"Deliverable {row['id']}: {row['state']}; {row['reason']}; task type {row['task_type'] or 'not reported'}; checks basis {row['checks_basis']}; elapsed seconds {elapsed}; tokens {row['tokens']['total']}")
     lines.append("Link evidence events: " + "; ".join(f"{k} {v}" for k, v in report["coverage"]["evidence_counts"].items()))
     for agent, coverage in report["coverage"]["adapters"].items():
         lines.append(f"Coverage {agent}: files {coverage['files_scanned']}; sessions read {coverage['sessions_read']}; "
