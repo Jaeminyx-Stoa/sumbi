@@ -66,7 +66,7 @@ project ─ deliverable (ID, acceptance, state, dispatched/closed at)
 ```
 
 - **Every link carries its evidence:** a deliverable ID in the brief, a worker contract, a PR URL or branch name seen in the log. A working directory's git origin is a *candidate*, not proof.
-- **Allocation:** sessions spanning several projects are allocated explicitly or left *unassigned*. Parent sessions (dispatch, review, handoff) are allocated to their deliverables.
+- **Project allocation:** billable events in a session are split by the project evidence in force at each event. Prefer the event's working directory, then repository paths in that turn's recognized tool inputs, then the previous billable event's project when the gap is below the idle threshold; otherwise leave the event *unassigned*. Conflicting evidence at one priority is left unassigned. These project candidates are not proof of deliverable ownership. Parent sessions (dispatch, review, handoff) still need explicit deliverable links.
 - **Coverage report per host, every run:** sessions read, broken lines, duplicates, unknown formats, and the share of unattributed spend.
 - **Time.**
   - Observed (request and tool start/stop events) is reported separately from estimated (gaps between events, with sensitivity to the idle threshold).

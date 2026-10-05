@@ -120,9 +120,42 @@ and must not be added to each other or to active time.
 
 ## Attribution and privacy
 
-Only structured cwd fields are candidate evidence; command strings and prose are
-not mined for project ownership. A preceding cwd applies until an in-window cwd
-replaces it. Later out-of-window directories cannot change the historical link.
+Schema 1.1 allocates reported tokens per billable event, rather than assigning a
+whole session to one project. An event is one selected Claude assistant message
+or one nonzero Codex cumulative-token delta. The evidence priority is:
+
+1. The Claude message's own `cwd`, or the Codex working directory in force at
+   the closing snapshot. A Codex `turn_context` starts a new context; an explicit
+   command `workdir` or `cwd` supersedes it for the remainder of that turn.
+2. Repository paths in that turn's recognized tool inputs: read/write/edit file
+   operands, apply-patch targets, `git -C` operands and a leading shell `cd`.
+   Working-directory evidence wins even when a tool targets another repository.
+   Distinct projects at this priority leave the event unassigned.
+3. The immediately previous billable event's project, only when the gap is
+   strictly less than the idle threshold. An unassigned event breaks this chain.
+4. Otherwise, unassigned.
+
+Claude user messages start turns; tool-result messages continue the existing
+turn. Codex turn contexts reset command directories and tool paths. Relative
+operands resolve against the structured working directory. Existing files and
+subdirectories resolve to their local Git root; missing operands can use an
+existing ancestor's repository. Paths without a resolvable repository remain
+path candidates. Supported Windows drive/UNC paths normalize case and separators;
+POSIX paths preserve case. UNC paths remain path candidates without filesystem
+or Git probing, so collection does not initiate network-share access.
+Shell extraction is deliberately limited: it does not
+execute commands, infer later `cd` operations, expand variables or evaluate
+expressions. Unknown tool inputs, wrapper code and ordinary message prose are
+not mined. Paths and commands are retained in memory only.
+
+A Codex delta spanning a working-directory change belongs entirely to the
+project in force at its closing snapshot. Cumulative counters provide no measured
+split within that interval; proportional splitting would invent precision. Equal
+timestamps use logged ordinals when available, with accepted record order as the
+tie breaker and as the fallback when an ordinal is absent.
+The counter baseline and attribution state include pre-window events. Neither
+future directories nor future tool calls can change an earlier delta's link.
+Claude's selected streaming snapshot supplies both usage and its own evidence.
 
 For an existing working-tree directory, local read-only Git commands find the
 origin. No remote request is made. HTTPS and SSH origin forms normalize to the
@@ -137,12 +170,26 @@ unsupported or unreadable origin is `unassigned` in that mode. Without origin
 rules, a path-only configuration can scope existing repositories as well as
 missing working folders. Paths without a usable origin use path patterns.
 
-Every link records its evidence, matching rule name and pseudonymous project key.
-Several directories with the same origin and rule remain one project. A session
-with several project keys, conflicting rules or insufficient cwd evidence is
-`unassigned`; its candidate links remain visible. Known unmatched projects are
-`other`. Both buckets count toward the unattributed spend share. Rules scope the
-spend breakdown rather than hiding other sessions from coverage.
+Every event allocation records its evidence counts, matching rule label and
+pseudonymous project key. Several directories with the same origin and rule
+remain one project. Without rules, inferred candidate projects are grouped
+automatically. With rules, matching is per event: a mixed session counts toward
+a project only for its matching billable events. Known unmatched projects are
+`other`. Both `other` and `unassigned` count toward `unattributed_share`;
+`unassigned_share` separately measures missing or conflicting attribution.
+Rules scope the spend breakdown rather than hiding sessions from coverage.
+
+Each session's `allocations` and the coverage `spend` rows contain token kinds,
+billable event counts, `evidence_counts`, `evidence_tokens` and `fallback_share`
+(previous-event tokens divided by reported tokens in that row). Coverage also
+reports the global evidence mix by tokens. The four evidence categories are
+`cwd`, `tool_path`, `previous_event` and `unassigned`. Conflicting paths or rules
+retain the category that supplied the evidence, even though their bucket is
+unassigned. Spend rows count a session once per project; those counts need not
+sum to the global session count. Unknown token kinds remain null. Reasoning is
+still an output subset. The legacy session `project` field describes aggregate
+cwd candidates only; it is not the spend allocation. Consumers must use
+`allocations` or `coverage.spend` to judge project spend.
 
 Session, parent and project IDs are stable SHA-256 pseudonyms by default. Reports
 and summaries explicitly label these keys as unsalted. Set `SUMBI_SALT` or use
@@ -176,13 +223,15 @@ other local clones of that repository exactly. Otherwise normalized paths match
 the repository root and its descendants, with one project key for subdirectories.
 A known different origin never falls back to a matching path; an unreadable or
 unsupported origin remains unassigned when the target has a usable origin.
-Mixed-repository sessions are excluded rather than allocating their full cost.
+Mixed-repository sessions contribute only their matching billable events.
 
 The counts-only JSON is written exclusively to
 `.sumbi/baseline/<UTC timestamp>.json`. Coverage diagnostics describe all logs
 scanned; `scope` and adapter `sessions_selected` counts distinguish selected
 sessions from the wider window. The summary and session rows contain only the
-selected repository sessions. If none match, the status is `no sessions found`
+selected repository events and their containing sessions. Tool counts and time
+remain session-level diagnostics for selected sessions, not project-allocated
+costs. If none match, the status is `no sessions found`
 and an empty report is written. `--home DIR` selects the log home for fixtures
 or another local user home. Baseline files never overwrite existing files or
 source logs, and the installer ignores them in Git.

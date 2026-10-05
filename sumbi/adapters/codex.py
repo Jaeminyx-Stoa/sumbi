@@ -3,6 +3,7 @@
 from pathlib import Path
 import re
 
+from sumbi.evidence import tool_evidence
 from sumbi.model import (Coverage, Session, Window, epoch, integer, label, mapping,
                          records, timestamp)
 
@@ -70,10 +71,13 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
             if not session.accept(event, coverage):
                 continue
             when = timestamp(event.get("timestamp"))
+            order = integer(event.get("ordinal"))
+            order = (order if order is not None else len(session.seen), len(session.seen))
             if kind not in KNOWN:
                 coverage.unknown(kind)
             if kind in ("session_meta", "turn_context") and not inherited_meta:
                 session.cwd(payload.get("cwd"), when)
+                session.context(when, order, payload.get("cwd"))
             if kind == "turn_context":
                 contexts.setdefault(session.raw_id, []).append((when, payload.get("model"), payload.get("effort")))
             if kind == "compacted":
@@ -91,15 +95,17 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                                 or values["cached_input_tokens"] > values["input_tokens"]:
                             coverage.invalid_token_records += 1
                         else:
-                            order = integer(event.get("ordinal"))
                             snapshots.setdefault(session.raw_id, []).append(
-                                (when, order if order is not None else len(session.seen), values))
+                                (when, order, values))
                 elif subtype in ("task_started", "task_complete", "task_completed"):
                     start = epoch(payload.get("started_at"))
                     end = epoch(payload.get("completed_at"))
                     session.interval("request", identity, start or (when if subtype == "task_started" else None),
                                      end or (when if subtype != "task_started" else None))
                 elif subtype in ("exec_command_begin", "mcp_tool_call_begin"):
+                    if subtype == "exec_command_begin":
+                        cwd, paths = tool_evidence("exec_command", payload)
+                        session.tool_paths(when, order, cwd, paths)
                     session.count("tool_calls", identity, when, window)
                     session.interval("tool", identity, when, None)
                 elif subtype in ("exec_command_end", "mcp_tool_call_end"):
@@ -124,6 +130,9 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                         session.interval("tool", identity, start, end)
                     if item_type == "CommandExecution":
                         session.cwd(item.get("cwd"), when)
+                    if item_type in ("CommandExecution", "FileChange"):
+                        cwd, paths = tool_evidence(item_type, item)
+                        session.tool_paths(start or when, order, cwd, paths)
                     if item_type == "AgentMessage":
                         session.local_text(item.get("content"), when, window, local_review)
                 elif subtype == "error":
@@ -136,6 +145,9 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                 if subtype not in RESPONSES:
                     coverage.unknown("response_item:" + str(subtype))
                 if subtype in ("function_call", "custom_tool_call", "local_shell_call", "web_search_call"):
+                    cwd, paths = tool_evidence(payload.get("name", subtype),
+                                               payload.get("arguments", payload.get("input", payload.get("action"))))
+                    session.tool_paths(when, order, cwd, paths)
                     session.count("tool_calls", identity, when, window)
                     session.interval("tool", identity, when, None)
                     if str(payload.get("name", "")).split(".")[-1] in ("request_user_input", "request_user_input_async"):
@@ -161,7 +173,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
     for raw_id, entries in snapshots.items():
         session = sessions[raw_id]
         previous = dict.fromkeys(FIELDS, 0)
-        for when, _, total in sorted(entries, key=lambda e: (e[0], e[1])):
+        for when, order, total in sorted(entries, key=lambda e: (e[0], e[1])):
             reset = any(total[k] is not None and previous[k] is not None and total[k] < previous[k]
                         for k in FIELDS)
             baseline = dict.fromkeys(FIELDS, 0) if reset else previous
@@ -169,13 +181,16 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                      for k in FIELDS}
             if reset and window.contains(when):
                 session.counts["counter_resets"] += 1
-            if window.contains(when):
-                fresh = delta["input_tokens"] - delta["cached_input_tokens"]
-                if fresh < 0:
+            fresh = delta["input_tokens"] - delta["cached_input_tokens"]
+            if fresh < 0:
+                if window.contains(when):
                     # A correction contradicts the nested cached-input contract. Expose the gap.
                     coverage.invalid_token_records += 1
-                else:
-                    session.add_tokens({"new_input": fresh, "cache_read": delta["cached_input_tokens"],
-                                        "output": delta["output_tokens"], "reasoning_output": delta["reasoning_output_tokens"]})
+            elif any(value for value in delta.values() if value is not None):
+                values = {"new_input": fresh, "cache_read": delta["cached_input_tokens"],
+                          "output": delta["output_tokens"], "reasoning_output": delta["reasoning_output_tokens"]}
+                session.usage(when, order, values)
+                if window.contains(when):
+                    session.add_tokens(values)
             previous = total
     return list(sessions.values())

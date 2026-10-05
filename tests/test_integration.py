@@ -133,14 +133,16 @@ class IntegrationTests(unittest.TestCase):
         self.log("mixed", [self.repository, sibling])
         result = baseline(repository=self.repository, home=self.home, now=NOW)
         report = self.read_baseline(result)
-        self.assertEqual((result["status"], result["sessions"]), ("recorded", 2))
+        self.assertEqual((result["status"], result["sessions"]), ("recorded", 3))
         self.assertEqual(report["window"]["since"], "2030-01-01T00:00:00Z")
         self.assertEqual(report["window"]["until"], "2030-01-15T00:00:00Z")
-        self.assertEqual(report["summary"]["tokens"]["total"], 57)
+        # The mixed session contributes its matching 19-token message only.
+        self.assertEqual(report["summary"]["tokens"]["total"], 76)
         self.assertEqual(report["scope"], {"kind": "repository", "sessions_in_window": 4,
-                                         "sessions_selected": 2, "sessions_excluded": 2})
+                                         "sessions_selected": 3, "sessions_excluded": 1})
         self.assertEqual(len({s["project"]["project_key"] for s in report["sessions"]}), 1)
         self.assertTrue(all(s["project"]["bucket"] == "project" for s in report["sessions"]))
+        self.assertTrue(all("links" in s["project"] for s in report["sessions"]))
 
     def test_baseline_exact_normalized_origin_and_no_wrong_origin_fallback(self):
         self.git_repository("repository", "https://example.test/team/fixture[one].git")
@@ -153,7 +155,8 @@ class IntegrationTests(unittest.TestCase):
         report = self.read_baseline(baseline(repository=self.repository, home=self.home, now=NOW))
         self.assertEqual(report["summary"]["sessions"], 2)
         evidence = {s["project"]["evidence"] for s in report["sessions"]}
-        self.assertEqual(evidence, {"git_origin_candidate", "path_pattern"})
+        # A missing worktree folder is resolved through its existing repository ancestor.
+        self.assertEqual(evidence, {"git_origin_candidate"})
 
     def test_no_logs_and_no_matching_sessions_are_clear_statuses(self):
         result = baseline(repository=self.repository, home=self.home, now=NOW)
