@@ -1,0 +1,2 @@
+{"schema_version":1,"type":"session_start","event_id":"worker-start","session_id":"worker-session","timestamp":"2030-01-01T01:00:00Z","role":"worker","agent":"synthetic executor","parent_session_id":"root-session","cwd":"/fixture/workspace","model":"synthetic model","effort":"synthetic effort","cli_version":"synthetic version"}
+{"schema_version":1,"type":"token_usage","event_id":"worker-usage","session_id":"worker-session","timestamp":"2030-01-01T01:00:05Z","tokens":{"new_input":100,"cache_write":0,"cache_read":20,"output":10,"reasoning_output":2},"cwd":"/fixture/workspace"}

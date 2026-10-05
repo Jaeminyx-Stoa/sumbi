@@ -12,7 +12,7 @@ from sumbi.ledger import Deliverable, read_ledger
 from sumbi.model import Attributor, Coverage, TOKEN_KINDS, Window, normalize_origin, normalize_path
 from sumbi.outcomes import Outcomes, REVERT
 from sumbi.privacy import current_key, pseudonym, pseudonym_key, read_salt
-from sumbi.report import ADAPTERS
+from sumbi.report import ADAPTERS, DEFAULT_AGENTS
 
 STATES = ("success", "failed", "in_progress", "immature")
 CHECKS_BASES = ("historical", "current_policy", "all_visible", "unknown")
@@ -166,6 +166,12 @@ def linked_events(session, scan, attributor, idle, ledger, judgments):
     hints = sorted(session.deliverable_events, key=lambda e: (e[0], e[1]))
     index, current_branch, current_directory, refs = 0, None, None, set()
     for when, order, values, project, project_evidence, cwd in session.event_allocations(scan, attributor, idle):
+        if session.agent == "sumbi-events":
+            # V1 has project candidates but no GitHub deliverable ownership proof.
+            bucket = "unallocated" if project["bucket"] == "project" else project["bucket"]
+            repositories = project_repos(cwd, project, attributor, {r for d in ledger for r in d.repos})
+            yield when, values, None, bucket, bucket, next(iter(repositories)) if len(repositories) == 1 else None
+            continue
         own_branch, own_refs = None, set()
         while index < len(hints) and (hints[index][0], hints[index][1]) <= (when, order):
             t, o, kind, data = hints[index]
@@ -245,7 +251,7 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
         evidence_counts, evidence_tokens = Counter(), Counter()
         missing_tokens = {scope: dict.fromkeys(TOKEN_KINDS, 0) for scope in ("period", "lifetime_scan")}
         coverage, links, project_spend = {}, {}, {}
-        for agent in agents if agents is not None else ADAPTERS:
+        for agent in agents if agents is not None else DEFAULT_AGENTS:
             measured = Coverage()
             found = ADAPTERS[agent].collect(home, scan, measured, collect_links=True)
             coverage[agent] = {**measured.as_dict(), "sessions_read": len(found),
@@ -254,7 +260,7 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
             for session in found:
                 if comparison_metadata:
                     times = [t for t in session.times if t < scan.until]
-                    session_metadata[session.id()] = {"id": session.id(), "agent": agent,
+                    session_metadata[session.id()] = {"id": session.id(), "agent": session.public_agent(),
                         "first_at": min(times).isoformat() if times else None,
                         "last_at": max(times).isoformat() if times else None,
                         "model": sorted(session.models), "effort": sorted(session.efforts),
@@ -266,8 +272,8 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
                         missing_tokens["lifetime_scan"][kind] += values.get(kind) is None
                     if selected:
                         add_tokens(by_deliverable[selected], values)
-                        required = ("new_input", "cache_read", "output") + (("cache_write",) if agent == "claude-code" else ())
-                        tokens_complete[selected] &= all(values.get(k) is not None for k in required)
+                        required = ("new_input", "cache_read", "output") if session.agent == "codex" else TOKEN_KINDS[:4]
+                        tokens_complete[selected] &= not session.token_evidence_incomplete and all(values.get(k) is not None for k in required)
                     if window.contains(when):
                         add_tokens(period[bucket], values)
                         for kind in TOKEN_KINDS:

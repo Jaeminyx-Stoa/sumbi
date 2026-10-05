@@ -1,0 +1,10 @@
+{"schema_version":1,"type":"session_start","event_id":"root-start","session_id":"root-session","timestamp":"2030-01-01T00:30:00Z","role":"orchestrator","agent":"synthetic coordinator","cwd":"/fixture/workspace"}
+{"schema_version":1,"type":"token_usage","event_id":"root-usage","session_id":"root-session","timestamp":"2030-01-01T00:30:01Z","tokens":{"new_input":30,"cache_write":0,"cache_read":0,"output":10,"reasoning_output":null},"cwd":"/fixture/workspace"}
+{"schema_version":1,"type":"session_end","event_id":"root-end","session_id":"root-session","timestamp":"2030-01-01T00:30:02Z"}
+{"schema_version":1,"type":"session_start","event_id":"worker-start","session_id":"worker-session","timestamp":"2030-01-01T01:00:00Z","role":"worker","agent":"synthetic executor","parent_session_id":"root-session","cwd":"/fixture/workspace","model":"synthetic model","effort":"synthetic effort","cli_version":"synthetic version"}
+{"schema_version":1,"type":"file_edit","event_id":"worker-edit","session_id":"worker-session","timestamp":"2030-01-01T01:00:02Z"}
+{"schema_version":1,"type":"tool_start","event_id":"worker-tool-start","session_id":"worker-session","timestamp":"2030-01-01T01:00:03Z","tool_call_id":"worker-tool"}
+{"schema_version":1,"type":"command_execution","event_id":"worker-command","session_id":"worker-session","timestamp":"2030-01-01T01:00:04Z","started_at":"2030-01-01T01:00:03Z","cwd":"/fixture/workspace","command":["bash","scripts/check.sh"],"exit_code":0}
+{"schema_version":1,"type":"tool_end","event_id":"worker-tool-end","session_id":"worker-session","timestamp":"2030-01-01T01:00:04Z","tool_call_id":"worker-tool","error":false}
+{"schema_version":1,"type":"token_usage","event_id":"worker-usage","session_id":"worker-session","timestamp":"2030-01-01T01:00:05Z","tokens":{"new_input":100,"cache_write":0,"cache_read":20,"output":10,"reasoning_output":2},"cwd":"/fixture/workspace"}
+{"schema_version":1,"type":"session_end","event_id":"worker-end","session_id":"worker-session","timestamp":"2030-01-01T01:00:06Z"}

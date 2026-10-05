@@ -39,7 +39,7 @@ def timestamp(value: object) -> datetime | None:
         if result.tzinfo is None:
             return None
         return result.astimezone(timezone.utc)
-    except ValueError:
+    except (ValueError, OverflowError):
         return None
 
 
@@ -94,13 +94,15 @@ class Coverage:
                 for name, value in vars(self).items()}
 
 
-def records(path: Path, coverage: Coverage):
+def records(path: Path, coverage: Coverage, *, ignore_blank: bool = False):
     """Continue after broken JSON, invalid UTF-8 and non-object records."""
     coverage.files_scanned += 1
     try:
         with path.open("rb") as stream:
             for raw in stream:
                 coverage.lines_read += 1
+                if ignore_blank and not raw.strip():
+                    continue
                 try:
                     event = json.loads(raw.decode("utf-8"))
                     if not isinstance(event, dict):
@@ -358,6 +360,13 @@ class Session:
     edits: dict[str, datetime] = field(default_factory=dict)
     completed_at: datetime | None = None
     local_evidence_gaps: Counter = field(default_factory=Counter)
+    # Open-format emitter identities stay local; IDs use the adapter namespace.
+    emitter_agent: str | None = None
+    token_evidence_incomplete: bool = False
+    metadata_incomplete: dict[str, bool] = field(default_factory=dict)
+
+    def public_agent(self):
+        return "sumbi-events:" + pseudonym("agent", self.emitter_agent or "unknown") if self.agent == "sumbi-events" else self.agent
 
     def execution(self, identity, when, command, code, *, started_at=None, cwd=None):
         if when is not None:
@@ -423,6 +432,8 @@ class Session:
             if kind == "context":
                 raw_cwd, reset = data
                 context_cwd = resolve_path(raw_cwd)
+                if self.agent == "sumbi-events" and context_cwd is None:
+                    previous, previous_when = None, None
                 if reset:
                     command_cwd, turn_paths = None, set()
                 continue
@@ -438,6 +449,8 @@ class Session:
             cwd = resolve_path(own_cwd, context_cwd) if own_cwd else None
             if self.agent == "codex":
                 cwd = command_cwd or context_cwd
+            elif self.agent == "sumbi-events":
+                cwd = cwd or context_cwd
             if cwd:
                 link = attributor.event_link(cwd)
                 evidence = "cwd"
@@ -468,6 +481,10 @@ class Session:
                                             "evidence_counts": dict.fromkeys(EVIDENCE_TYPES, 0),
                                             "evidence_tokens": dict.fromkeys(EVIDENCE_TYPES, 0)})
             row["events"] += 1
+            if self.agent == "sumbi-events":
+                missing = row.setdefault("not_reported_events", dict.fromkeys(TOKEN_KINDS, 0))
+                for kind in TOKEN_KINDS:
+                    missing[kind] += values.get(kind) is None
             row["evidence_counts"][evidence] += 1
             total = sum(values.get(k) or 0 for k in TOKEN_KINDS if k != "reasoning_output")
             row["evidence_tokens"][evidence] += total
@@ -476,6 +493,11 @@ class Session:
                     row["tokens"][key] = (row["tokens"][key] or 0) + value
         for row in rows.values():
             row["tokens"]["total"] = sum(row["tokens"][k] or 0 for k in TOKEN_KINDS if k != "reasoning_output")
+            if self.agent == "sumbi-events":
+                missing = row.pop("not_reported_events")
+                row["tokens"]["not_reported_events"] = missing
+                row["tokens"]["evidence_incomplete"] = self.token_evidence_incomplete
+                row["tokens"]["complete_total"] = row["tokens"]["total"] if not self.token_evidence_incomplete and not any(missing[k] for k in TOKEN_KINDS[:4]) else None
             total = row["tokens"]["total"]
             row["fallback_share"] = row["evidence_tokens"]["previous_event"] / total if total else 0.0
         return sorted(rows.values(), key=lambda r: (r["bucket"], r["project_key"] or "", r["rule"] or ""))
@@ -545,8 +567,8 @@ class Session:
                                      for key, t in self.ends.items())}
         total = sum(self.tokens[k] or 0 for k in TOKEN_KINDS if k != "reasoning_output")
         allocations = self.allocations(window, attributor, idle_minutes)
-        return {"id": self.id(), "parent_id": pseudonym("session", self.agent + ":" + self.parent_raw_id)
-                if self.parent_raw_id else None, "agent": self.agent,
+        result = {"id": self.id(), "parent_id": pseudonym("session", self.agent + ":" + self.parent_raw_id)
+                if self.parent_raw_id else None, "agent": self.public_agent(),
                 "project": attributor.session_link(self.project_paths(window)),
                 "allocations": allocations,
                 "spend_allocation": "events",
@@ -559,3 +581,11 @@ class Session:
                          "active": {"measurement": "estimated", "idle_minutes": idle_minutes,
                                     "seconds": active[format(idle_minutes, "g")],
                                     "sensitivity_seconds": active}, "durations": durations}}
+        if self.agent == "sumbi-events":
+            events = [values for at, _, kind, (values, *_) in self.attribution_events
+                      if kind == "usage" and window.contains(at)]
+            missing = {kind: sum(values.get(kind) is None for values in events) for kind in TOKEN_KINDS}
+            result["tokens"]["not_reported_events"] = missing
+            result["tokens"]["evidence_incomplete"] = self.token_evidence_incomplete
+            result["tokens"]["complete_total"] = total if events and not self.token_evidence_incomplete and not any(missing[k] for k in TOKEN_KINDS[:4]) else None
+        return result
