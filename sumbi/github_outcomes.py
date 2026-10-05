@@ -21,6 +21,7 @@ API = "https://api.github.com"
 MAX_BYTES = 16 * 1024 * 1024
 MAX_TEXT = 65536
 CACHE_SECONDS = 300
+PLAN_UNAVAILABLE = "Upgrade to GitHub Pro or make this repository public to enable this feature."
 
 
 def outside_repository(path: Path):
@@ -74,8 +75,8 @@ def _write(path, data):
 class GitHubOutcomes(FixtureOutcomes):
     """Fetch complete repository intervals and reuse the fixture judgment contract.
 
-    REST cannot prove the historical required-check list. `checks` stays unknown;
-    `observed_checks` reports visible results on the head or merge SHA at merge.
+    REST cannot prove the historical required-check list. Current policy or all
+    visible results supply explicitly weaker bases when no snapshot is available.
     Recordings include normalized fixtures and filtered REST pages for offline tests.
     """
 
@@ -94,6 +95,8 @@ class GitHubOutcomes(FixtureOutcomes):
         self.files_read = 0
         self.requests = self.cache_hits = 0
         self._entries = {}
+        self._base_refs = {}
+        self._policies = {}
         self._recordings = {}
         repos = sorted({r for d in ledger for r in d.repos})
         for repo in repos:
@@ -133,7 +136,28 @@ class GitHubOutcomes(FixtureOutcomes):
             return [pull(p) for p in raw] if isinstance(raw, list) else pull(raw)
         if endpoint.endswith("/check-runs"):
             fields = ("name", "head_sha", "started_at", "completed_at", "status", "conclusion")
-            return {"total_count": raw["total_count"], "check_runs": [{k: c[k] for k in fields} for c in raw["check_runs"]]}
+            return {"total_count": raw["total_count"], "check_runs": [
+                {**{k: c[k] for k in fields}, "app": {"id": c.get("app", {}).get("id")}}
+                for c in raw["check_runs"]]}
+        if "/rules/branches/" in endpoint:
+            return [{"type": "required_status_checks", "parameters": {"required_status_checks": [
+                {"context": c["context"], "integration_id": c.get("integration_id")}
+                for c in rule["parameters"]["required_status_checks"]]}}
+                if rule["type"] == "required_status_checks" else {"type": rule["type"]} for rule in raw]
+        if "/branches/" in endpoint:
+            protection = raw.get("protection", {})
+            checks = protection.get("required_status_checks", {})
+            enabled = protection.get("enabled", raw["protected"])
+            enforcement = checks["enforcement_level"] if checks else "off"
+            if type(raw["protected"]) is not bool or type(enabled) is not bool or enforcement not in ("off", "non_admins", "everyone"):
+                raise ValueError("GitHub branch policy was malformed")
+            return {"protected": raw["protected"], "protection": {
+                "enabled": enabled,
+                "required_status_checks": {
+                    "enforcement_level": enforcement,
+                    "contexts": checks.get("contexts", []),
+                    "checks": [{"context": c["context"], "app_id": c.get("app_id")}
+                               for c in checks.get("checks", [])]}}}
         if endpoint.endswith("/statuses"):
             # GitHub commit-status objects omit sha; the request supplies it.
             return [{k: s[k] for k in ("context", "updated_at", "state")} for s in raw]
@@ -142,7 +166,7 @@ class GitHubOutcomes(FixtureOutcomes):
                     "committer": {"date": c["commit"]["committer"]["date"]}}} for c in raw]
         raise ValueError("GitHub response endpoint is unsupported")
 
-    def _get(self, path, *, missing=False):
+    def _get(self, path, *, missing=False, policy=False):
         key = hashlib.sha256(path.encode("utf-8")).hexdigest()
         destination = self.cache / (key + ".json")
         payload = None
@@ -180,7 +204,8 @@ class GitHubOutcomes(FixtureOutcomes):
                     break
                 except urllib.error.HTTPError as exc:
                     headers, code = exc.headers, exc.code
-                    rate_message = exc.read(4096).lower() if code == 403 else b""
+                    error_body = exc.read(4096) if code == 403 else b""
+                    rate_message = error_body.lower()
                     exc.close()
                     if code == 404 and missing:
                         return None
@@ -201,6 +226,17 @@ class GitHubOutcomes(FixtureOutcomes):
                             time.sleep(step)
                             delay -= step
                         continue
+                    if policy and code in (403, 404):
+                        # Match the exact plan message only on the rules endpoint.
+                        try:
+                            plan_unavailable = (code == 403 and "/rules/branches/" in path
+                                                and json.loads(error_body).get("message") == PLAN_UNAVAILABLE)
+                        except (ValueError, AttributeError, UnicodeError):
+                            plan_unavailable = False
+                        payload = {"fetched_at": time.time(), "observed_at": captured_at,
+                                   "response": [] if plan_unavailable else None}
+                        _write(destination, payload)
+                        break
                     raise ValueError("GitHub request failed (HTTP " + str(code) + "); check access or retry later") from None
                 except (urllib.error.URLError, OSError, UnicodeError, json.JSONDecodeError,
                         KeyError, TypeError, AttributeError):
@@ -260,6 +296,7 @@ class GitHubOutcomes(FixtureOutcomes):
             response["merged"] = response["merged_at"] is not None
             entries.append({"response": response, "checks_at_merge": None})
             self._entries[identity] = entries[-1]
+            self._base_refs[identity] = pr["base"]["ref"]
         end = self._asof
         if start >= end:
             raise ValueError("GitHub observation must follow ledger dispatch")
@@ -277,12 +314,20 @@ class GitHubOutcomes(FixtureOutcomes):
         entry = self._entries.get(identity)
         if pr and pr.merged_at and "observed_checks_at_merge" not in entry:
             try:
-                value = self._observed_checks(pr)
+                results = self._merge_results(pr)
+                value = self._policy_checks({"required": [], "results": results}, pr.merged_at,
+                                            (pr.head_sha, pr.merge_sha))[0]
+                if entry["checks_at_merge"] is None:
+                    evidence = {"required": self._policy(identity), "results": results}
+                    entry["checks_policy_at_merge"] = evidence
+                    checks, basis, reason = self._policy_checks(evidence, pr.merged_at, (pr.head_sha, pr.merge_sha))
+                else:
+                    checks, basis, reason = pr.checks, pr.checks_basis, pr.checks_reason
             except (KeyError, TypeError, AttributeError):
                 raise ValueError("GitHub check response was malformed") from None
             entry["observed_checks_at_merge"] = value
             from dataclasses import replace
-            pr = replace(pr, observed_checks=value)
+            pr = replace(pr, observed_checks=value, checks=checks, checks_basis=basis, checks_reason=reason)
             self.pulls[identity] = pr
             self._record_repo(identity.rsplit("#", 1)[0])
         return pr
@@ -291,7 +336,56 @@ class GitHubOutcomes(FixtureOutcomes):
         follows, reverts = super().disturbances(pull, days)
         return [self.pull(p.id) for p in follows], reverts
 
-    def _observed_checks(self, pr):
+    def _policy(self, identity):
+        repo = identity.rsplit("#", 1)[0]
+        base = self._base_refs[identity]
+        key = repo, base
+        if key in self._policies:
+            return self._policies[key]
+        prefix = "/repos/" + repo
+        branch = urllib.parse.quote(base, safe="")
+        classic = self._get(prefix + "/branches/" + branch, policy=True)
+        rules = []
+        for page in range(1, 10001):
+            rows = self._get(prefix + "/rules/branches/" + branch + "?per_page=100&page=" + str(page), policy=True)
+            if rows is None:
+                rules = None
+                break
+            rules.extend(rows)
+            if len(rows) < 100:
+                break
+        else:
+            raise ValueError("GitHub rules pagination limit reached; capture is incomplete")
+        if classic is None or rules is None:
+            self._policies[key] = None
+            return None
+        required = set()
+
+        def add(context, app_id=None):
+            if (not isinstance(context, str) or not context or (app_id is not None
+                    and (type(app_id) is not int or app_id <= 0))):
+                raise ValueError("GitHub required check was malformed")
+            required.add((context, app_id))
+
+        protection = classic["protection"]
+        checks = protection["required_status_checks"]
+        if protection["enabled"] and checks["enforcement_level"] != "off":
+            # contexts mirror checks; do not turn a pinned check into an unpinned one.
+            for c in checks["checks"]:
+                # Classic -1 means any app; ruleset IDs have no such sentinel.
+                add(c["context"], None if c["app_id"] == -1 else c["app_id"])
+            for context in checks["contexts"]:
+                if not any(c["context"] == context for c in checks["checks"]):
+                    add(context)
+        for rule in rules:
+            if rule["type"] == "required_status_checks":
+                for c in rule["parameters"]["required_status_checks"]:
+                    add(c["context"], c["integration_id"])
+        value = [{"context": n, "app_id": app} for n, app in sorted(required, key=lambda r: (r[0], r[1] or 0))]
+        self._policies[key] = value
+        return value
+
+    def _merge_results(self, pr):
         repo = pr.id.rsplit("#", 1)[0]
         for sha in dict.fromkeys([pr.merge_sha, pr.head_sha]):
             if not sha or not re.fullmatch(SHA, sha):
@@ -314,9 +408,9 @@ class GitHubOutcomes(FixtureOutcomes):
                       if utc(s["updated_at"], "GitHub status timestamp") <= pr.merged_at]
             names = sorted({c["name"] for c in runs} | {s["context"] for s in states})
             if names:
-                return self._checks({"head_sha": sha, "captured_at": pr.merged_at.isoformat(),
-                                     "required": names, "check_runs": runs, "statuses": states}, sha, pr.merged_at)
-        return "unknown"
+                return {"head_sha": sha, "captured_at": pr.merged_at.isoformat(),
+                        "required": [], "check_runs": runs, "statuses": states}
+        return None
 
     def _record_repo(self, repo):
         if self.record:

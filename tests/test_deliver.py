@@ -305,15 +305,34 @@ class DeliverTests(unittest.TestCase):
         raw = outcome_fixture()
         raw["pulls"][0]["checks_at_merge"] = None
         row = judge(self.d(), self.outcomes(raw))
-        self.assertEqual(row["reason"], "checks_unknown")
+        self.assertEqual(row["reason"], "checks_policy_unreadable")
         raw["pulls"][0] = pull(1)
         raw["pulls"][0]["checks_at_merge"]["check_runs"] = []
-        self.assertEqual(judge(self.d(), self.outcomes(raw))["reason"], "checks_unknown")
+        self.assertEqual(judge(self.d(), self.outcomes(raw))["reason"], "checks_missing_required")
 
     def test_red_checks_cannot_succeed(self):
         raw = outcome_fixture()
         raw["pulls"][0] = pull(1, checks="failure")
         self.assertEqual(judge(self.d(), self.outcomes(raw))["reason"], "checks_red")
+
+    def test_mixed_basis_counts_and_per_pr_verdicts(self):
+        raw = outcome_fixture()
+        for index, required in ((0, [{"context": "test", "app_id": None}]), (3, [])):
+            entry = raw["pulls"][index]
+            results = entry["checks_at_merge"]
+            results["required"] = []
+            entry["checks_at_merge"] = None
+            entry["checks_policy_at_merge"] = {"required": required, "results": results}
+        self.outcomes(raw)
+        report = self.report()
+        self.assertEqual(report["checks_basis_counts"], {
+            "historical": 3, "current_policy": 1, "all_visible": 1, "unknown": 1})
+        rows = {row["id"]: row for row in report["deliverables"]}
+        self.assertEqual(rows["D1"]["checks_basis"], "current_policy")
+        self.assertEqual(rows["Dsplit"]["checks_basis"], "all_visible")
+        self.assertEqual([pr["checks_basis"] for pr in rows["Dsplit"]["pr_outcomes"]], ["all_visible", "historical"])
+        self.assertTrue(all(pr["checks_at_merge"] == "green" for pr in rows["Dsplit"]["pr_outcomes"]))
+        self.assertIn("historical 3; current_policy 1; all_visible 1; unknown 1", text_summary(report))
 
     def test_wrong_head_and_postmerge_checks_are_rejected(self):
         for field in ("head_sha", "completed_at"):

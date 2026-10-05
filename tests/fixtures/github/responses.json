@@ -115,5 +115,17 @@
       }
     ]
   },
-  "/repos/example/sample/commits/0000000000000000000000000000000000000066/statuses": []
+  "/repos/example/sample/commits/0000000000000000000000000000000000000066/statuses": [],
+  "/repos/example/sample/branches/main": {
+    "protected": false,
+    "protection": {
+      "enabled": false,
+      "required_status_checks": {
+        "enforcement_level": "off",
+        "contexts": [],
+        "checks": []
+      }
+    }
+  },
+  "/repos/example/sample/rules/branches/main": []
 }

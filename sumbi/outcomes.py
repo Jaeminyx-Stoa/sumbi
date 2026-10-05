@@ -35,6 +35,8 @@ class PullRequest:
     title: str
     body: str
     observed_checks: str = "unknown"
+    checks_basis: str = "unknown"
+    checks_reason: str = "checks_policy_unreadable"
 
 
 @dataclass(frozen=True)
@@ -87,7 +89,7 @@ class FixtureOutcomes:
             raise ValueError("Outcomes: pulls and commits must be arrays")
         for entry in raw["pulls"]:
             if (not isinstance(entry, dict) or not {"response", "checks_at_merge"} <= set(entry)
-                    or set(entry) - {"response", "checks_at_merge", "observed_checks_at_merge"}):
+                    or set(entry) - {"response", "checks_at_merge", "observed_checks_at_merge", "checks_policy_at_merge"}):
                 raise ValueError("Outcomes: each pull needs response and checks_at_merge")
             pr = entry["response"]
             number = pr["number"]
@@ -110,12 +112,16 @@ class FixtureOutcomes:
             if not isinstance(pr["title"], str) or (pr["body"] is not None and not isinstance(pr["body"], str)):
                 raise ValueError("Outcomes: PR title/body must be strings or null body")
             checks = self._checks(entry["checks_at_merge"], head, merged)
+            basis = "historical" if entry["checks_at_merge"] is not None else "unknown"
+            reason = "" if checks == "green" else "checks_red" if checks == "red" else "checks_missing_required"
+            if basis == "unknown":
+                checks, basis, reason = self._policy_checks(entry.get("checks_policy_at_merge"), merged, (head, merge))
             observed = entry.get("observed_checks_at_merge", "unknown")
             if observed not in ("unknown", "green", "red"):
                 raise ValueError("Outcomes: invalid observed check label")
             self.pulls[identity] = PullRequest(identity, pr["state"], created, closed, merged,
                                               head.lower(), merge.lower() if merge else None,
-                                              checks, pr["title"], pr["body"] or "", observed)
+                                              checks, pr["title"], pr["body"] or "", observed, basis, reason)
         commits = []
         for commit in raw["commits"]:
             if not re.fullmatch(SHA, commit["sha"]) or not isinstance(commit["commit"]["message"], str):
@@ -175,6 +181,68 @@ class FixtureOutcomes:
         if any(n not in latest for n in required):
             return "unknown"
         return "green" if all(latest[n][1] == "green" for n in required) else "red"
+
+    @classmethod
+    def _policy_checks(cls, evidence, merged, shas):
+        """Judge current requirements separately from authoritative snapshots.
+
+        Names match exactly. Latest attempts are independent per name and app;
+        a status sharing an unpinned name must also pass.
+        """
+        if evidence is None:
+            return "unknown", "unknown", "checks_policy_unreadable" if merged else "not_merged"
+        if not merged or not isinstance(evidence, dict) or set(evidence) != {"required", "results"}:
+            raise ValueError("Outcomes: invalid policy check evidence")
+        required, snapshot = evidence["required"], evidence["results"]
+        if required is not None and (not isinstance(required, list) or any(
+                not isinstance(r, dict) or set(r) != {"context", "app_id"}
+                or not isinstance(r["context"], str) or not r["context"]
+                or (r["app_id"] is not None and (type(r["app_id"]) is not int or r["app_id"] <= 0))
+                for r in required)):
+            raise ValueError("Outcomes: invalid policy requirements")
+        values = {}
+        if snapshot is not None:
+            if not isinstance(snapshot, dict) or snapshot.get("head_sha") not in shas:
+                raise ValueError("Outcomes: policy results must identify the head or merge SHA")
+            sha = snapshot["head_sha"]
+            # Validate the same timing and state contract as historical evidence.
+            if not isinstance(snapshot.get("check_runs"), list) or not isinstance(snapshot.get("statuses"), list):
+                raise ValueError("Outcomes: policy results need arrays")
+            cls._checks({**snapshot, "check_runs": [], "statuses": []}, sha, merged)
+            if snapshot["required"]:
+                raise ValueError("Outcomes: policy results cannot declare historical requirements")
+            groups = {}
+            for run in snapshot["check_runs"]:
+                app_id = run.get("app", {}).get("id")
+                if app_id is not None and (type(app_id) is not int or app_id <= 0):
+                    raise ValueError("Outcomes: invalid check app ID")
+                groups.setdefault((run["name"], app_id), []).append(run)
+            for (name, app_id), runs in groups.items():
+                values[(name, app_id, "check")] = cls._checks(
+                    {**snapshot, "required": [name], "check_runs": runs, "statuses": []}, sha, merged)
+            for name in {s["context"] for s in snapshot["statuses"]}:
+                values[(name, None, "status")] = cls._checks(
+                    {**snapshot, "required": [name], "check_runs": [],
+                     "statuses": [s for s in snapshot["statuses"] if s["context"] == name]}, sha, merged)
+        if required is None:
+            return "unknown", "unknown", "checks_policy_unreadable"
+        basis = "current_policy" if required else "all_visible"
+        if not required:
+            verdicts = list(values.values())
+            if not verdicts:
+                return "unknown", basis, "no_checks"
+        else:
+            verdicts = []
+            for requirement in required:
+                name, app_id = requirement["context"], requirement["app_id"]
+                matches = [value for (n, app, kind), value in values.items() if n == name
+                           and (app_id is None or (kind == "check" and app == app_id))]
+                verdicts.append("red" if "red" in matches else "green" if matches else "unknown")
+        if "red" in verdicts:
+            return "red", basis, "checks_red"
+        if "unknown" in verdicts:
+            return "unknown", basis, "checks_missing_required"
+        return "green", basis, ""
 
     def pull(self, identity):
         return self.pulls.get(identity)

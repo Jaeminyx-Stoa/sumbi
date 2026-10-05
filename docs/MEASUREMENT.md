@@ -335,12 +335,67 @@ contribute its later conclusion: it is red (still pending) at merge. The latest
 attempt by start time and latest status update win; missing evidence is unknown.
 `observed_checks_at_merge` is green/red/unknown for these visible results.
 
-**REST does not expose an authoritative historical required-check list.** The live
-adapter therefore reports `required_checks_at_merge: unknown` and withholds success
-even if observed results are green. It never substitutes current branch protection,
-current rulesets, or all observed checks for historical requirements. Authoritative
-historical snapshots in offline fixtures can establish green/red/missing required
-checks using the contract below. This limitation is visible in each PR outcome.
+**REST does not expose an authoritative historical required-check list.** Every
+merged PR reports `checks_at_merge` and `checks_basis` side by side, using this
+ladder in order:
+
+1. `historical`: an authoritative required-check snapshot at merge, under the
+   unchanged offline contract below. It always wins when present.
+2. `current_policy`: the union of classic base-branch protection and active
+   ruleset `required_status_checks`, configured now, applied to results visible
+   at merge. Classic checks apply when protection is enabled and
+   `enforcement_level` is not `off`. Every required name must be green; any red
+   or still pending result is red, and a missing required result is unknown.
+   Optional results do not affect this verdict.
+3. `all_visible`: both policy sources were read and require no checks. All
+   visible results at merge must be green, and at least one must exist. No results
+   gives unknown with PR reason `no_checks` and deliverable reason `checks_none`.
+4. `unknown`: a policy endpoint returned an access-denied 403 or a 404. Checks
+   remain unknown with reason `checks_policy_unreadable`. The single exception
+   is a rules endpoint 403 whose message exactly equals `Upgrade to GitHub Pro or
+   make this repository public to enable this feature.`; it means zero ruleset
+   rules. This exception never applies to the classic branch endpoint.
+
+Names match exactly and case-sensitively against check-run `name` or status
+`context`; no whitespace trimming, workflow prefix removal, globbing or aliases
+are applied. Latest check attempts are selected independently per name and app,
+and latest statuses per context. For an unpinned requirement, every matching
+check source and status must pass. An `app_id` or `integration_id` pin requires a
+check run with that `app.id`; a status or another app cannot satisfy it. Classic
+`contexts` mirror `checks`: a matching check object supplies its app pin rather
+than introducing another unpinned requirement. Null/omitted IDs and classic
+`app_id: -1` mean any app. Duplicate requirements from the two policy sources are
+deduplicated by name and app ID. Completed `success`, `neutral` and `skipped`
+checks qualify; statuses require `success`. Red takes precedence over a missing
+requirement for current-policy judgments. No results are combined across SHAs.
+Missing start timestamps cannot establish a check's presence at merge.
+
+The policy may have changed since the merge. Admin bypass under `non_admins`
+enforcement is caught only when a required result was red or missing at merge;
+this adapter does not audit bypass actors. `all_visible` proves observed green
+results without claiming an enforced gate. `observed_checks_at_merge` remains a
+diagnostic and may be red when an optional failure leaves `current_policy` green.
+Other collection failures still stop capture instead of inferring green checks.
+
+Each deliverable takes the weakest basis of its merged attempt PRs, including
+repairs (`historical` > `current_policy` > `all_visible` > `unknown`). Missing PRs
+or no merged attempts give `unknown`; unmerged retries supply no merge basis.
+JSON `checks_basis_counts` and the text summary count deliverables per basis,
+including unknown. Other check reasons distinguish `checks_red` and
+`checks_missing_required`. `required_checks_at_merge` is retained as a compatibility
+alias for the checks verdict; consumers must read its accompanying basis.
+Rounds compared later must use the same basis; M2 will enforce this.
+
+Endpoint shapes are verified against GitHub's REST documentation for
+[Get a branch](https://docs.github.com/en/rest/branches/branches#get-a-branch),
+[Get rules for a branch](https://docs.github.com/en/rest/repos/rules#get-rules-for-a-branch),
+and [Check runs](https://docs.github.com/en/rest/checks/runs#list-check-runs-for-a-git-reference).
+The protected-branch example omits `protection.enabled`; when absent, the adapter
+uses `protected`. The rules endpoint is paginated and already excludes disabled
+and evaluate-only rules, including rules inherited from organizations. Check runs
+expose `app.id`; classic requirements use `app_id` and rules use `integration_id`.
+The plan-unavailable error text was observed by the maintainer; the endpoint's
+documented response codes list 200 only, without documenting this 403 message.
 
 `--cache DIR` defaults to `~/.cache/sumbi/outcomes`. Responses expire after five
 minutes. A cache hit retains the original observation time, so cached data cannot
@@ -391,6 +446,16 @@ Each commit response needs `sha`, `commit.message`, and `commit.committer.date`,
 within `[coverage_start, observed_at)`.
 PR entries may also carry `observed_checks_at_merge` (`green`, `red`, or
 `unknown`); it is diagnostic and never substitutes for `checks_at_merge`.
+Live recordings additionally retain `checks_policy_at_merge`, an object with
+exactly `required` and `results`. `required` is null for unreadable policy or an
+array of `{ "context": "test", "app_id": null }` requirements (empty for
+`all_visible`). `results` is null when no pre-merge results exist, or the snapshot
+shape below with `required: []`, the selected head or merge SHA, and check-run
+`app.id` fields. This evidence is evaluated on replay and never promoted to
+`historical`. Raw policy cache/record pages retain only the enforcement, context
+and app fields used by the adapter, plus rule types to preserve pagination.
+Denied-policy responses retain a normalized null; the plan exception retains an
+empty rule array. Response error prose is discarded.
 
 For merged PRs, `checks_at_merge` is null when historical evidence is unavailable,
 or an object with exactly `head_sha`, `captured_at`, `required`, `check_runs` and
@@ -405,12 +470,14 @@ status by update time win; conflicting ties fail validation. If both check and
 status use the same required name, both must pass. Completed `success`, `neutral`
 and `skipped` checks qualify; commit statuses require `success`. Missing required
 results are unknown, never green. Present-day checks cannot stand in for checks
-at merge, and current branch protection cannot stand in for the historical list.
+at merge. Current policy supplies a separately labeled weaker basis, never an
+authoritative historical list.
 
 The completeness flags attest that all PRs and commits in the declared interval
 were captured (including pagination). They do not infer completeness from a
-partial list. A missing PR, missing required-check snapshot or incomplete capture
-prevents a success claim. Coverage counters expose the missing evidence.
+partial list. A missing PR, unknown checks verdict or incomplete capture prevents
+a success claim. Missing historical snapshots may use the weaker basis ladder
+above. Coverage counters expose the missing evidence.
 
 ### States, attempts and time
 

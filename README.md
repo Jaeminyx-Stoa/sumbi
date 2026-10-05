@@ -10,8 +10,9 @@ sumbi is a self-improving harness for coding agents. Seed a sensible harness in 
 session measurement for Claude Code and Codex through one `sumbi` command.
 Install records a repository-scoped 14-day baseline before applying practices.
 M1d adds a deliverable ledger, recorded or read-only live GitHub pull-request
-outcomes, PR roles and token cost per success. Live required-check evidence remains
-unknown when historical requirements are unavailable. Comparison verdicts and
+outcomes, PR roles and token cost per success. Checks at merge use an explicit
+basis: historical requirements, current policy, or all visible results when no
+checks are required. Unreadable policy remains unknown. Comparison verdicts and
 propagation remain planned.
 
 ## Quickstart
