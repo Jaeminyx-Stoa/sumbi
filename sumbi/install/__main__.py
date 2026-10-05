@@ -13,6 +13,7 @@ from .apply import apply_plan
 from .baseline import baseline
 from .errors import InstallError
 from .inventory import safe_path
+from .exclusions import GitIgnore
 from .planner import build_plan
 
 
@@ -45,6 +46,8 @@ def run(args: argparse.Namespace) -> int:
             if args.json.casefold() in {c.path.casefold() for c in plan.changes}:
                 raise InstallError("Plan JSON conflicts with a planned target.")
             destination = safe_path(plan.root, args.json)
+            if GitIgnore(destination.parent).check(destination.name):
+                raise InstallError("Plan JSON cannot be written into an ignored path.")
             if destination.exists():
                 raise InstallError("Plan JSON already exists; it will not be overwritten.")
             # Parent must already exist: dry-run does not create directories.
@@ -54,6 +57,9 @@ def run(args: argparse.Namespace) -> int:
         report = plan.report
         print("Inventory (offline; paths and parsed labels only):")
         print(f"  excluded roots: {report['exclusions']['count']}")
+        print(f"  git-ignored roots: {report['exclusions']['gitignore_count']}")
+        nested = report["versioning"]["nested_repositories"]
+        print(f"  nested git repositories: {nested['count']}" + (" (" + ", ".join(nested["paths"]) + ")" if nested["paths"] else ""))
         for entry in report["exclusions"]["patterns"]:
             print(f"  exclude {entry['pattern']}: {entry['count']}")
         for name, entry in report["instructions"].items():

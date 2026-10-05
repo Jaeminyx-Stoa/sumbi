@@ -23,12 +23,27 @@ a current gap produce no change. Unknown IDs fail before application.
 
 ## Inventory and gaps
 
-Inventory never executes a repository command or loads a repository module.
+Inventory never executes a project command or loads a repository module. It
+asks local git for work-tree boundaries and standard ignore rules, offline.
 It reports paths, counts and parsed workflow job labels. Commands, prompts,
 permission values, MCP details and instruction text are not exported. Imports
 are resolved relative to their source file, only within the repository; cycles
 are bounded and external, missing and linked targets are visible without being
-read. Required checks and rulesets remain `unknown (offline)`.
+read. Imports inside Markdown fenced code blocks (backticks or tildes, including
+unterminated blocks) and inline backtick spans are ignored. Required checks and
+rulesets remain `unknown (offline)`.
+
+If the inspected root is not inside a git work tree, inventory reports
+`root-not-versioned` and lists discovered nested git repositories as relative
+paths with a count. Applying at such a root can write files outside any review
+or pull request; the warning does not change `--apply` behavior. Discovery follows
+the same exclusions and link restrictions as the rest of inventory.
+
+An agent started inside a nested repository does not load the enclosing
+workspace's `AGENTS.md`: Codex stops at the nearest git root, and Claude Code
+loads parent `CLAUDE.md` files, not `AGENTS.md`. Put shared instructions inside
+each repository or provide an explicit Claude import. Inherited cost estimates
+are upper bounds, not proof that instructions outside a git boundary are loaded.
 
 Instruction size is `ceil(characters / 4)` after normalizing line endings.
 Unique imported files count once
@@ -36,7 +51,7 @@ per agent. Root instructions are reported separately from the largest inherited
 scope: siblings are never summed as if they loaded together. Nested instructions
 include ancestor instructions and their import closures. All rule files are
 included, so this remains an upper bound where rules are conditional, not a
-measurement of a particular task's loaded context. Dynamic/global configuration
+measurement of a particular task's loaded context. Dynamic/global agent configuration
 is not read. Skill-description estimates
 use UTF-8 text front matter, including common scalar and block descriptions.
 Every-prompt counts identify declared `UserPromptSubmit` hooks; sumbi does not
@@ -44,10 +59,24 @@ claim that a configured hook actually ran.
 
 Files larger than 1 MiB, invalid UTF-8/configuration, unsupported workflow
 syntax and inaccessible directories produce diagnostics. Default exclusions
-prune `.git`, `.sumbi`, `node_modules`, `vendor`, `.venv`, `venv`, `dist`,
+prune `.git`, `.sumbi`, `.tmp`, `node_modules`, `vendor`, `.venv`, `venv`, `dist`,
 `build` and `__pycache__` at any depth. A `fixtures` or `testdata` tree beneath
 any `tests` or `test` directory is excluded too. Other nested instruction files
 belong to the repository's own scopes, including instructions for test code.
+The ordinary `tmp` directory remains eligible source.
+
+Within git work trees, inventory also prunes ignored paths using git's standard
+rules: `.gitignore`, `.git/info/exclude` and the configured global excludes file.
+Inventory disables repository-configured git programs.
+Tracked files remain eligible even when an ignore pattern matches them. Nested
+repositories use their own ignore rules. Ignored roots are counted separately
+as `gitignore_count` and included in the total exclusion count, without counting
+descendants. Imports into these paths are `excluded-not-read`. Planned targets,
+including absent files, are checked with git too, and changed ignore rules are
+rechecked when applying. Sumbi's own `.sumbi/` metadata handling stays unchanged.
+If git is unavailable, fails or times out, inventory reports
+`gitignore-unavailable` and falls back to glob exclusions for the affected work
+tree. Versioning is unknown when git cannot establish the root boundary.
 
 Repeat `--exclude GLOB` to add repository-relative exclusions, or configure:
 

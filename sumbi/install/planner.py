@@ -13,7 +13,7 @@ from sumbi.catalog import VERSION, load_catalog
 from .errors import InstallError
 from .gaps import find_gaps, has_import, shared_target
 from .inventory import MAX_BYTES, inventory, read_bytes
-from .exclusions import excluded_by
+from .exclusions import GitIgnore, excluded_by
 
 MARKER = re.compile(r"^<!-- sumbi:(begin|end) ([a-z][a-z0-9-]*) -->$")
 
@@ -96,6 +96,19 @@ def build_plan(repository: Path | str = ".", *, budget: int = 2000,
                exclude: list[str] | tuple[str, ...] = ()) -> Plan:
     root = Path(repository).resolve()
     report = inventory(root, budget, exclude=exclude)
+    git_contexts = {}
+
+    def ignored_target(target: str) -> bool:
+        repositories = report["versioning"]["nested_repositories"]["paths"]
+        scope = next((p for p in sorted(repositories, key=len, reverse=True)
+                      if target.startswith(p + "/")), "")
+        if scope not in git_contexts:
+            git_contexts[scope] = GitIgnore(root / scope)
+        context = git_contexts[scope]
+        ignored = context.check(target[len(scope) + 1:] if scope else target)
+        if not context.available and {"kind": "gitignore-unavailable"} not in report["warnings"]:
+            report["warnings"].append({"kind": "gitignore-unavailable"})
+        return ignored
     patterns = tuple(entry["pattern"] for entry in report["exclusions"]["patterns"])
     gaps = find_gaps(report)
     catalog = load_catalog()
@@ -123,7 +136,7 @@ def build_plan(repository: Path | str = ".", *, budget: int = 2000,
             if identifier == "shared-instructions":
                 targets = report["instructions"]["claude"]["paths"]
             for target in targets:
-                if excluded_by(target, patterns):
+                if excluded_by(target, patterns) or ignored_target(target):
                     notes.append({"id": identifier, "status": "excluded-target-preserved"})
                     continue
                 if target not in before:
@@ -134,7 +147,7 @@ def build_plan(repository: Path | str = ".", *, budget: int = 2000,
                 if identifier == "shared-instructions":
                     agent_paths = report["instructions"]["agents"]["paths"] + (["AGENTS.md"] if "AGENTS.md" in after else [])
                     shared = shared_target(target, agent_paths)
-                    if shared not in agent_paths or excluded_by(shared, patterns):
+                    if shared not in agent_paths or excluded_by(shared, patterns) or ignored_target(shared):
                         raise InstallError("Shared instructions require an existing or selected AGENTS.md.")
                     depth = len(Path(target).parts) - len(Path(shared).parts)
                     text = "@" + "../" * depth + "AGENTS.md"

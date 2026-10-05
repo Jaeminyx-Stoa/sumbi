@@ -93,6 +93,18 @@ Seeds a sensible first harness in the current repository, starting from what is 
    - **Cost signals:** always-loaded instruction size per agent (estimated tokens), skill metadata size, hooks that run on every prompt.
 
    The report lists counts and repository-relative paths, never file contents.
+   Inventory excludes `.tmp` scratch trees at any depth (but not ordinary `tmp`
+   source directories) and asks local git, offline, to skip paths ignored by
+   standard rules. Ignored roots are counted; missing or failing git produces
+   `gitignore-unavailable` and falls back to glob exclusions. Planned writes
+   respect git ignores too, except for sumbi's existing `.sumbi/` handling.
+   Claude imports inside Markdown fenced blocks or inline code spans are ignored.
+   A root outside a git work tree produces `root-not-versioned` and a count and
+   relative paths of discovered nested repositories; application is unchanged.
+   Files written outside a repository cannot appear in its review or pull request.
+   Agents started inside nested repositories do not load the workspace root's
+   `AGENTS.md`: Codex stops at the nearest git root; Claude Code loads parent
+   `CLAUDE.md` files rather than `AGENTS.md`.
 2. **Gaps.** Rules over the inventory. Examples:
    - no `AGENTS.md`
    - a `CLAUDE.md` that does not import `AGENTS.md`
