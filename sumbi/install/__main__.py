@@ -1,4 +1,4 @@
-"""Standalone namespace-package CLI until the shared command is wired."""
+"""Offline install command, also available through the shared CLI."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 import sys
 
+from sumbi.privacy import read_salt
+
 from .apply import apply_plan
 from .baseline import baseline
 from .errors import InstallError
@@ -14,8 +16,7 @@ from .inventory import safe_path
 from .planner import build_plan
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Inventory and seed text-only repository practices offline.")
+def configure_parser(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--root", default=".", help="Repository to inspect (default: current directory).")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="Print additive unified diffs (the default).")
@@ -25,8 +26,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--exclude", action="append", default=[], metavar="GLOB",
                         help="Exclude repository-relative paths and descendants; repeatable.")
     parser.add_argument("--json", metavar="PATH", help="Create a JSON plan at a repository-relative path; never overwrite.")
-    args = parser.parse_args(argv)
+    parser.add_argument("--home", type=Path, default=Path.home(), help="Local agent-log home for the baseline.")
+    parser.add_argument("--salt-file", type=Path, help="Local pseudonym key file (overrides SUMBI_SALT).")
+
+
+def run(args: argparse.Namespace) -> int:
     try:
+        try:
+            salt = read_salt(args.salt_file)
+        except (OSError, ValueError):
+            raise InstallError("Cannot read a nonempty pseudonym salt.") from None
         selection = [p.strip() for p in args.select.split(",")] if args.select is not None else None
         plan = build_plan(Path(args.root), budget=args.budget, select=selection, exclude=args.exclude)
         status = baseline(plan.root)
@@ -86,9 +95,11 @@ def main(argv: list[str] | None = None) -> int:
         for change in plan.changes:
             sys.stdout.write(change.diff())
         if args.apply:
-            result = apply_plan(plan)
+            result = apply_plan(plan, home=args.home, salt=salt)
             print("Applied: " + (", ".join(result["applied"]) or "none"))
             print("baseline: " + result["baseline"]["status"])
+            if "file" in result["baseline"]:
+                print("Baseline file: " + result["baseline"]["file"])
             if "backup" in result:
                 print("Backup: " + result["backup"])
         elif not plan.changes:
@@ -98,6 +109,12 @@ def main(argv: list[str] | None = None) -> int:
         message = str(error) if isinstance(error, InstallError) else "Repository operation failed."
         print("sumbi install: " + message, file=sys.stderr)
         return 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Inventory and seed text-only repository practices offline.")
+    configure_parser(parser)
+    return run(parser.parse_args(argv))
 
 
 if __name__ == "__main__":

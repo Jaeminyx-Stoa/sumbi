@@ -50,7 +50,24 @@ def _write(root: Path, relative: str, expected: bytes | None,
             os.unlink(temporary)
 
 
-def apply_plan(plan: Plan) -> dict:
+LOCAL_IGNORES = b"backups/\nbaseline/\ninstall.lock\n"
+
+
+def _protect_local_artifacts(root: Path) -> None:
+    """Keep privacy protection even if apply later fails and leaves backups."""
+    relative = ".sumbi/.gitignore"
+    before = read_bytes(root, relative)
+    if before is not None and before.endswith(LOCAL_IGNORES):
+        _checked(root, relative, before)
+        return
+    data = before or b""
+    if data and not data.endswith(b"\n"):
+        data += b"\n"
+    mode = stat.S_IMODE(safe_path(root, relative).stat().st_mode) if before is not None else 0o644
+    _write(root, relative, before, data + LOCAL_IGNORES, mode)
+
+
+def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = None) -> dict:
     if not plan.changes:
         return {"applied": [], "baseline": {"status": "not requested (empty plan)"}}
     root = plan.root
@@ -91,7 +108,8 @@ def apply_plan(plan: Plan) -> dict:
                 raise InstallError("Intervention ledger is not valid JSON lines.") from None
         originals[ledger_path] = ledger
         modes[ledger_path] = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
-        baseline_result = baseline(root, run=True)
+        _protect_local_artifacts(root)
+        baseline_result = baseline(root, run=True, home=home, salt=salt)
         now = datetime.now(timezone.utc)
         utc = now.isoformat(timespec="microseconds").replace("+00:00", "Z")
         backup_relative = ".sumbi/backups/" + now.strftime("%Y%m%dT%H%M%S.%fZ")

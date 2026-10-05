@@ -12,7 +12,7 @@ not fetch upstream repositories or pin their current revisions.
 | [gajae code](https://github.com/Yeachan-Heo/gajae-code) ([license](https://github.com/Yeachan-Heo/gajae-code/blob/main/LICENSE)) | MIT | Resolve requirements, plan, critique, change; respect approval boundaries. |
 | Local lab practice (unpublished; original synthesis) | No third-party text included | Short entry instructions, review levels by work size, continuation records, friction reporting, devices before rules. |
 
-The three upstream licenses above are identified as MIT in the supplied
-design brief. Version 0.1.0 does not claim source revision or license verification
-against live repositories. Fetching or executing upstream material is outside
+The licenses of Superpowers, gstack and gajae code were confirmed as MIT
+through the GitHub API on 2026-10-05. This records license verification, not
+a pinned source revision. Fetching or executing upstream material is outside
 this offline installer's scope.

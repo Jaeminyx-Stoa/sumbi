@@ -2,13 +2,15 @@
 
 import importlib
 from pathlib import Path
+import re
 
 from .errors import InstallError
 
 PENDING = "pending (collect not available)"
 
 
-def baseline(repository: Path, *, run: bool = False) -> dict:
+def baseline(repository: Path, *, run: bool = False, home: Path | None = None,
+             salt: bytes | None = None) -> dict:
     try:
         module = importlib.import_module("sumbi.collect")
     except ModuleNotFoundError as error:
@@ -23,9 +25,20 @@ def baseline(repository: Path, *, run: bool = False) -> dict:
     if not run:
         return {"status": "available (runs before apply)"}
     try:
-        entry(repository=repository)
+        options = {}
+        if home is not None:
+            options["home"] = home
+        if salt is not None:
+            options["salt"] = salt
+        result = entry(repository=repository, **options)
     except Exception:
         raise InstallError("Collect baseline failed; no practices applied.") from None
-    # The collect entry point owns its aggregate artifact. Never echo its return
-    # value: an unrecognized integration must not export free text or log data.
+    # Only recognized statuses and validated, relative artifact IDs cross into
+    # committable intervention records; arbitrary collector text stays local.
+    if (isinstance(result, dict) and isinstance(result.get("status"), str)
+            and result["status"] in {"recorded", "no sessions found"}
+            and isinstance(result.get("file"), str)
+            and re.fullmatch(r"\.sumbi/baseline/[0-9]{8}T[0-9]{6}\.[0-9]{6}Z\.json", result["file"])
+            and type(result.get("sessions")) is int and result["sessions"] >= 0):
+        return {key: result[key] for key in ("status", "file", "sessions")}
     return {"status": "recorded", "entry_point": "sumbi.collect.baseline"}

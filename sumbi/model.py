@@ -16,14 +16,11 @@ import re
 import subprocess
 from urllib.parse import urlsplit
 
+from sumbi.privacy import pseudonym
+
 TOKEN_KINDS = ("new_input", "cache_write", "cache_read", "output", "reasoning_output")
 COUNT_KINDS = ("compactions", "tool_calls", "tool_results", "tool_errors", "api_errors",
                "user_input_requests", "counter_resets")
-
-
-def pseudonym(category: str, value: str) -> str:
-    """Stable local identifiers, never raw paths or user-provided identifiers."""
-    return category + "_" + hashlib.sha256(value.encode(errors="surrogatepass")).hexdigest()[:24]
 
 
 def label(value: object, category: str = "label") -> str:
@@ -225,6 +222,31 @@ class Attributor:
             return {"bucket": "unassigned", "project_key": None, "rule": None,
                     "evidence": "multiple_projects", "links": links}
         return {**links[0], "links": links}
+
+
+class RepositoryAttributor(Attributor):
+    """Exact repository scope, consolidating subdirectories and local clones."""
+
+    def __init__(self, repository: Path):
+        super().__init__([])
+        self.path = normalize_path(str(repository.resolve()))
+        self.repository_origin, _ = self.origin(str(repository.resolve()))
+
+    def link(self, cwd: str) -> dict:
+        origin, state = self.origin(cwd)
+        path = normalize_path(cwd)
+        matched = path == self.path or path.startswith(self.path + "/")
+        evidence = "path_pattern"
+        bucket = "project" if matched else "other"
+        if self.repository_origin and origin:
+            matched = origin == self.repository_origin
+            bucket = "project" if matched else "other"
+            evidence = "git_origin_candidate" if matched else "git_origin_out_of_scope"
+        elif self.repository_origin and state in ("unsupported_origin", "origin_unavailable"):
+            matched, bucket, evidence = False, "unassigned", state
+        identity = (self.repository_origin or self.path) if matched else (origin or path)
+        return {"project_key": pseudonym("project", identity),
+                "rule": "repository" if matched else None, "evidence": evidence, "bucket": bucket}
 
 
 @dataclass

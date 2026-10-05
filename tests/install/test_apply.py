@@ -52,7 +52,8 @@ class ApplyTests(OfflineTest):
                     self.assertTrue(record["utc_time"].endswith("Z"))
                     self.assertIn("prediction", record)
                     self.assertIn("judgment_policy", record)
-                    self.assertEqual(record["baseline"]["status"], "pending (collect not available)")
+                    self.assertEqual(record["baseline"]["status"], "no sessions found")
+                    self.assertTrue((root / record["baseline"]["file"]).is_file())
                 with patch.object(apply_module, "baseline", side_effect=AssertionError("Empty plans must not run collect.")):
                     self.assertEqual(apply_plan(second)["applied"], [])
                 self.assertEqual(ledger_path.read_bytes(), ledger)
@@ -129,8 +130,10 @@ class ApplyTests(OfflineTest):
         calls = 0
         def fail_once(*args, **kwargs):
             nonlocal calls
-            calls += 1
+            if not args[1].startswith(".sumbi/"):
+                calls += 1
             if calls == 3:
+                calls += 1  # Recovery writes are allowed after this one failure.
                 raise OSError("Synthetic disk failure")
             return write(*args, **kwargs)
         with patch.object(apply_module, "_write", side_effect=fail_once), self.assertRaises(InstallError):
@@ -138,6 +141,7 @@ class ApplyTests(OfflineTest):
         self.assertEqual((root / "AGENTS.md").read_bytes(), original)
         self.assertFalse((root / ".sumbi/interventions.jsonl").exists())
         self.assertTrue((root / ".sumbi/backups").is_dir())
+        self.assertEqual((root / ".sumbi/.gitignore").read_bytes(), apply_module.LOCAL_IGNORES)
         self.assertFalse((root / ".sumbi/install.lock").exists())
         for change in plan.changes:
             if change.before is None:
