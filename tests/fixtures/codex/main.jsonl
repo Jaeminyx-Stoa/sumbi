@@ -1,0 +1,16 @@
+{"type":"session_meta","timestamp":"2029-12-31T23:50:00Z","payload":{"id":"session-x","cwd":"fixture-one","cli_version":"0.1.0"}}
+{"type":"turn_context","timestamp":"2029-12-31T23:55:00Z","payload":{"cwd":"fixture-one","model":"model-a","effort":"low"}}
+{"type":"event_msg","timestamp":"2029-12-31T23:59:00Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":100,"cached_input_tokens":60,"output_tokens":20,"reasoning_output_tokens":5}}}}
+{"type":"event_msg","timestamp":"2030-01-01T00:00:00Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":130,"cached_input_tokens":80,"output_tokens":30,"reasoning_output_tokens":7}}}}
+{"type":"event_msg","timestamp":"2030-01-01T00:00:00Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":130,"cached_input_tokens":80,"output_tokens":30,"reasoning_output_tokens":7}}}}
+{"type":"response_item","timestamp":"2030-01-01T00:01:00Z","payload":{"type":"function_call","call_id":"tool-a","name":"exec_command","arguments":"Synthetic command canary"}}
+{"type":"event_msg","timestamp":"2030-01-01T00:01:00Z","payload":{"type":"exec_command_begin","call_id":"tool-a"}}
+{"type":"event_msg","timestamp":"2030-01-01T00:02:00Z","payload":{"type":"exec_command_end","call_id":"tool-a","exit_code":2,"aggregated_output":"Synthetic output canary"}}
+{"type":"response_item","timestamp":"2030-01-01T00:02:00Z","payload":{"type":"function_call_output","call_id":"tool-a","output":"Process exited with code 2\nSynthetic output canary"}}
+{"type":"turn_context","timestamp":"2030-01-01T00:03:00Z","payload":{"cwd":"fixture-one","model":"model-b","effort":"high"}}
+{"type":"event_msg","timestamp":"2030-01-01T00:03:00Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":180,"cached_input_tokens":110,"output_tokens":50,"reasoning_output_tokens":15}}}}
+{"type":"fixture_record","timestamp":"2030-01-01T00:04:00Z","payload":{"text":"Synthetic unknown canary"}}
+{"type":"compacted","timestamp":"2030-01-01T00:05:00Z","payload":{"message":"Synthetic compaction canary"}}
+{"type":"response_item","timestamp":"2030-01-01T00:05:00Z","payload":{"type":"function_call","call_id":"ask-one","name":"request_user_input","arguments":"Synthetic question"}}
+{"type":"response_item","timestamp":"2030-01-01T00:06:00Z","payload":{"type":"function_call_output","call_id":"ask-one","output":"Synthetic answer canary"}}
+{"type":"event_msg","timestamp":"2030-01-01T00:06:00Z","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":20,"cached_input_tokens":5,"output_tokens":3,"reasoning_output_tokens":1}}}}
