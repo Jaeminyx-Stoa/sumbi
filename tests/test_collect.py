@@ -398,7 +398,7 @@ class AttributionTests(SyntheticHome):
         self.assertEqual(link["bucket"], "project")
         self.assertEqual(len(link["links"]), 2)
 
-    def test_session_touching_two_repositories_is_unassigned_with_all_evidence(self):
+    def test_session_candidates_do_not_override_event_spend(self):
         self.write("codex", "rollout-one.jsonl", [self.meta(),
             {"type": "turn_context", "timestamp": "2030-01-01T00:01:00Z", "payload": {"cwd": str(self.one)}},
             self.token("2030-01-01T00:02:00Z", 10, 2, 3),
@@ -408,7 +408,8 @@ class AttributionTests(SyntheticHome):
         link = report["sessions"][0]["project"]
         self.assertEqual((link["bucket"], link["evidence"]), ("unassigned", "multiple_projects"))
         self.assertEqual(len(link["links"]), 2)
-        self.assertEqual(report["coverage"]["unattributed_share"], 1)
+        self.assertEqual(report["coverage"]["unattributed_share"], 0)
+        self.assertEqual(report["sessions"][0]["allocations"][0]["tokens"]["total"], 13)
 
     def test_previous_cwd_applies_before_a_later_in_window_switch(self):
         self.write("codex", "rollout-one.jsonl", [self.meta(), self.token("2030-01-01T00:01:00Z", 10, 2, 3),
@@ -480,14 +481,14 @@ class CliTests(SyntheticHome):
         self.assertEqual(result, 0)
         self.assertEqual(stderr, "")
         self.assertIn("Reported tokens (observed): 263", stdout)
-        self.assertEqual(json.loads(output.read_text())["schema_version"], "1.0")
+        self.assertEqual(json.loads(output.read_text())["schema_version"], "1.1")
         self.assertIn("Harness friction: synthetic local note", review.read_text())
         self.assertNotIn("Harness friction:", stdout)
 
     def test_stdout_json_keeps_text_summary_on_stderr(self):
         result, stdout, stderr = self.invoke(["--json", "-", "--agents", "codex"])
         self.assertEqual(result, 0)
-        self.assertEqual(json.loads(stdout)["schema_version"], "1.0")
+        self.assertEqual(json.loads(stdout)["schema_version"], "1.1")
         self.assertIn("Sessions in window: 0", stderr)
         self.assertEqual(list(json.loads(stdout)["by_agent"]), ["codex"])
 

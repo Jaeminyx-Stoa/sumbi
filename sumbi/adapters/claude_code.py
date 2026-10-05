@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from sumbi.evidence import tool_evidence
 from sumbi.model import Coverage, Session, Window, integer, label, mapping, records, timestamp
 
 KNOWN = {"assistant", "user", "system", "progress", "attachment", "summary",
@@ -35,13 +36,27 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
             if not session.accept(event, coverage):
                 continue
             when = timestamp(event.get("timestamp"))
+            order = len(session.seen)
             session.cwd(event.get("cwd"), when)
             if event.get("version"):
                 session.versions.add(label(event["version"], "version"))
             kind = event.get("type")
+            content = mapping(event.get("message")).get("content")
+            if kind == "user" and not (isinstance(content, list) and any(
+                    mapping(b).get("type") == "tool_result" for b in content)):
+                session.context(when, order, event.get("cwd"))
             if kind not in KNOWN:
                 coverage.unknown(kind)
             message = mapping(event.get("message"))
+            paths = []
+            command_cwd = None
+            for block in message.get("content", []) if isinstance(message.get("content"), list) else []:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    workdir, operands = tool_evidence(block.get("name"), block.get("input"))
+                    command_cwd = workdir or command_cwd
+                    paths.extend(operands)
+            if kind != "assistant" or not mapping(message.get("usage")):
+                session.tool_paths(when, order, command_cwd or (event.get("cwd") if paths else None), paths)
             session.local_text(message.get("content"), when, window, local_review)
             session.local_text(event.get("content"), when, window, local_review)
             key = event.get("uuid") or len(session.seen)
@@ -73,7 +88,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                         previous = candidates.get(identity)
                         rank = values["output"], when
                         if previous is None or rank > previous[0]:
-                            candidates[identity] = rank, values
+                            candidates[identity] = rank, values, order, event.get("cwd") or command_cwd, paths, command_cwd
             blocks = message.get("content")
             if not isinstance(blocks, list):
                 continue
@@ -93,7 +108,9 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                         session.count("tool_errors", identity, when, window)
                     session.interval("tool", identity, None, when)
     for raw_id, candidates in messages.items():
-        for (_, when), values in candidates.values():
+        for (_, when), values, order, cwd, paths, command_cwd in candidates.values():
+            sessions[raw_id].tool_paths(when, order, command_cwd or (cwd if paths else None), paths)
+            sessions[raw_id].usage(when, order, values, cwd=cwd, paths=paths)
             if window.contains(when):
                 sessions[raw_id].add_tokens(values)
     return list(sessions.values())

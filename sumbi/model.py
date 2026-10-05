@@ -19,6 +19,7 @@ from urllib.parse import urlsplit
 from sumbi.privacy import pseudonym
 
 TOKEN_KINDS = ("new_input", "cache_write", "cache_read", "output", "reasoning_output")
+EVIDENCE_TYPES = ("cwd", "tool_path", "previous_event", "unassigned")
 COUNT_KINDS = ("compactions", "tool_calls", "tool_results", "tool_errors", "api_errors",
                "user_input_requests", "counter_resets")
 
@@ -164,6 +165,45 @@ class Attributor:
     def __init__(self, rules: list[ProjectRule]):
         self.rules = rules
         self.cache: dict[str, tuple[str | None, str]] = {}
+        self.roots: dict[str, str] = {}
+
+    def repository_path(self, value: str) -> str:
+        """Resolve an existing file/subdirectory to its local repository root."""
+        normalized = normalize_path(value)
+        if normalized in self.roots:
+            return self.roots[normalized]
+        root = normalized
+        path = Path(value)
+        # Do not interpret foreign Windows paths as relative paths on POSIX.
+        if not normalized.startswith("//") and (os.name == "nt" or not ntpath.splitdrive(value)[0]):
+            while not path.exists() and path != path.parent:
+                path = path.parent
+            directory = path if path.is_dir() else path.parent
+            if directory.is_dir():
+                try:
+                    result = subprocess.run(["git", "-C", str(directory), "rev-parse", "--show-toplevel"],
+                                            capture_output=True, text=True, timeout=5,
+                                            env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+                    if result.returncode == 0 and result.stdout.strip():
+                        root = normalize_path(result.stdout.strip())
+                except (OSError, subprocess.TimeoutExpired, UnicodeError):
+                    pass
+        self.roots[normalized] = root
+        return root
+
+    def event_link(self, path: str) -> dict:
+        root = self.repository_path(path)
+        # Scope against the observed operand as well as its repository root.
+        link = self.link(path)
+        root_link = self.link(root) if root != normalize_path(path) else link
+        if root_link["bucket"] == "unassigned" or root_link["evidence"] in (
+                "git_origin_out_of_scope", "git_origin_candidate"):
+            return root_link
+        if link["bucket"] != "project" and root_link["bucket"] == "project":
+            link = root_link
+        if root != normalize_path(path):
+            link = {**link, "project_key": root_link["project_key"]}
+        return link
 
     def origin(self, cwd: str) -> tuple[str | None, str]:
         normalized = normalize_path(cwd)
@@ -171,7 +211,7 @@ class Attributor:
             return self.cache[normalized]
         origin, state = None, "path_only"
         try:
-            if Path(cwd).is_dir():
+            if not normalized.startswith("//") and (os.name == "nt" or not ntpath.splitdrive(cwd)[0]) and Path(cwd).is_dir():
                 options = dict(
                     capture_output=True, text=True, timeout=5,
                     env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"},
@@ -209,6 +249,9 @@ class Attributor:
         key = pseudonym("project", origin or path)
         if len(set(matches)) > 1:
             return {"project_key": key, "rule": None, "evidence": "ambiguous_rules", "bucket": "unassigned"}
+        if not self.rules:
+            return {"project_key": key, "rule": None, "evidence": "git_origin_candidate" if origin else "cwd_candidate",
+                    "bucket": "project"}
         return {"project_key": key, "rule": matches[0] if matches else None,
                 "evidence": evidence if matches else "unmatched_path", "bucket": "project" if matches else "other"}
 
@@ -267,6 +310,7 @@ class Session:
     intervals: dict[tuple[str, str], tuple[datetime, datetime]] = field(default_factory=dict)
     counted: set[tuple[str, str]] = field(default_factory=set)
     review: set[str] = field(default_factory=set)
+    attribution_events: list[tuple] = field(default_factory=list)
 
     def id(self):
         return pseudonym("session", self.agent + ":" + self.raw_id)
@@ -292,6 +336,85 @@ class Session:
         for key, value in values.items():
             if value is not None:
                 self.tokens[key] = (self.tokens[key] or 0) + value
+
+    def context(self, when, order, cwd, *, reset=True):
+        if when is not None:
+            self.attribution_events.append((when, order, "context", (cwd, reset)))
+
+    def tool_paths(self, when, order, cwd, paths):
+        if when is not None and (cwd or paths):
+            self.attribution_events.append((when, order, "tool", (cwd, paths)))
+
+    def usage(self, when, order, values, *, cwd=None, paths=()):
+        if when is not None:
+            self.attribution_events.append((when, order, "usage", (values, cwd, paths)))
+
+    def allocations(self, window, attributor, idle_minutes):
+        from sumbi.evidence import resolve_path
+
+        rows = {}
+        context_cwd = None
+        command_cwd = None
+        turn_paths = set()
+        previous = None
+        previous_when = None
+        for when, _, kind, data in sorted(self.attribution_events, key=lambda e: (e[0], e[1])):
+            if when >= window.until:
+                break
+            if kind == "context":
+                raw_cwd, reset = data
+                context_cwd = resolve_path(raw_cwd)
+                if reset:
+                    command_cwd, turn_paths = None, set()
+                continue
+            if kind == "tool":
+                cwd, paths = data
+                if cwd:
+                    command_cwd = resolve_path(cwd, context_cwd)
+                turn_paths.update(p for raw in paths if (p := resolve_path(raw, command_cwd or context_cwd)))
+                continue
+            values, own_cwd, own_paths = data
+            # A Claude line's cwd belongs to that message; Codex context is in force
+            # at the closing cumulative snapshot, even across a directory change.
+            cwd = resolve_path(own_cwd, context_cwd) if own_cwd else None
+            if self.agent == "codex":
+                cwd = command_cwd or context_cwd
+            if cwd:
+                link = attributor.event_link(cwd)
+                evidence = "cwd"
+            else:
+                paths = turn_paths | {p for raw in own_paths if (p := resolve_path(raw, context_cwd))}
+                if paths:
+                    links = [attributor.event_link(p) for p in sorted(paths)]
+                    signatures = {(x["bucket"], x["project_key"], x["rule"]) for x in links}
+                    link = links[0] if len(signatures) == 1 else {
+                        "bucket": "unassigned", "project_key": None, "rule": None, "evidence": "conflicting_tool_paths"}
+                    evidence = "tool_path"
+                elif previous is not None and previous["bucket"] != "unassigned" and previous_when is not None \
+                        and (when - previous_when).total_seconds() < idle_minutes * 60:
+                    link, evidence = previous, "previous_event"
+                else:
+                    link = {"bucket": "unassigned", "project_key": None, "rule": None, "evidence": "missing_evidence"}
+                    evidence = "unassigned"
+            previous, previous_when = link, when
+            if not window.contains(when):
+                continue
+            identity = link["bucket"], link["project_key"], link["rule"]
+            row = rows.setdefault(identity, {**link, "events": 0, "tokens": dict.fromkeys(TOKEN_KINDS),
+                                            "evidence_counts": dict.fromkeys(EVIDENCE_TYPES, 0),
+                                            "evidence_tokens": dict.fromkeys(EVIDENCE_TYPES, 0)})
+            row["events"] += 1
+            row["evidence_counts"][evidence] += 1
+            total = sum(values.get(k) or 0 for k in TOKEN_KINDS if k != "reasoning_output")
+            row["evidence_tokens"][evidence] += total
+            for key, value in values.items():
+                if value is not None:
+                    row["tokens"][key] = (row["tokens"][key] or 0) + value
+        for row in rows.values():
+            row["tokens"]["total"] = sum(row["tokens"][k] or 0 for k in TOKEN_KINDS if k != "reasoning_output")
+            total = row["tokens"]["total"]
+            row["fallback_share"] = row["evidence_tokens"]["previous_event"] / total if total else 0.0
+        return sorted(rows.values(), key=lambda r: (r["bucket"], r["project_key"] or "", r["rule"] or ""))
 
     def count(self, kind: str, key: object, when: datetime | None, window: Window):
         identity = (kind, str(key))
@@ -357,9 +480,12 @@ class Session:
                 "unpaired_ends": sum(key[0] == kind and key not in self.intervals and window.contains(t)
                                      for key, t in self.ends.items())}
         total = sum(self.tokens[k] or 0 for k in TOKEN_KINDS if k != "reasoning_output")
+        allocations = self.allocations(window, attributor, idle_minutes)
         return {"id": self.id(), "parent_id": pseudonym("session", self.agent + ":" + self.parent_raw_id)
                 if self.parent_raw_id else None, "agent": self.agent,
                 "project": attributor.session_link(self.project_paths(window)),
+                "allocations": allocations,
+                "spend_allocation": "events",
                 "models": sorted(self.models), "efforts": sorted(self.efforts),
                 "cli_versions": sorted(self.versions),
                 "tokens": {**self.tokens, "total": total, "measurement": "observed",

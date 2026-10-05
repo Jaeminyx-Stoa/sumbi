@@ -6,7 +6,8 @@ from pathlib import Path
 
 from sumbi import SCHEMA_VERSION
 from sumbi.adapters import claude_code, codex
-from sumbi.model import Attributor, COUNT_KINDS, Coverage, ProjectRule, RepositoryAttributor, TOKEN_KINDS, Window
+from sumbi.model import (Attributor, COUNT_KINDS, Coverage, EVIDENCE_TYPES, ProjectRule,
+                         RepositoryAttributor, TOKEN_KINDS, Window)
 from sumbi.privacy import current_key, pseudonym_key, read_salt
 
 ADAPTERS = {"claude-code": claude_code, "codex": codex}
@@ -61,8 +62,16 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
         coverage[agent] = {**measured.as_dict(), "sessions_read": len(found), "sessions_in_window": len(included)}
         for session in included:
             row = session.as_dict(window, attributor, idle_minutes)
-            if repository is not None and row["project"]["bucket"] != "project":
-                continue
+            if repository is not None:
+                selected = [a for a in row["allocations"] if a["bucket"] == "project"]
+                if not selected and (row["allocations"] or row["project"]["bucket"] != "project"):
+                    continue
+                row["allocations"] = selected
+                if selected:
+                    row["project"] = {k: selected[0][k] for k in ("bucket", "project_key", "rule", "evidence")}
+                    for kind in (*TOKEN_KINDS, "total"):
+                        reported = [a["tokens"][kind] for a in selected if a["tokens"][kind] is not None]
+                        row["tokens"][kind] = sum(reported) if reported else None
             sessions.append(row)
             reviews.extend(session.id() + " " + text for text in sorted(session.review))
         if repository is not None:
@@ -71,21 +80,34 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
     summary = totals(sessions, idle_minutes)
     spend = {}
     for session in sessions:
-        link = session["project"]
-        identity = link["bucket"], link["project_key"] if link["bucket"] == "project" else None, link["rule"]
-        row = spend.setdefault(identity, {"bucket": link["bucket"], "project_key": identity[1],
-                                          "rule": link["rule"], "sessions": 0, "tokens": 0})
-        row["sessions"] += 1
-        row["tokens"] += session["tokens"]["total"]
+        session_identities = set()
+        for allocation in session["allocations"]:
+            identity = (allocation["bucket"], allocation["project_key"] if allocation["bucket"] == "project" else None,
+                        allocation["rule"])
+            row = spend.setdefault(identity, spend_row(*identity))
+            if identity not in session_identities:
+                row["sessions"] += 1
+                session_identities.add(identity)
+            row["events"] += allocation["events"]
+            row["tokens"] += allocation["tokens"]["total"]
+            for kind in TOKEN_KINDS:
+                value = allocation["tokens"][kind]
+                if value is not None:
+                    row["tokens_by_kind"][kind] = (row["tokens_by_kind"][kind] or 0) + value
+            for evidence in EVIDENCE_TYPES:
+                row["evidence_counts"][evidence] += allocation["evidence_counts"][evidence]
+                row["evidence_tokens"][evidence] += allocation["evidence_tokens"][evidence]
     # Keep zero-spend coverage categories visible even for an empty home.
     for bucket in ("unassigned", "other"):
-        spend.setdefault((bucket, None, None), {"bucket": bucket, "project_key": None,
-                                               "rule": None, "sessions": 0, "tokens": 0})
+        spend.setdefault((bucket, None, None), spend_row(bucket, None, None))
     all_tokens = summary["tokens"]["total"]
     for row in spend.values():
         row["share"] = row["tokens"] / all_tokens if all_tokens else 0.0
         row["measurement"] = "observed"
+        row["fallback_share"] = row["evidence_tokens"]["previous_event"] / row["tokens"] if row["tokens"] else 0.0
     unattributed = sum(row["tokens"] for row in spend.values() if row["bucket"] != "project")
+    unassigned = sum(row["tokens"] for row in spend.values() if row["bucket"] == "unassigned")
+    evidence_tokens = {e: sum(row["evidence_tokens"][e] for row in spend.values()) for e in EVIDENCE_TYPES}
     salted = current_key() is not None
     report = {"schema_version": SCHEMA_VERSION,
               "pseudonyms": {"salted": salted, "algorithm": "hmac-sha256" if salted else "sha256"},
@@ -96,6 +118,10 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
               "coverage": {"adapters": coverage, "sessions_in_window": len(sessions),
                            "spend": sorted(spend.values(), key=lambda r: (r["bucket"], r["project_key"] or "")),
                            "unattributed_share": unattributed / all_tokens if all_tokens else 0.0,
+                           "unassigned_share": unassigned / all_tokens if all_tokens else 0.0,
+                           "evidence_counts": {e: sum(row["evidence_counts"][e] for row in spend.values()) for e in EVIDENCE_TYPES},
+                           "evidence_tokens": evidence_tokens,
+                           "evidence_shares": {e: n / all_tokens if all_tokens else 0.0 for e, n in evidence_tokens.items()},
                            "spend_basis": "reported_tokens", "verdict": "not_evaluated"},
               "sessions": sessions}
     if repository is not None:
@@ -103,6 +129,13 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
         report["scope"] = {"kind": "repository", "sessions_in_window": scanned,
                            "sessions_selected": len(sessions), "sessions_excluded": scanned - len(sessions)}
     return report, "\n".join(reviews) + ("\n" if reviews else "")
+
+
+def spend_row(bucket, project_key, rule):
+    return {"bucket": bucket, "project_key": project_key, "rule": rule, "sessions": 0, "events": 0,
+            "tokens": 0, "tokens_by_kind": dict.fromkeys(TOKEN_KINDS),
+            "evidence_counts": dict.fromkeys(EVIDENCE_TYPES, 0),
+            "evidence_tokens": dict.fromkeys(EVIDENCE_TYPES, 0)}
 
 
 def text_summary(report: dict) -> str:
@@ -135,7 +168,11 @@ def text_summary(report: dict) -> str:
         lines.append("  Unknown record types: " + (", ".join(f"{key} {value}" for key, value in
                                                             cov["unknown_record_types"].items()) or "none"))
     for row in report["coverage"]["spend"]:
-        name = row["bucket"] + (" " + row["rule"] + " " + row["project_key"] if row["rule"] else "")
+        name = " ".join(str(x) for x in (row["bucket"], row["rule"], row["project_key"]) if x)
         lines.append(f"Spend {name}: {row['tokens']} tokens (observed); share {row['share']:.6f}")
+        lines.append("  Evidence events: " + "; ".join(f"{k} {v}" for k, v in row["evidence_counts"].items())
+                     + f"; fallback token share {row['fallback_share']:.6f}")
+    lines.append(f"Unassigned token share: {report['coverage']['unassigned_share']:.6f}")
+    lines.append("Evidence token shares: " + "; ".join(f"{k} {v:.6f}" for k, v in report["coverage"]["evidence_shares"].items()))
     lines.append(f"Unattributed token share: {report['coverage']['unattributed_share']:.6f}")
     return "\n".join(lines)
