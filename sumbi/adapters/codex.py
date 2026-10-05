@@ -5,7 +5,7 @@ import re
 
 from sumbi.evidence import tool_evidence
 from sumbi.deliver_evidence import branch, branch_query, tool_refs
-from sumbi.model import (Coverage, Session, Window, epoch, integer, label, mapping,
+from sumbi.model import (Coverage, Session, Window, epoch, execution_cwd, integer, label, mapping,
                          records, timestamp)
 
 KNOWN = {"session_meta", "turn_context", "event_msg", "response_item", "compacted",
@@ -201,14 +201,20 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                                 item.get("cwd"), "cwd" in item)
                         if subtype == "item_completed":
                             started, cwd, explicit = execution_context.get((session.raw_id, identity), (None, None, False))
-                            resolved_start = start or started
-                            paired_cwd = explicit and started is not None and started == resolved_start
-                            resolved_cwd = item.get("cwd") if "cwd" in item else cwd if paired_cwd else None
+                            has_pair = (session.raw_id, identity) in execution_context
+                            start_conflict = has_pair and (started is None or
+                                (start is not None and start != started))
+                            cwd_conflict = explicit and "cwd" in item and (
+                                execution_cwd(cwd) != execution_cwd(item["cwd"]))
+                            resolved_start = None if start_conflict else start or started
+                            paired_cwd = explicit and started is not None and not start_conflict
+                            resolved_cwd = None if start_conflict or cwd_conflict else (
+                                item.get("cwd") if "cwd" in item else cwd if paired_cwd else None)
                             session.execution(identity, when, item.get("command"), verification_exit_code(item),
                                 started_at=resolved_start, cwd=resolved_cwd)
                             key = session.raw_id, str(identity)
-                            if "cwd" not in item and not paired_cwd:
-                                pending_cwds[key] = resolved_start
+                            if start_conflict or cwd_conflict or ("cwd" not in item and not paired_cwd):
+                                pending_cwds[key] = None if cwd_conflict else resolved_start
                             else:
                                 pending_cwds.pop(key, None)
                     if item_type == "FileChange" and subtype == "item_completed":

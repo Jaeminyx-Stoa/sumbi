@@ -423,6 +423,42 @@ class UnitTests(unittest.TestCase):
             self.save(self.codex / ("rollout-" + identity + ".jsonl"), records)
         self.assertEqual(self.report()["states"]["success"], 3)
 
+    def test_conflicting_or_untimed_paired_start_cannot_upgrade_verification(self):
+        cases = (
+            ("rounded-other", 3.0005, "other", False, "unverified"),
+            ("pre-edit-root", 1, "root", True, "unverified"),
+            ("pre-edit-inferred", 1, None, False, "unverified"),
+            ("untimed-other", None, "other", False, "unverified"),
+            ("matched-other", 3, "other", False, "unverified"),
+            ("matched-conflicting-cwd", 3, "other", True, "unverified"),
+            ("matched-root", 3, "root", False, "success"),
+            ("matched-normalized-root", 3, "normalized-root", True, "success"),
+        )
+        for identity, seconds, cwd, completed_cwd, expected in cases:
+            with self.subTest(identity=identity):
+                records = self.write_codex(identity)
+                start = timestamp(records[0]["timestamp"])
+                item = {"type": "CommandExecution", "id": "check-1", "command": ["bash", SCRIPT]}
+                if cwd is not None:
+                    item["cwd"] = str(self.repo if cwd == "root" else self.repo / "child" / ".."
+                                      if cwd == "normalized-root" else self.repo / "other")
+                index = next(i for i, r in enumerate(records) if r.get("payload", {}).get("type") == "item_completed")
+                paired = {"type": "event_msg", "payload": {"type": "item_started", "item": item}}
+                if seconds is not None:
+                    paired["timestamp"] = (start + timedelta(seconds=seconds)).isoformat()
+                records.insert(index, paired)
+                if completed_cwd:
+                    records[index + 1]["payload"]["item"]["cwd"] = str(self.repo)
+                self.save(self.codex / ("rollout-" + identity + ".jsonl"), records)
+                session = next(s for s in collect_codex(self.home, self.window, Coverage()) if s.raw_id == identity)
+                if seconds != 3:
+                    self.assertIsNone(session.commands["check-1"].started_at)
+                unit = next(r for r in self.report()["units"] if r["id"] == session.id())
+                self.assertEqual(unit["state"], expected)
+        report = self.report()
+        self.assertEqual(report["states"]["success"], 2)
+        self.assertEqual(report["states"]["unverified"], 6)
+
     def test_inferred_cwd_rejects_ambiguous_untimed_or_pre_dispatch_context(self):
         for identity, kind in (("ambiguous-context", "ambiguous"), ("untimed-context", "untimed"),
                                ("pre-dispatch-context", "old"), ("no-execution-start", "missing")):

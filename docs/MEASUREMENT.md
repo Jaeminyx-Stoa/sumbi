@@ -928,6 +928,13 @@ Edits, completed executions and activity used for a worker outcome are bounded
 to `[dispatch, scan-until)`. A verification start must also fall in that lifetime
 and strictly after its last known edit. Inherited pre-dispatch edits and checks
 cannot make an unchanged child successful or give it negative elapsed time.
+Conflicting paired start and completion timestamps, including differences in
+timestamp precision, or an untimed paired start leave execution start and cwd
+unconfirmed. Later context or an explicit completion cwd cannot repair that
+missing ordering proof.
+Contradictory explicit start and completion directories likewise leave cwd
+unconfirmed, even when the timestamps agree. Equivalent normalized directories
+retain their evidence.
 Claude's earliest timestamp and earliest cwd-bearing event are preserved
 separately; an earlier metadata event without cwd does not erase that cwd.
 Local-only start provenance distinguishes session headers from first-observed
