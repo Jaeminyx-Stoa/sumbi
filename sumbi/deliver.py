@@ -33,11 +33,38 @@ def wilson(successes, total):
 
 def judge(deliverable: Deliverable, outcomes: Outcomes, days=7):
     """All constituent PRs must succeed. Follow-ups are attempts, not successes."""
+    if deliverable.abandoned:
+        return {"state": "failed", "first_pass_success": False, "closed_at": deliverable.abandoned_at,
+                "reason": "abandoned", "attempt_prs": list(deliverable.prs)}
+    if not deliverable.prs:
+        return {"state": "in_progress", "first_pass_success": False, "closed_at": None,
+                "reason": "no_pr", "attempt_prs": []}
+    pulls = [outcomes.pull(p) for p in deliverable.prs]
+    known = [p for p in pulls if p is not None]
+    if any(p.created_at < deliverable.dispatched_at or (p.merged_at and p.merged_at < deliverable.dispatched_at) for p in known):
+        raise ValueError("Ledger PR evidence precedes dispatch")
+    constituents = [p for p in known if deliverable.role(p.id) == "constituent"]
+    superseded = {p.id for p in known if deliverable.role(p.id) == "retry" and not p.merged_at
+                  and p.state == "closed" and any(c.merged_at and c.merged_at > p.closed_at
+                      and c.id.rsplit("#", 1)[0] == p.id.rsplit("#", 1)[0] for c in constituents)}
+    explicit_follows = [p for p in known if deliverable.role(p.id) == "followup"]
+    memo = {}
+
     def attempt(pr):
+        if pr.id not in memo:
+            memo[pr.id] = assess(pr)
+        return memo[pr.id]
+
+    def assess(pr):
         observation = outcomes.observation(pr.id.rsplit("#", 1)[0])
         if not pr.merged_at:
             return ("failed" if pr.state == "closed" else "in_progress", False, pr.closed_at, "closed_unmerged" if pr.state == "closed" else "open", [])
         follows, reverts = outcomes.disturbances(pr, days)
+        fixes = getattr(outcomes, "commit_fixes", lambda p, d: [])(pr, days)
+        end = pr.merged_at + timedelta(days=days)
+        eligible = [p for p in explicit_follows if p.id != pr.id
+                    and pr.merged_at < (p.merged_at or p.created_at) < end]
+        follows = list({p.id: p for p in [*follows, *eligible] if p.id not in superseded}.values())
         revert_prs = [p for p in follows if REVERT.search(p.title + "\n" + p.body)]
         reverts = sorted([*reverts, *[p.merged_at for p in revert_prs if p.merged_at]])
         repairs = [p for p in follows if p not in revert_prs]
@@ -59,7 +86,7 @@ def judge(deliverable: Deliverable, outcomes: Outcomes, days=7):
                 return "failed", False, max((r[2] for r in results if r[2]), default=pr.merged_at), "follow_up_failed", descendants
             if any(r[0] == "in_progress" for r in results):
                 return "in_progress", False, None, "follow_up_pending", descendants
-        mature_at = pr.merged_at + timedelta(days=days)
+        mature_at = max([pr.merged_at, *fixes]) + timedelta(days=days)
         complete = (observation is not None and observation.pulls_complete and observation.commits_complete
                     and observation.start <= pr.merged_at and observation.until >= mature_at)
         if not complete:
@@ -67,19 +94,13 @@ def judge(deliverable: Deliverable, outcomes: Outcomes, days=7):
             return "immature", False, pr.merged_at, reason, descendants
         if any(r[0] == "immature" for r in results):
             return "immature", False, max(r[2] for r in results if r[2]), "follow_up_window_open", descendants
-        return "success", not (follows or reverts), max([pr.merged_at, *[r[2] for r in results if r[2]]]), "accepted", descendants
+        return "success", not (follows or reverts or fixes), max([pr.merged_at, *[r[2] for r in results if r[2]]]), "accepted", descendants
 
-    if deliverable.abandoned:
-        return {"state": "failed", "first_pass_success": False, "closed_at": deliverable.abandoned_at,
-                "reason": "abandoned", "attempt_prs": list(deliverable.prs)}
-    if not deliverable.prs:
+    required = [p for p in known if deliverable.role(p.id) != "followup" and p.id not in superseded]
+    results = [attempt(p) for p in required]
+    if not any(deliverable.role(p) == "constituent" for p in deliverable.prs) and not any(r[0] == "failed" for r in results):
         return {"state": "in_progress", "first_pass_success": False, "closed_at": None,
-                "reason": "no_pr", "attempt_prs": []}
-    pulls = [outcomes.pull(p) for p in deliverable.prs]
-    known = [p for p in pulls if p is not None]
-    if any(p.created_at < deliverable.dispatched_at or (p.merged_at and p.merged_at < deliverable.dispatched_at) for p in known):
-        raise ValueError("Ledger PR evidence precedes dispatch")
-    results = [attempt(p) for p in known]
+                "reason": "no_constituent", "attempt_prs": list(deliverable.prs)}
     if len(known) != len(pulls) and not any(r[0] == "failed" for r in results):
         return {"state": "in_progress", "first_pass_success": False, "closed_at": None,
                 "reason": "missing_pr", "attempt_prs": sorted(set([*deliverable.prs, *[p for r in results for p in r[4]]]))}
@@ -91,7 +112,8 @@ def judge(deliverable: Deliverable, outcomes: Outcomes, days=7):
     closed = max((r[2] for r in results if r[2]), default=None)
     if state == "in_progress":
         closed = None
-    return {"state": state, "first_pass_success": state == "success" and all(r[1] for r in results),
+    return {"state": state, "first_pass_success": state == "success" and all(r[1] for r in results)
+            and not any(deliverable.role(p) == "retry" for p in deliverable.prs),
             "closed_at": closed, "reason": reason,
             "attempt_prs": sorted(set([*deliverable.prs, *[p for r in results for p in r[4]]]))}
 
@@ -269,7 +291,11 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
                          "first_pass_success": j["first_pass_success"], "eventual_success": j["state"] == "success",
                          "prs": [pseudonym("pr", p) for p in j["attempt_prs"]],
                          "pr_outcomes": [{"id": pseudonym("pr", p), "merged": bool(outcomes.pull(p).merged_at),
+                              "role": d.role(p) if p in d.prs else "followup",
                               "head_sha": outcomes.pull(p).head_sha, "required_checks_at_merge": outcomes.pull(p).checks,
+                              "observed_checks_at_merge": outcomes.pull(p).observed_checks,
+                              "follow_up_commit_count": len(getattr(outcomes, "commit_fixes", lambda pr, days: [])(
+                                  outcomes.pull(p), follow_up_days)) if outcomes.pull(p).merged_at else 0,
                               "merged_at": outcomes.pull(p).merged_at.isoformat() if outcomes.pull(p).merged_at else None,
                               "dispatch_to_merge_seconds": ((outcomes.pull(p).merged_at - d.dispatched_at).total_seconds()
                                   if outcomes.pull(p).merged_at else None)} for p in j["attempt_prs"] if outcomes.pull(p)],

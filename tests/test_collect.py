@@ -553,10 +553,12 @@ class ContractTests(unittest.TestCase):
         self.assertIsNone(data["tokens"]["new_input"])
         self.assertEqual(data["tokens"]["total"], 0)
 
-    def test_core_has_no_project_rules_and_no_network_access(self):
+    def test_offline_core_has_no_project_rules_and_no_network_access(self):
         # All links depend on caller configuration; adapters expose no project defaults.
         self.assertEqual(Attributor([]).rules, [])
         for path in (Path(__file__).parent.parent / "sumbi").rglob("*.py"):
+            if path.name == "github_outcomes.py":
+                continue  # Only the explicitly selected live outcome adapter uses HTTP.
             source = path.read_text(encoding="utf-8")
             self.assertNotIn("import socket", source)
             self.assertNotIn("urllib.request", source)
