@@ -617,13 +617,14 @@ never caches that transient failure as an unreadable policy.
 ### Registration JSON schema
 
 The top-level object has exactly the required fields below, plus optional
-`confounders`. Duplicate keys and unknown fields are rejected. Numbers must be
+`confounders` and `outcome_source`. Duplicate keys and unknown fields are rejected. Numbers must be
 finite JSON numbers, not booleans. All times are UTC ISO strings ending in `Z`
 or `+00:00`. This file is local evidence: sumbi validates its contents, but does
 not authenticate its timestamp or prevent an owner from editing it retrospectively.
 
 ```json
 {
+  "outcome_source": "github",
   "intervention_id": "round-01",
   "applied_at": "2030-01-08T00:00:00Z",
   "registered_at": "2029-12-31T00:00:00Z",
@@ -648,6 +649,9 @@ not authenticate its timestamp or prevent an owner from editing it retrospective
   ID and applied time. It does **not** provide margin, sample size, windows, or
   a full registration. Register these before application; do not treat an
   intervention record written later as independent proof of pre-registration.
+- `outcome_source` is `github` or `local-verify` and applies identically to both
+  arms. Legacy registrations without it mean `github`; local comparisons require
+  it explicitly. The CLI rejects a source override that differs from registration.
 - Margin is strictly between 0 and 100 **absolute percentage points** of success
   rate. Five means 0.05, not five percent of the baseline. Sample size is a
   positive integer per arm; follow-up days is positive and finite.
@@ -834,3 +838,110 @@ labels must be public-safe categories. Acceptance, notes, branches, prompts,
 commands, outcome prose, paths, host names and prediction conditions are absent.
 Use a local salt before sharing. See the authored
 [round calculations and verdict cases](../tests/fixtures/compare/ROUND.md).
+
+## Local verification: fixed worker-session outcomes
+
+Workspaces without a pull request flow can explicitly select `local-verify`.
+This is a separate, weaker outcome source; it cannot certify human acceptance
+or absence of later reverts. Declare the verification scripts in the repository:
+
+```toml
+# .sumbi/config.toml
+verify = ["scripts/check.sh"]
+```
+
+```sh
+sumbi deliver --outcome-source local-verify --repository workspace \
+  --home local-log-home --since 2030-01-01T00:00:00Z \
+  --until 2030-01-08T00:00:00Z --scan-until 2030-01-09T00:00:00Z \
+  --json out/local-deliver.json
+
+sumbi compare --registration local-registration.json --repository workspace \
+  --home local-log-home --scan-until 2030-01-16T00:00:00Z \
+  --seed 1729 --resamples 5000 --json out/local-compare.json
+```
+
+The registration must name `"outcome_source": "local-verify"`. Its existing
+windows, margin, sample size, predictions and confounders apply. The follow-up
+field remains required by the shared schema but provides **no local acceptance
+or revert window**. Do not supply a ledger, GitHub outcome directory, cache or
+record option. Repeated `--verify scripts/check.sh` declarations replace the
+TOML list for a run. Both arms use this single declaration set; sumbi does not
+authenticate retrospective edits to registration or verification configuration.
+`--scan-until` must cover the dispatch window and defaults to its end. Outcome
+evidence and lifetime spend stop at this explicit observation cutoff.
+
+Adapters retain an agent-neutral `CommandExecution` event locally: agent,
+session, completion time, command and exit code, with start time and cwd evidence
+for safe interpretation. Codex recognizes Desktop `item_completed` /
+`CommandExecution`, item start times and older `exec_command_begin/end` pairs.
+Claude Code pairs `Bash` tool uses and results by ID. The foreground result
+envelope with `interrupted: false`, string stdout/stderr and `is_error: false`
+means exit zero even where no numeric exit field is logged. An error's anchored
+`Exit code N` envelope or numeric machine field supplies nonzero codes. Missing,
+interrupted, deferred/background, unpaired or unsupported results remain unknown.
+Text inside stdout never supplies an exit code. Commands, stdout and edit payloads
+are never included in public JSON or text summaries.
+
+Recognition accepts a single executed repository-relative script, including
+`./scripts/check.sh`, `bash`/`sh`, `-l`/`--login`, quoted `-c`/`-lc` scripts,
+environment assignment prefixes, PowerShell's `&` and quoted shell executable,
+and `pwsh`/`powershell -Command` wrappers. It matches the entire normalized script
+path rather than a basename. Execution cwd must establish that the declared
+script is the target repository's script. A same-named script in a different cwd
+does not pass. Reads (`Get-Content`, `cat`, `type`, `rg`, `grep`, `Select-String`,
+`sed`, `head`, `tail`) do not count, including quoted mentions. Shell syntax-only
+checks (`-n`/`--noexec`) do not execute the verifier. Conditional commands,
+pipelines, background execution, redirects, substitutions and unsupported options
+with a declaration mention are counted as `unmatched_shape`, withholding a
+comparison rather than guessing. Coverage holds only counts and safe labels.
+
+Worker units are fixed from session start metadata before their outcomes are
+read. Codex subagent metadata and Claude subagent streams identify dispatched
+workers; a parent's existence is not required to create its child unit. Missing
+start metadata is counted and blocks comparison. The dispatch timestamp selects
+the cohort independently of whether the worker edits anything or runs a check.
+Sessions starting outside the dispatch window cannot enter merely because they
+verify inside it. Parent orchestrators are separately reported as dispatch
+overhead, even if they span the intervention.
+
+Known edit tools are Codex `apply_patch`/`FileChange` and Claude
+`Edit`/`Write`/`MultiEdit`/`NotebookEdit`. The five states are:
+
+- `success`: the last matched completed verification started strictly after the
+  last known edit, has confirmed target cwd and exited zero.
+- `failed`: the same machine evidence exited nonzero. A launch or prerequisite
+  failure is a failed command attempt; this does not prove that tests executed.
+- `unverified`: known edits lack such an execution. This includes an unknown last
+  exit, unknown start/cwd, or a check begun before the edit. An earlier pass does
+  not survive a later unknown check. It counts as non-success.
+- `in_progress`: edits exist and activity was observed within `--active-minutes`
+  (default five) of scan end without a later completion signal. It is excluded
+  but counted. Freshness is a heuristic; absent terminal events are not proof of
+  continuing or completed work.
+- `no_change`: no known edits. It is excluded but counted even if a check passed.
+
+Tied edit/check times cannot establish ordering. Units' elapsed time is dispatch
+to last observed activity, **not human acceptance time**. Shell-based edits are
+invisible, attempted edit tools count conservatively, and deleted or unlogged
+sessions cannot be detected. CLI reports these limitations alongside the source.
+
+Local comparison reuses Wilson success intervals, Newcombe method 10,
+pre-registered sample gates, whole-unit deterministic bootstrap ratios and the
+same ordered verdict policy. `unverified` remains in all retained denominators
+and cost numerators. Recent `in_progress` and mixed-exposure units are excluded;
+their combined share over 10% in either candidate arm blocks comparability.
+No-change exclusions remain visible and a difference in their shares over 0.2
+blocks comparison. A worker spanning application is mixed exposure. Agent mix,
+model/effort/version observability, mix shifts, registered confounders, missing
+token fields, unknown command/result evidence and parse errors retain conservative
+gates. Structurally unsupported token kinds stay null, not zero.
+
+Every local cost estimate and proposal is **retained worker-session scope only**.
+Lifetime token costs include all observed worker spend from start to scan cutoff,
+including failures and verification retries. Lifetime time costs use each
+worker's observed elapsed span. Parent overhead and excluded worker spend are
+shown separately with observed partial totals; neither is fabricated into an
+individual worker or its bootstrap. A parent spanning an intervention does not
+poison worker-only comparisons. An `adopt` proposal cannot support a claim of
+whole-workspace savings: orchestration and excluded work require separate study.

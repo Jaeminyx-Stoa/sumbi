@@ -82,6 +82,8 @@ def verdict(*, coverage_reasons, preregistered, blocking_flags, arms, registered
 def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
             agents=None, rules=None, idle_minutes=5, salt=None, seed=1729, resamples=5000):
     registration = read_registration(registration_path)
+    if registration.outcome_source != "github":
+        raise ValueError("GitHub comparison requires github outcome source in registration")
     policy = load_judgment_policy()
     if policy["decision_order"] != DECISION_ORDER:
         raise ValueError("Comparison decision order does not match the bundled judgment policy")
@@ -245,6 +247,7 @@ def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
                          "cost": {m: _descriptive(rows, task, m) for m in METRICS}} for arm, rows in arms.items()}})
         return {"schema_version": "compare-1.0", "pseudonyms": measured["pseudonyms"],
             "registration": {"intervention_id": pseudonym("intervention", registration.intervention_id),
+                "outcome_source": registration.outcome_source,
                 "applied_at": registration.applied_at.isoformat(), "registered_at": registration.registered_at.isoformat(),
                 "preregistered": registration.preregistered, "predictions": list(registration.predictions),
                 "non_inferiority_margin_pp": registration.margin_pp, "follow_up_days": registration.follow_up_days,

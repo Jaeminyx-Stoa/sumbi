@@ -48,6 +48,9 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
     snapshots: dict[str, list] = {}
     contexts: dict[str, list] = {}
     tool_names = {}
+    commands = {}
+    execution_context = {}
+    current_cwds = {}
     for path in sorted(root.rglob("rollout-*.jsonl")):
         session = None
         meta_seen = False
@@ -74,11 +77,22 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
             if not session.accept(event, coverage):
                 continue
             when = timestamp(event.get("timestamp"))
+            if kind == "session_meta" and not inherited_meta:
+                if session.start_at is None or when is not None and when < session.start_at:
+                    session.start_at = when
+                    session.start_cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else None
+                subagent = mapping(mapping(payload.get("source")).get("subagent"))
+                session.is_worker = session.is_worker or bool(subagent)
+                parent = mapping(subagent.get("thread_spawn")).get("parent_thread_id")
+                if isinstance(parent, str):
+                    session.parent_raw_id = parent
             order = integer(event.get("ordinal"))
             order = (order if order is not None else len(session.seen), len(session.seen))
             if kind not in KNOWN:
                 coverage.unknown(kind)
             if kind in ("session_meta", "turn_context") and not inherited_meta:
+                if isinstance(payload.get("cwd"), str):
+                    current_cwds[session.raw_id] = payload["cwd"]
                 session.cwd(payload.get("cwd"), when)
                 session.context(when, order, payload.get("cwd"))
                 if collect_links and when:
@@ -104,12 +118,20 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                             snapshots.setdefault(session.raw_id, []).append(
                                 (when, order, values))
                 elif subtype in ("task_started", "task_complete", "task_completed"):
+                    if subtype == "task_started":
+                        if window.contains(when):
+                            session.completed_at = None
+                    elif when is not None and when < window.until:
+                        session.completed_at = when
                     start = epoch(payload.get("started_at"))
                     end = epoch(payload.get("completed_at"))
                     session.interval("request", identity, start or (when if subtype == "task_started" else None),
                                      end or (when if subtype != "task_started" else None))
                 elif subtype in ("exec_command_begin", "mcp_tool_call_begin"):
                     if subtype == "exec_command_begin":
+                        commands[session.raw_id, identity] = payload.get("command", payload.get("cmd"))
+                        execution_context[session.raw_id, identity] = (when,
+                            payload.get("cwd", payload.get("workdir", current_cwds.get(session.raw_id))))
                         cwd, paths = tool_evidence("exec_command", payload)
                         session.tool_paths(when, order, cwd, paths)
                         if collect_links and when:
@@ -118,6 +140,10 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                     session.count("tool_calls", identity, when, window)
                     session.interval("tool", identity, when, None)
                 elif subtype in ("exec_command_end", "mcp_tool_call_end"):
+                    if subtype == "exec_command_end":
+                        started, cwd = execution_context.get((session.raw_id, identity), (None, None))
+                        session.execution(identity, when, payload.get("command", commands.get((session.raw_id, identity))),
+                                          exit_code(payload), started_at=started, cwd=cwd)
                     if collect_links and when:
                         name, query = tool_names.get((session.raw_id, identity), (None, False))
                         session.deliverable_events.append((when, order, "refs", tool_refs(
@@ -143,6 +169,16 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                         session.interval("tool", identity, start, end)
                     if item_type == "CommandExecution":
                         session.cwd(item.get("cwd"), when)
+                        if subtype == "item_started":
+                            execution_context[session.raw_id, identity] = (start or when,
+                                item.get("cwd", current_cwds.get(session.raw_id)))
+                        if subtype == "item_completed":
+                            started, cwd = execution_context.get((session.raw_id, identity), (None, None))
+                            session.execution(identity, when, item.get("command"), exit_code(item),
+                                started_at=start or started,
+                                cwd=item.get("cwd", cwd or current_cwds.get(session.raw_id)))
+                    if item_type == "FileChange" and subtype == "item_completed":
+                        session.edit(identity, when)
                     if item_type in ("CommandExecution", "FileChange"):
                         cwd, paths = tool_evidence(item_type, item)
                         session.tool_paths(start or when, order, cwd, paths)
@@ -151,6 +187,9 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                                 tool_refs(item_type, item)))
                     if item_type == "AgentMessage":
                         session.local_text(item.get("content"), when, window, local_review)
+                elif subtype == "shutdown_complete":
+                    if when is not None and when < window.until:
+                        session.completed_at = when
                 elif subtype == "error":
                     session.count("api_errors", identity, when, window)
                 elif subtype == "request_user_input":
@@ -161,6 +200,8 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                 if subtype not in RESPONSES:
                     coverage.unknown("response_item:" + str(subtype))
                 if subtype in ("function_call", "custom_tool_call", "local_shell_call", "web_search_call"):
+                    if str(payload.get("name", "")).split(".")[-1] == "apply_patch":
+                        session.edit(identity, when)
                     cwd, paths = tool_evidence(payload.get("name", subtype),
                                                payload.get("arguments", payload.get("input", payload.get("action"))))
                     session.tool_paths(when, order, cwd, paths)

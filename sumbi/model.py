@@ -293,6 +293,19 @@ class RepositoryAttributor(Attributor):
 
 
 @dataclass
+class CommandExecution:
+    """Agent-neutral machine execution evidence. Commands stay local only."""
+
+    agent: str
+    session: str
+    at: datetime
+    command: str | list[str] | None
+    exit_code: int | None
+    started_at: datetime | None = None
+    cwd: str | None = None
+
+
+@dataclass
 class Session:
     agent: str
     raw_id: str
@@ -313,6 +326,27 @@ class Session:
     attribution_events: list[tuple] = field(default_factory=list)
     # Bounded branch/PR evidence, enabled only by the deliver command.
     deliverable_events: list[tuple] = field(default_factory=list)
+    # These fields are deliberately absent from as_dict/public collect output.
+    start_at: datetime | None = None
+    start_cwd: str | None = None
+    is_worker: bool = False
+    commands: dict[str, CommandExecution] = field(default_factory=dict)
+    edits: dict[str, datetime] = field(default_factory=dict)
+    completed_at: datetime | None = None
+    local_evidence_gaps: Counter = field(default_factory=Counter)
+
+    def execution(self, identity, when, command, code, *, started_at=None, cwd=None):
+        if when is not None:
+            self.commands[str(identity)] = CommandExecution(
+                self.agent, self.raw_id, when, command, code, started_at, cwd)
+        else:
+            self.local_evidence_gaps["command_timestamp_missing"] += 1
+
+    def edit(self, identity, when):
+        if when is not None:
+            self.edits[str(identity)] = when
+        else:
+            self.local_evidence_gaps["edit_timestamp_missing"] += 1
 
     def id(self):
         return pseudonym("session", self.agent + ":" + self.raw_id)
