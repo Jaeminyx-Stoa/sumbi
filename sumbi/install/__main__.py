@@ -98,6 +98,10 @@ def run(args: argparse.Namespace) -> int:
         print("  required checks: unknown (offline); rulesets: unknown (offline)")
         print("  estimate: " + report["cost"]["estimate_rule"])
         print("  instruction tokens (root/largest scope): " + ", ".join(f"{agent}={cost['root_estimated_tokens']}/{cost['estimated_tokens']}" for agent, cost in report["cost"]["instructions"].items()))
+        for agent, cost in report["cost"]["conditional_instructions"].items():
+            print(f"  conditional instruction tokens {agent}: {cost['estimated_tokens']} ({len(cost['paths'])} rules)")
+        for key, convention in report["conventions"].items():
+            print(f"  convention {key}: {convention['status']} " + json.dumps(convention["evidence"], sort_keys=True))
         print(f"  budget={args.budget}; warnings={len(report['warnings'])}")
         for entry in report["cost"]["skill_descriptions"]:
             print(f"  skill description {entry['path']}: characters={entry['characters']}, tokens={entry['estimated_tokens']}")

@@ -31,7 +31,7 @@ class ExclusionTests(OfflineTest):
         self.assertEqual(report["instructions"]["agents"]["paths"],
                          ["AGENTS.md", "src/AGENTS.md", "tests/helpers/AGENTS.md"])
         self.assertEqual(report["instructions"]["claude"]["paths"], ["CLAUDE.md"])
-        self.assertEqual(report["conventions"]["handoff"], [])
+        self.assertEqual(report["conventions"]["handoff"], {"status": "absent", "evidence": []})
         self.assertEqual(report["cost"]["instructions"]["claude"]["estimated_tokens"], 25)
         self.assertEqual(report["exclusions"]["count"], len(trees))
         self.assertEqual(sum(e["count"] for e in report["exclusions"]["patterns"]), len(trees))
@@ -102,7 +102,7 @@ class ExclusionTests(OfflineTest):
             {"source": "bridge.md", "status": "excluded-not-read"},
         ])
         self.assertEqual(report["cost"]["instructions"]["claude"]["paths"], ["AGENTS.md", "CLAUDE.md", "bridge.md"])
-        self.assertEqual(report["conventions"]["handoff"], [])
+        self.assertEqual(report["conventions"]["handoff"], {"status": "absent", "evidence": []})
         self.assertNotIn("tests/fixtures/CLAUDE.md", json.dumps(report))
         self.assertNotIn("vendor/secret.md", json.dumps(report))
 

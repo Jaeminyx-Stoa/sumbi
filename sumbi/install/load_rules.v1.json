@@ -1,9 +1,10 @@
 {
   "version": 1,
-  "checked_at": "2026-10-05",
+  "revision": 2,
+  "checked_at": "2026-10-06",
   "agents": [
     {"agent": "codex", "support": "verified", "entry": "AGENTS.md", "scope": "git-root-to-cwd", "global": ["~/.codex/AGENTS.override.md", "~/.codex/AGENTS.md"], "precedence": ["AGENTS.override.md", "AGENTS.md"], "conditions": ["project-root-configurable", "fallback-names-configurable", "byte-budget"]},
-    {"agent": "claude-code", "support": "verified", "entry": "CLAUDE.md", "launch_entries": ["CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"], "scope": "ancestors", "global": ["~/.claude/CLAUDE.md"], "imports": "launch", "nested": "on-demand", "agents_fallback": {"entry": "AGENTS.md", "minimum_version": "2.1.277", "scope": "ancestors", "conditions": ["no-claude-entry-in-cwd-or-ancestors", "default-project-instructions-setting", "session-support", "excludes", "subagent-project-instructions"]}},
+    {"agent": "claude-code", "support": "verified", "entry": "CLAUDE.md", "launch_entries": ["CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"], "scope": "ancestors", "global": ["~/.claude/CLAUDE.md"], "imports": "launch", "nested": "on-demand", "rules": {"directory": ".claude/rules", "suffix": ".md", "always_loaded": "no-nonempty-paths-frontmatter", "conditional": "nonempty-paths-frontmatter", "activation": "matching-file-read"}, "agents_fallback": {"entry": "AGENTS.md", "minimum_version": "2.1.277", "scope": "ancestors", "conditions": ["no-claude-entry-in-cwd-or-ancestors", "default-project-instructions-setting", "session-support", "excludes", "subagent-project-instructions"]}},
     {"agent": "gemini", "support": "verified", "entry": "GEMINI.md", "scope": "ancestors", "global": ["~/.gemini/GEMINI.md"], "nested": "on-demand", "conditions": ["workspace-and-trust-configurable", "filename-configurable"]},
     {"agent": "copilot", "support": "verified", "entry": ".github/copilot-instructions.md", "scope": "repository", "conditions": ["feature-support", "repository-context"]},
     {"agent": "cursor", "support": "verified", "entry": ".cursor/rules/sumbi.mdc", "scope": "repository", "rule_directory": ".cursor/rules", "rule_suffix": ".mdc", "required_frontmatter": "alwaysApply: true", "conditions": ["alwaysApply-true", "workspace-context"]},

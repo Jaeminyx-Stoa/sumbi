@@ -56,6 +56,6 @@ def find_gaps(report: dict) -> list[dict]:
         ("parallel_worktree", "missing-worktree-rule", "parallel-worktrees"),
         ("plan_approval", "missing-plan-approval", "plan-and-approval"),
     ):
-        if not report["conventions"][key]:
+        if report["conventions"][key]["status"] == "absent":
             add(identifier, {"paths": [], "searched_paths": report["convention_search_paths"]}, [practice])
     return gaps

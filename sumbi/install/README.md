@@ -47,16 +47,33 @@ recommended entry paths when a planned instruction misses most eligible observed
 session starts. Top-level and worker counts are shown separately. Workers with
 only an inferred first cwd contribute unknown coverage, not recommendation votes.
 Ignored, missing and unsafe cwd paths are withheld from placement output.
+Starts in another local worktree of the inspected repository are recognized by
+the same git common directory, queried with `core.fsmonitor=false` and
+`core.untrackedCache=false`. They use scope `same-repository-worktree` and paths
+relative to that worktree; its folder name and absolute path are not exported.
+They count toward repository placement, rather than `outside_workspace`.
+Folder names never establish repository identity.
 See [load rules and limitations](../../docs/LOAD_RULES.md). Inherited cost
-estimates remain upper bounds, not proof of loaded context.
+estimates remain heuristics, not proof of loaded context.
 
-Instruction size is `ceil(characters / 4)` after normalizing line endings.
+Instruction size uses the named `script-aware-v1` rule after normalizing line
+endings: `ceil(other_characters / 4)` plus one token per Hangul, Han, Hiragana
+or Katakana character. This is an upper-leaning heuristic, not a tokenizer or
+a guaranteed upper bound. JSON and text report the rule name so estimates from
+different rules cannot be confused. Skill descriptions use the same rule.
 Unique imported files count once
 per agent. Root instructions are reported separately from the largest inherited
 scope: siblings are never summed as if they loaded together. Nested instructions
-include ancestor instructions and their import closures. All rule files are
-included, so this remains an upper bound where rules are conditional, not a
-measurement of a particular task's loaded context. Dynamic/global agent configuration
+include ancestor instructions and their import closures. The largest scope is
+chosen by estimated tokens, rather than character count. Claude Markdown rules
+with non-empty `paths:` in YAML front matter are conditional: they load when
+matching files are read. Their paths, characters and token estimate are reported
+separately in `cost.conditional_instructions.claude`, excluded from the
+always-loaded instruction budget. Missing or empty `paths:` stays always-loaded.
+The front-matter check supports scalar, flow-list and indented block forms; it
+is a bounded YAML subset and does not execute tags or path expressions.
+Other agents' rule estimates remain conservative. No estimate measures a
+particular task's loaded context. Dynamic/global agent configuration
 is not read. Skill-description estimates
 use UTF-8 text front matter, including common scalar and block descriptions.
 Every-prompt counts identify declared `UserPromptSubmit` hooks; sumbi does not
@@ -107,12 +124,43 @@ YAML with plain or quoted job IDs and scalar display names, without a YAML
 dependency. Flow mappings, anchors and multiline names have explicit unknown
 diagnostics; this is not a complete YAML parser.
 
-Convention detection is a conservative text heuristic over agent entry files,
+Each convention reports a `status` of `present`, `absent` or `unknown` and an
+`evidence` list of paths with kinds `directive` or `declared`. Only `absent`
+produces a convention gap or an installation proposal. Detection is a
+conservative text heuristic over agent entry files,
 rules, skills, commands, subagents and resolved Claude imports. Ordinary README,
 roadmap and design documents do not supply evidence unless actually imported
 as instructions. Markdown links alone do not load instructions. Only directives
 count; idea listings, examples, fenced snippets, metadata and explicit denials
 are ignored. Its evidence identifies files, not enforcement proof.
+The versioned `sumbi/catalog/conventions.v1.json` lexicon supplies English and
+Korean directive patterns and exclusions for review gates, handoffs, plan
+approval, worktrees and friction lines. Languages can be added by extending
+its script labels and patterns without changing code. If more than half of
+the searched guidance's letters use uncovered scripts, undetected conventions
+are `unknown`. `convention-language-unsupported` lists dominant script
+categories, never source text. Front matter and fenced code do not vote on
+language coverage. A directive match still establishes `present`.
+
+An owner can declare implementation paths, including documents not otherwise
+searched, in `.sumbi/config.toml`:
+
+```toml
+[conventions]
+review_gate = ["docs/review.md"]
+handoff = ["docs/handoff.md"]
+plan_approval = ["docs/planning.md"]
+parallel_worktree = ["docs/worktrees.md"]
+friction_line = ["docs/reporting.md"]
+```
+
+An existing file or directory supplies `declared` evidence and makes the
+convention `present`, including when its language is unknown. Declarations
+check existence without reading implementation content, including excluded
+paths. A missing path produces `convention-declaration-missing` and supplies
+no presence evidence. Unknown IDs, malformed path lists, links, absolute paths
+and traversal are rejected with sanitized errors. Paths use forward slashes
+and must stay within the inspected repository.
 CODEOWNERS alone does not establish a risk review gate. A configured test runner
 or a documented test command supplies test evidence; no test command is printed.
 

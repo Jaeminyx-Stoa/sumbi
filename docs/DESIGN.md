@@ -118,6 +118,18 @@ Seeds a sensible first harness in the current repository, starting from what is 
    Top-level and worker session counts are visible; workers without their own
    start-header evidence cannot vote in placement recommendations. Ignored,
    missing and unsafe cwd paths are withheld.
+   Other local worktrees of the inspected repository count too when hardened
+   local git queries establish the same common directory. Their scope is
+   `same-repository-worktree`, and output gives paths relative to the starting
+   worktree without exposing its folder name or absolute path. Folder names
+   never establish identity; placement uses the inspected relative layout and
+   cannot prove another checkout's instruction contents.
+   Costs name the `script-aware-v1` estimate rule: `ceil(other_characters / 4)`
+   plus one token per Hangul, Han, Hiragana or Katakana character after line
+   ending normalization. This is an upper-leaning heuristic, not a tokenizer.
+   Conditional Claude Markdown rules with non-empty `paths:` front matter are
+   estimated separately and excluded from always-loaded budgets; rules without
+   non-empty paths stay always-loaded.
    See [load rules and limitations](LOAD_RULES.md).
 2. **Gaps.** Rules over the inventory. Examples:
    - no `AGENTS.md`
@@ -128,6 +140,17 @@ Seeds a sensible first harness in the current repository, starting from what is 
    - no review gate on risky paths
    - no handoff convention
    - no friction line
+   Conventions are tri-state: `present`, `absent` or `unknown`, with path evidence
+   marked `directive` or `declared`. Only `absent` proposes a convention gap.
+   A versioned English/Korean lexicon next to the catalog holds directive and
+   roadmap/example/denial patterns and can add languages without code changes.
+   Predominantly uncovered scripts make undetected conventions `unknown` and
+   produce `convention-language-unsupported` with dominant script labels only.
+   Owners can map the five convention IDs (`review_gate`, `handoff`,
+   `plan_approval`, `parallel_worktree`, `friction_line`) to repository-relative
+   path lists in `[conventions]` in `.sumbi/config.toml`. Existing paths establish
+   `present` with `declared` evidence without reading their content. Missing
+   paths warn and do not establish presence; unsafe paths are rejected.
 3. **Candidates.** Practices from the curated catalog (below) that address the detected gaps. Each practice states the files it adds or changes, its risk level, its expected effect, and how sumbi will judge it.
 4. **Plan, then apply.**
    - `--dry-run` (the default) prints the plan as diffs.

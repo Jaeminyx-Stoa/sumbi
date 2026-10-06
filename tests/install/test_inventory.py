@@ -255,7 +255,7 @@ class InventoryTests(OfflineTest):
         (root / "docs/design.md").write_text(rule, encoding="utf-8")
         (root / "AGENTS.md").write_text("See [design](docs/design.md).\n", encoding="utf-8")
         report = inventory(root)
-        self.assertEqual(report["conventions"]["plan_approval"], [])
+        self.assertEqual(report["conventions"]["plan_approval"], {"status": "absent", "evidence": []})
         self.assertIn("missing-plan-approval", {gap["id"] for gap in find_gaps(report)})
 
     def test_loaded_rules_skills_and_imports_supply_directive_evidence(self):
@@ -271,7 +271,7 @@ class InventoryTests(OfflineTest):
                 if path.startswith("docs/"):
                     (root / "CLAUDE.md").write_text("@docs/imported.md\n", encoding="utf-8")
                 report = inventory(root)
-                self.assertEqual(report["conventions"]["plan_approval"], [path])
+                self.assertEqual(report["conventions"]["plan_approval"], {"status": "present", "evidence": [{"path": path, "kind": "directive"}]})
                 self.assertNotIn("missing-plan-approval", {g["id"] for g in find_gaps(report)})
 
     def test_instruction_mentions_examples_metadata_and_denials_are_not_rules(self):
