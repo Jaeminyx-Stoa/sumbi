@@ -105,7 +105,7 @@ class InventoryBoundaryTests(OfflineTest):
             self.assertFalse(path.is_relative_to(self.root / "scratch"))
             return original_read(path)
 
-        with patch("sumbi.install.inventory.os.walk", walk), patch.object(Path, "read_bytes", read):
+        with patch("sumbi.install.inventory.walk.os.walk", walk), patch.object(Path, "read_bytes", read):
             report = inventory(self.root)
         self.assertEqual(report["instructions"]["agents"]["count"], 0)
         self.assertEqual(report["enforcement"]["test_sources"], [])

@@ -85,90 +85,12 @@ def _git_identity(directory: Path) -> tuple[Path, Path] | None:
 def observed_starts(root: Path, report: dict, sessions, window: Window | None = None) -> dict:
     """Count session starts, with worker attribution and uncertain child coverage."""
     root = root.resolve()
-    base = normalize_path(str(root.resolve()))
-    counts, coverage, roles, agent_roles, seen = Counter(), Counter(), Counter(), Counter(), set()
+    counts, coverage, roles, agent_roles = Counter(), Counter(), Counter(), Counter()
     provenance = Counter()
     repositories = report["versioning"]["nested_repositories"]["paths"]
-    ignored = _IgnoreChecks(root, repositories)
-    git_identity = _git_identity(root)
-    worktree_checks, identities = {}, {}
     patterns = tuple(e["pattern"] for e in report["exclusions"]["patterns"])
-    for session in sessions:
-        identity = session.agent, session.raw_id
-        if identity in seen:
-            coverage["duplicate_sessions"] += 1
-            continue
-        seen.add(identity)
-        role = "worker" if session.parent_raw_id or getattr(session, "is_worker", False) else "top-level"
-        dated = [e for e in session.cwd_events if e[0] is not None]
-        when = getattr(session, "start_at", None) or min((t for t, _ in dated), default=None)
-        if window is not None and not window.contains(when):
-            coverage["outside_window"] += 1
-            continue
-        cwd = getattr(session, "start_cwd", None)
-        if not cwd:
-            events = list(session.cwd_events)
-            if dated:
-                first = min(e[0] for e in dated)
-                candidates = {p for t, p in dated if t == first}
-            else:
-                candidates = {p for _, p in events}
-            if len(candidates) != 1:
-                coverage["missing_or_ambiguous_cwd"] += 1
-                continue
-            cwd = next(iter(candidates))
-            coverage["first_observed_cwd"] += 1
-        path = normalize_path(cwd)
-        same_worktree = False
-        start_root, start_ignored = root, ignored
-        if path != base and not path.startswith(base + "/"):
-            if path not in identities:
-                identities[path] = _git_identity(Path(cwd)) if git_identity else None
-            candidate = identities[path]
-            if candidate is None or candidate[1] != git_identity[1] or candidate[0] == git_identity[0]:
-                coverage["outside_workspace"] += 1
-                continue
-            same_worktree = True
-            start_root = candidate[0]
-            if start_root not in worktree_checks:
-                worktree_checks[start_root] = _IgnoreChecks(start_root, [])
-            start_ignored = worktree_checks[start_root]
-        try:
-            relative = Path(os.path.normpath(cwd)).relative_to(start_root).as_posix()
-        except ValueError:
-            coverage["unsafe_cwd"] += 1
-            continue
-        if relative != "." and excluded_by(relative, patterns):
-            coverage["excluded_cwd"] += 1
-            continue
-        try:
-            directory = start_root if relative == "." else safe_path(start_root, relative)
-            if not directory.is_dir():
-                coverage["missing_or_non_directory_cwd"] += 1
-                continue
-            excluded = start_ignored.check(relative)
-        except (InstallError, OSError):
-            coverage["unsafe_cwd"] += 1
-            continue
-        if excluded is not False:
-            coverage["excluded_cwd" if excluded else "gitignore_unknown_cwd"] += 1
-            continue
-        roles[role] += 1
-        agent_roles[session.agent, role] += 1
-        evidence = getattr(session, "start_evidence", None)
-        if role == "worker" and (evidence not in {"session-header", "first-observed-cwd"}
-                or not getattr(session, "start_cwd", None)):
-            coverage["worker_start_unknown"] += 1
-            continue
-        evidence = evidence or "first-observed-cwd"
-        provenance[evidence] += 1
-        scope = None if same_worktree else next((p for p in sorted(repositories, key=len, reverse=True)
-                      if path == normalize_path(str(root / p))
-                      or path.startswith(normalize_path(str(root / p)) + "/")), None)
-        if scope:
-            relative = scope + relative[len(scope):]
-        kind = "same-repository-worktree" if same_worktree else "workspace-root" if relative == "." else "nested-repository" if scope else "subfolder"
-        counts[session.agent, relative, kind, scope, role, evidence] += 1
+    _count_starts(root, sessions, window, repositories, patterns,
+                  counts, coverage, roles, agent_roles, provenance)
     paths = {}
     for (agent, path, kind, repository, role, evidence), count in sorted(counts.items()):
         row = paths.setdefault((agent, path, kind, repository), {"agent": agent, "path": path, "kind": kind,
@@ -339,3 +261,95 @@ def annotate_placement(plan, sessions, window: Window | None = None, coverage: d
             elif unknown:
                 plan.report["warnings"].append({"kind": "target-load-unknown", "agent": agent,
                     "target": target, "starts": total, "unknown_starts": unknown})
+
+
+def _count_starts(root: Path, sessions, window, repositories, patterns,
+                  counts, coverage, roles, agent_roles, provenance) -> None:
+    base = normalize_path(str(root.resolve()))
+    seen = set()
+    ignored = _IgnoreChecks(root, repositories)
+    git_identity = _git_identity(root)
+    worktree_checks, identities = {}, {}
+    for session in sessions:
+        identity = session.agent, session.raw_id
+        if identity in seen:
+            coverage["duplicate_sessions"] += 1
+            continue
+        seen.add(identity)
+        role = "worker" if session.parent_raw_id or getattr(session, "is_worker", False) else "top-level"
+        dated = [e for e in session.cwd_events if e[0] is not None]
+        when = getattr(session, "start_at", None) or min((t for t, _ in dated), default=None)
+        if window is not None and not window.contains(when):
+            coverage["outside_window"] += 1
+            continue
+        found, cwd = _start_cwd(session, dated, coverage)
+        if not found:
+            continue
+        path = normalize_path(cwd)
+        same_worktree = False
+        start_root, start_ignored = root, ignored
+        if path != base and not path.startswith(base + "/"):
+            if path not in identities:
+                identities[path] = _git_identity(Path(cwd)) if git_identity else None
+            candidate = identities[path]
+            if candidate is None or candidate[1] != git_identity[1] or candidate[0] == git_identity[0]:
+                coverage["outside_workspace"] += 1
+                continue
+            same_worktree = True
+            start_root = candidate[0]
+            if start_root not in worktree_checks:
+                worktree_checks[start_root] = _IgnoreChecks(start_root, [])
+            start_ignored = worktree_checks[start_root]
+        try:
+            relative = Path(os.path.normpath(cwd)).relative_to(start_root).as_posix()
+        except ValueError:
+            coverage["unsafe_cwd"] += 1
+            continue
+        if relative != "." and excluded_by(relative, patterns):
+            coverage["excluded_cwd"] += 1
+            continue
+        try:
+            directory = start_root if relative == "." else safe_path(start_root, relative)
+            if not directory.is_dir():
+                coverage["missing_or_non_directory_cwd"] += 1
+                continue
+            excluded = start_ignored.check(relative)
+        except (InstallError, OSError):
+            coverage["unsafe_cwd"] += 1
+            continue
+        if excluded is not False:
+            coverage["excluded_cwd" if excluded else "gitignore_unknown_cwd"] += 1
+            continue
+        roles[role] += 1
+        agent_roles[session.agent, role] += 1
+        evidence = getattr(session, "start_evidence", None)
+        if role == "worker" and (evidence not in {"session-header", "first-observed-cwd"}
+                or not getattr(session, "start_cwd", None)):
+            coverage["worker_start_unknown"] += 1
+            continue
+        evidence = evidence or "first-observed-cwd"
+        provenance[evidence] += 1
+        scope = None if same_worktree else next((p for p in sorted(repositories, key=len, reverse=True)
+                      if path == normalize_path(str(root / p))
+                      or path.startswith(normalize_path(str(root / p)) + "/")), None)
+        if scope:
+            relative = scope + relative[len(scope):]
+        kind = "same-repository-worktree" if same_worktree else "workspace-root" if relative == "." else "nested-repository" if scope else "subfolder"
+        counts[session.agent, relative, kind, scope, role, evidence] += 1
+
+
+def _start_cwd(session, dated, coverage):
+    cwd = getattr(session, "start_cwd", None)
+    if not cwd:
+        events = list(session.cwd_events)
+        if dated:
+            first = min(e[0] for e in dated)
+            candidates = {p for t, p in dated if t == first}
+        else:
+            candidates = {p for _, p in events}
+        if len(candidates) != 1:
+            coverage["missing_or_ambiguous_cwd"] += 1
+            return False, None
+        cwd = next(iter(candidates))
+        coverage["first_observed_cwd"] += 1
+    return True, cwd

@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from sumbi.install import find_gaps, inventory
-from sumbi.install.conventions import load_lexicon
+from sumbi.install.inventory.conventions import load_lexicon
 from sumbi.install.inventory import conditional_paths
 from sumbi.install.text import ESTIMATE_RULE, estimate_tokens
 from sumbi.install.planner import build_plan
@@ -173,7 +173,7 @@ class ConventionTests(OfflineTest):
         self.assertEqual(lexicon["version"], 1)
         lexicon["languages"]["synthetic"] = {"scripts": ["Cyrillic"], "exclude_lines": [],
                                              "directives": {"handoff": [text.strip()]}}
-        with patch("sumbi.install.conventions.load_lexicon", return_value=lexicon):
+        with patch("sumbi.install.inventory.conventions.load_lexicon", return_value=lexicon):
             report = inventory(root)
         self.assertEqual(report["conventions"]["handoff"]["status"], "present")
         self.assertEqual(report["conventions"]["review_gate"]["status"], "absent")

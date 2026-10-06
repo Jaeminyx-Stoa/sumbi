@@ -7,7 +7,6 @@ import json
 import os
 from pathlib import Path
 import stat
-import tempfile
 import re
 
 from sumbi.catalog import VERSION, load_judgment_policy
@@ -55,65 +54,8 @@ def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = Non
     created_dirs: set[Path] = set()
     backup_relative = None
     try:
-        # The public Plan object contains mutable lists. Rebuild from the trusted
-        # catalog so a modified or hand-crafted object cannot bypass additions.
-        fresh = build_plan(root, budget=plan.report["cost"]["budget"],
-                           select=[p["id"] for p in plan.practices], exclude=plan.exclude)
-        if fresh.changes != plan.changes or fresh.practices != plan.practices:
-            raise InstallError("Plan no longer matches the repository and bundled catalog.")
-        for change in plan.changes:
-            path = _checked(root, change.path, change.before)
-            originals[change.path] = change.before
-            modes[change.path] = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o644
-        ledger_path = ".sumbi/interventions.jsonl"
-        ledger = read_bytes(root, ledger_path)
-        path = _checked(root, ledger_path, ledger)
-        if ledger and not ledger.endswith(b"\n"):
-            raise InstallError("Intervention ledger lacks a final newline.")
-        if ledger:
-            try:
-                if any(not isinstance(json.loads(line), dict) for line in ledger.splitlines()):
-                    raise ValueError
-            except (ValueError, UnicodeError):
-                raise InstallError("Intervention ledger is not valid JSON lines.") from None
-        originals[ledger_path] = ledger
-        modes[ledger_path] = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
-        _protect_local_artifacts(root)
-        baseline_result = baseline(root, run=True, home=home, salt=salt)
-        now = datetime.now(timezone.utc)
-        utc = now.isoformat(timespec="microseconds").replace("+00:00", "Z")
-        backup_relative = ".sumbi/backups/" + now.strftime("%Y%m%dT%H%M%S.%fZ")
-        backup = safe_path(root, backup_relative)
-        backup.mkdir(parents=True, mode=0o700, exist_ok=False)
-        records = [{"practice_id": p["id"], "catalog_version": VERSION,
-                    **({"intervention_id": intervention_id} if intervention_id is not None else {}),
-                    "content_hash": p["content_hash"], "files": p["files"],
-                    "prediction": p["prediction"], "judgment": p["judgment"],
-                    "provenance": p["provenance"], "utc_time": utc,
-                    "baseline": baseline_result, "judgment_policy": load_judgment_policy()} for p in plan.practices]
-        # Register predictions in the recovery manifest before changing targets.
-        applied = {c.path: c.after for c in plan.changes}
-        manifest = {"version": 1, "status": "prepared", "records": records,
-                    "files": [{"path": name, "before_hash": digest(data), "mode": modes[name],
-                               "applied_hash": digest(applied.get(name)) if name in applied else None,
-                               "absent": data is None} for name, data in originals.items()]}
-        for name, data in originals.items():
-            destination = safe_path(root, backup_relative + "/files/" + name)
-            if data is not None:
-                destination.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
-                with destination.open("xb") as stream:
-                    stream.write(data)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                os.chmod(destination, 0o600)
-            # New files have no bytes to back up; the manifest records absence.
-        manifest_path = safe_path(root, backup_relative + "/manifest.json")
-        with manifest_path.open("x", encoding="utf-8") as stream:
-            json.dump(manifest, stream, indent=2)
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.chmod(manifest_path, 0o600)
+        ledger_path, ledger, baseline_result, backup_relative, records, manifest = _prepare_apply(
+            plan, originals, modes, home=home, salt=salt, intervention_id=intervention_id)
         updates = [(c.path, c.after) for c in plan.changes]
         updates.append((ledger_path, (ledger or b"") + b"".join(
             (json.dumps(record, sort_keys=True) + "\n").encode() for record in records)))
@@ -158,3 +100,71 @@ def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = Non
         raise InstallError("Apply failed; prior files were restored; backups remain if created.") from None
     finally:
         safe_path(root, ".sumbi/install.lock").unlink()
+
+
+def _prepare_apply(plan: Plan, originals: dict, modes: dict, *, home, salt, intervention_id):
+    root = plan.root
+    # The public Plan object contains mutable lists. Rebuild from the trusted
+    # catalog so a modified or hand-crafted object cannot bypass additions.
+    fresh = build_plan(root, budget=plan.report["cost"]["budget"],
+                       select=[p["id"] for p in plan.practices], exclude=plan.exclude)
+    if fresh.changes != plan.changes or fresh.practices != plan.practices:
+        raise InstallError("Plan no longer matches the repository and bundled catalog.")
+    for change in plan.changes:
+        path = _checked(root, change.path, change.before)
+        originals[change.path] = change.before
+        modes[change.path] = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o644
+    ledger_path = ".sumbi/interventions.jsonl"
+    ledger = read_bytes(root, ledger_path)
+    path = _checked(root, ledger_path, ledger)
+    if ledger and not ledger.endswith(b"\n"):
+        raise InstallError("Intervention ledger lacks a final newline.")
+    if ledger:
+        try:
+            if any(not isinstance(json.loads(line), dict) for line in ledger.splitlines()):
+                raise ValueError
+        except (ValueError, UnicodeError):
+            raise InstallError("Intervention ledger is not valid JSON lines.") from None
+    originals[ledger_path] = ledger
+    modes[ledger_path] = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
+    _protect_local_artifacts(root)
+    baseline_result = baseline(root, run=True, home=home, salt=salt)
+    now = datetime.now(timezone.utc)
+    utc = now.isoformat(timespec="microseconds").replace("+00:00", "Z")
+    backup_relative = ".sumbi/backups/" + now.strftime("%Y%m%dT%H%M%S.%fZ")
+    backup = safe_path(root, backup_relative)
+    backup.mkdir(parents=True, mode=0o700, exist_ok=False)
+    records = [{"practice_id": p["id"], "catalog_version": VERSION,
+                **({"intervention_id": intervention_id} if intervention_id is not None else {}),
+                "content_hash": p["content_hash"], "files": p["files"],
+                "prediction": p["prediction"], "judgment": p["judgment"],
+                "provenance": p["provenance"], "utc_time": utc,
+                "baseline": baseline_result, "judgment_policy": load_judgment_policy()} for p in plan.practices]
+    # Register predictions in the recovery manifest before changing targets.
+    applied = {c.path: c.after for c in plan.changes}
+    manifest = {"version": 1, "status": "prepared", "records": records,
+                "files": [{"path": name, "before_hash": digest(data), "mode": modes[name],
+                           "applied_hash": digest(applied.get(name)) if name in applied else None,
+                           "absent": data is None} for name, data in originals.items()]}
+    _save_backup(root, backup_relative, originals, manifest)
+    return ledger_path, ledger, baseline_result, backup_relative, records, manifest
+
+
+def _save_backup(root: Path, backup_relative: str, originals: dict, manifest: dict) -> None:
+    for name, data in originals.items():
+        destination = safe_path(root, backup_relative + "/files/" + name)
+        if data is not None:
+            destination.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+            with destination.open("xb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.chmod(destination, 0o600)
+        # New files have no bytes to back up; the manifest records absence.
+    manifest_path = safe_path(root, backup_relative + "/manifest.json")
+    with manifest_path.open("x", encoding="utf-8") as stream:
+        json.dump(manifest, stream, indent=2)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.chmod(manifest_path, 0o600)
