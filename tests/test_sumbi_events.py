@@ -6,7 +6,8 @@ from support import IsolatedTemporaryDirectory
 from types import SimpleNamespace
 import unittest
 
-from sumbi.events.adapters.sumbi_events import collect
+from sumbi.events.adapters import sumbi_events
+from sumbi.sessions.builder import collect as collect_sessions
 from sumbi.outcomes.github.deliver import linked_events
 from sumbi.outcomes.local_verify.workers import state, token_measurement
 from sumbi.measure.attribution import Attributor
@@ -43,7 +44,7 @@ class OpenEventAdapterTests(unittest.TestCase):
 
     def read(self):
         coverage = Coverage()
-        return collect(self.home, self.window, coverage, session_factory=Session), coverage
+        return collect_sessions(sumbi_events, self.home, self.window, coverage), coverage
 
     def worker(self):
         return [self.start(), self.event("file_edit", "edit", 1),

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sumbi.sessions.session import Session
+from sumbi.sessions.builder import collect as collect_sessions
 
 from pathlib import Path
 
@@ -65,7 +65,7 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
     reviews = []
     for agent in agents if agents is not None else DEFAULT_AGENTS:
         measured = Coverage()
-        found = ADAPTERS[agent].collect(home, window, measured, local_review=local_review, session_factory=Session)
+        found = collect_sessions(ADAPTERS[agent], home, window, measured, local_review=local_review)
         included = [s for s in found if s.in_window(window)]
         coverage[agent] = {**measured.as_dict(), "sessions_read": len(found), "sessions_in_window": len(included)}
         selected_count = 0
