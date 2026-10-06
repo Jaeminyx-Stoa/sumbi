@@ -11,6 +11,7 @@ import re
 
 from sumbi.catalog import VERSION, load_judgment_policy
 from .baseline import baseline
+from .blocks import added_blocks
 from .errors import InstallError
 from .files import _checked, _write, read_bytes, safe_path
 from .planner import Plan, build_plan, digest
@@ -136,15 +137,17 @@ def _prepare_apply(plan: Plan, originals: dict, modes: dict, *, home, salt, inte
     backup.mkdir(parents=True, mode=0o700, exist_ok=False)
     records = [{"practice_id": p["id"], "catalog_version": VERSION,
                 **({"intervention_id": intervention_id} if intervention_id is not None else {}),
-                "content_hash": p["content_hash"], "files": p["files"],
+                "content_hash": p["content_hash"], "language": p["language"], "files": p["files"],
                 "prediction": p["prediction"], "judgment": p["judgment"],
                 "provenance": p["provenance"], "utc_time": utc,
                 "baseline": baseline_result, "judgment_policy": load_judgment_policy()} for p in plan.practices]
     # Register predictions in the recovery manifest before changing targets.
     applied = {c.path: c.after for c in plan.changes}
+    blocks = {c.path: added_blocks(c.before, c.after) for c in plan.changes}
     manifest = {"version": 1, "status": "prepared", "records": records,
                 "files": [{"path": name, "before_hash": digest(data), "mode": modes[name],
                            "applied_hash": digest(applied.get(name)) if name in applied else None,
+                           **({"blocks": blocks[name]} if name in blocks else {}),
                            "absent": data is None} for name, data in originals.items()]}
     _save_backup(root, backup_relative, originals, manifest)
     return ledger_path, ledger, baseline_result, backup_relative, records, manifest

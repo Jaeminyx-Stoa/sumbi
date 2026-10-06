@@ -54,6 +54,13 @@ def prepare(root, case):
     setup = case["setup"]
     if setup.startswith("install:"):
         copy_text_tree(TESTS / "install/fixtures" / setup.split(":", 1)[1], repo)
+        if "install_config" in case:
+            save(repo / ".sumbi/config.toml", case["install_config"])
+        if "install_guidance" in case:
+            save(repo / "AGENTS.md", case["install_guidance"])
+        if "install_gitignore" in case:
+            repository(repo)
+            save(repo / ".gitignore", case["install_gitignore"])
     elif setup in ("deliver", "compare"):
         copy_text_tree(TESTS / "fixtures" / setup, fixture)
         home = fixture / "home"
@@ -252,6 +259,10 @@ def run_case(case):
                 backup = next((line.removeprefix("Backup ID: ") for line in streams["stdout.txt"].splitlines()
                                if line.startswith("Backup ID: ")), None)
                 if backup:
+                    if "revert_edit" in case:
+                        edit = case["revert_edit"]
+                        target = repo / edit["path"]
+                        target.write_bytes(target.read_bytes() + edit["append"].encode("utf-8"))
                     reverted = invoke(["install", "--root", str(repo), "--revert", backup])
                     if reverted["exit-code.txt"] != "0\n":
                         raise AssertionError("Revert failed: " + reverted["stderr.txt"])

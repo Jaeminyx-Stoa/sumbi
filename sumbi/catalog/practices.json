@@ -4,104 +4,314 @@
     {
       "id": "instruction-map",
       "title": "Keep the entry instructions short",
-      "gap_ids": ["missing-agents", "instruction-budget"],
-      "risk": "low",
-      "sources": ["lab"],
-      "files": [
-        {"path": "AGENTS.md", "mode": "managed-block", "text": "Keep this entry file brief. Open detailed guidance only when the task needs it. See [instruction maintenance](docs/sumbi/instructions.md)."},
-        {"path": "docs/sumbi/instructions.md", "mode": "managed-block", "text": "# Instruction maintenance\n\nKeep the entry file as a table of contents plus the rules that always apply. Put examples, background and specialized procedures in documents opened on demand.\n\nAn owner should review the token estimate, move optional detail, and confirm that approvals and review gates still reach every affected agent. sumbi only adds this guidance; it never trims existing instructions automatically."}
+      "gap_ids": [
+        "missing-agents",
+        "instruction-budget"
       ],
-      "prediction": {"metric": "input_tokens_per_success", "direction": "decrease", "rough_size_percent": 15, "condition": "Owner removes optional always-loaded detail without weakening gates."},
+      "risk": "low",
+      "sources": [
+        "lab"
+      ],
+      "files": [
+        {
+          "path": "AGENTS.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "Keep this entry file brief. Open detailed guidance only when the task needs it. See [instruction maintenance](docs/sumbi/instructions.md).",
+            "ko": "이 진입 파일은 짧게 유지한다. 자세한 지침은 작업에 필요할 때만 연다. [지침 관리](docs/sumbi/instructions.md)를 참고한다."
+          },
+          "text_without_links": {
+            "en": "Keep this entry file brief. Open detailed guidance only when the task needs it.",
+            "ko": "이 진입 파일은 짧게 유지한다. 자세한 지침은 작업에 필요할 때만 연다."
+          }
+        },
+        {
+          "path": "docs/sumbi/instructions.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "# Instruction maintenance\n\nKeep the entry file as a table of contents plus the rules that always apply. Put examples, background and specialized procedures in documents opened on demand.\n\nAn owner should review the token estimate, move optional detail, and confirm that approvals and review gates still reach every affected agent. sumbi only adds this guidance; it never trims existing instructions automatically.",
+            "ko": "# 지침 관리\n\n진입 파일에는 목차와 항상 적용할 규칙만 둔다. 예시, 배경 설명, 전문 절차는 필요할 때 여는 문서로 옮긴다.\n\n소유자는 토큰 추정치를 검토하고 선택적 내용을 옮긴 뒤, 승인과 검토 절차가 모든 관련 에이전트에 계속 전달되는지 확인한다. sumbi는 이 지침을 추가할 뿐, 기존 지침을 자동으로 줄이지 않는다."
+          }
+        }
+      ],
+      "prediction": {
+        "metric": "input_tokens_per_success",
+        "direction": "decrease",
+        "rough_size_percent": 15,
+        "condition": "Owner removes optional always-loaded detail without weakening gates."
+      },
       "judgment": "Compare input tokens and success for matched task cohorts after the owner completes the move; withhold while instruction size is unchanged."
     },
     {
       "id": "shared-instructions",
       "title": "Share the repository rules across agents",
-      "gap_ids": ["missing-shared-import"],
-      "risk": "low",
-      "sources": ["lab"],
-      "files": [
-        {"path": "CLAUDE.md", "mode": "managed-block", "text": "@AGENTS.md"}
+      "gap_ids": [
+        "missing-shared-import"
       ],
-      "prediction": {"metric": "instruction_divergence_followups_per_deliverable", "direction": "decrease", "rough_size_percent": 10, "condition": "Both agents read the shared instructions."},
+      "risk": "low",
+      "sources": [
+        "lab"
+      ],
+      "files": [
+        {
+          "path": "CLAUDE.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "@AGENTS.md",
+            "ko": "@AGENTS.md"
+          }
+        }
+      ],
+      "prediction": {
+        "metric": "instruction_divergence_followups_per_deliverable",
+        "direction": "decrease",
+        "rough_size_percent": 10,
+        "condition": "Both agents read the shared instructions."
+      },
       "judgment": "Count follow-up fixes attributed to conflicting guidance across matched multi-agent deliverables; preserve any stronger agent-specific rule."
     },
     {
       "id": "test-and-verify",
       "title": "Make test evidence part of completion",
-      "gap_ids": ["missing-test-command"],
-      "risk": "low",
-      "sources": ["superpowers"],
-      "files": [
-        {"path": "AGENTS.md", "mode": "managed-block", "text": "Before claiming completion, run the task's relevant checks and report their results. See [test evidence](docs/sumbi/testing.md)."},
-        {"path": "docs/sumbi/testing.md", "mode": "managed-block", "text": "# Test evidence\n\nOwner setup: record the repository's exact test command here, together with any required environment. Until then, the missing-command gap remains unresolved.\n\nFor a behavior change, first show a focused check that exposes the problem, then make it pass. Run the required checks for the final change. State the command, result and any untested boundary in the local handoff. Do not turn an intended check into a claim that it ran."}
+      "gap_ids": [
+        "missing-test-command"
       ],
-      "prediction": {"metric": "followup_fixes_per_deliverable", "direction": "decrease", "rough_size_percent": 15, "condition": "Owner documents a runnable test command and agents use it."},
+      "risk": "low",
+      "sources": [
+        "superpowers"
+      ],
+      "files": [
+        {
+          "path": "AGENTS.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "Before claiming completion, run the task's relevant checks and report their results. See [test evidence](docs/sumbi/testing.md).",
+            "ko": "완료를 보고하기 전에 작업에 맞는 검사를 실행하고 결과를 기록한다. [테스트 증거](docs/sumbi/testing.md)를 참고한다."
+          },
+          "text_without_links": {
+            "en": "Before claiming completion, run the task's relevant checks and report their results.",
+            "ko": "완료를 보고하기 전에 작업에 맞는 검사를 실행하고 결과를 기록한다."
+          }
+        },
+        {
+          "path": "docs/sumbi/testing.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "# Test evidence\n\nOwner setup: record the repository's exact test command here, together with any required environment. Until then, the missing-command gap remains unresolved.\n\nFor a behavior change, first show a focused check that exposes the problem, then make it pass. Run the required checks for the final change. State the command, result and any untested boundary in the local handoff. Do not turn an intended check into a claim that it ran.",
+            "ko": "# 테스트 증거\n\n소유자가 준비할 내용: 저장소의 정확한 테스트 명령과 필요한 환경을 여기에 기록한다. 그 전까지 테스트 명령 누락은 해결되지 않은 상태로 남는다.\n\n동작을 바꿀 때는 먼저 문제를 드러내는 집중 검사를 보여 준 뒤 통과시킨다. 최종 변경에 필요한 검사를 실행한다. 로컬 인계 문서에 명령, 결과, 확인하지 못한 범위를 명시한다. 실행할 예정인 검사를 이미 실행한 것처럼 보고하지 않는다."
+          }
+        }
+      ],
+      "prediction": {
+        "metric": "followup_fixes_per_deliverable",
+        "direction": "decrease",
+        "rough_size_percent": 15,
+        "condition": "Owner documents a runnable test command and agents use it."
+      },
       "judgment": "Use outside check results and follow-up fixes within identical windows; compare time and tokens including failing attempts."
     },
     {
       "id": "review-gates",
       "title": "Scale review to the risk of the change",
-      "gap_ids": ["missing-risk-review"],
-      "risk": "medium",
-      "sources": ["gstack", "lab", "superpowers"],
-      "files": [
-        {"path": "AGENTS.md", "mode": "managed-block", "text": "Risky paths need review before release. Preserve existing approvals and require independent review for security, permissions and money paths. See [review levels](docs/sumbi/review.md)."},
-        {"path": "docs/sumbi/review.md", "mode": "managed-block", "text": "# Review levels\n\n| Work size or risk | Evidence and review |\n| --- | --- |\n| Small wording or local configuration | Read the resulting change and check the affected behavior. |\n| Behavior across several components | Ask an independent engineering reviewer; include targeted test evidence. |\n| Security, permissions, money, or irreversible operations | Require owner approval and a reviewer from a different model family; include the applicable security and release checks. |\n\nThe owner must map risky repository paths to these roles. A role is a review responsibility, not a claim that a tool enforces it. Existing stronger gates remain in force. If review is unavailable, leave the risky action pending."}
+      "gap_ids": [
+        "missing-risk-review"
       ],
-      "prediction": {"metric": "risk_related_followups_per_deliverable", "direction": "decrease", "rough_size_percent": 15, "condition": "Owner assigns paths and reviewers; required gates are actually observed."},
+      "risk": "medium",
+      "sources": [
+        "gstack",
+        "lab",
+        "superpowers"
+      ],
+      "files": [
+        {
+          "path": "AGENTS.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "Risky paths need review before release. Preserve existing approvals and require independent review for security, permissions and money paths. See [review levels](docs/sumbi/review.md).",
+            "ko": "위험 경로는 릴리스 전에 리뷰를 받아야 한다. 기존 승인 절차를 유지하고 보안, 권한, 금전 경로에는 독립 리뷰를 요구한다. [리뷰 수준](docs/sumbi/review.md)을 참고한다."
+          },
+          "text_without_links": {
+            "en": "Risky paths need review before release. Preserve existing approvals and require independent review for security, permissions and money paths.",
+            "ko": "위험 경로는 릴리스 전에 리뷰를 받아야 한다. 기존 승인 절차를 유지하고 보안, 권한, 금전 경로에는 독립 리뷰를 요구한다."
+          }
+        },
+        {
+          "path": "docs/sumbi/review.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "# Review levels\n\n| Work size or risk | Evidence and review |\n| --- | --- |\n| Small wording or local configuration | Read the resulting change and check the affected behavior. |\n| Behavior across several components | Ask an independent engineering reviewer; include targeted test evidence. |\n| Security, permissions, money, or irreversible operations | Require owner approval and a reviewer from a different model family; include the applicable security and release checks. |\n\nThe owner must map risky repository paths to these roles. A role is a review responsibility, not a claim that a tool enforces it. Existing stronger gates remain in force. If review is unavailable, leave the risky action pending.",
+            "ko": "# 리뷰 수준\n\n| 작업 규모 또는 위험 | 증거와 리뷰 |\n| --- | --- |\n| 간단한 문구 또는 로컬 설정 | 최종 변경을 읽고 영향을 받는 동작을 확인한다. |\n| 여러 구성 요소에 걸친 동작 | 독립적인 엔지니어링 리뷰를 요청하고 관련 테스트 증거를 첨부한다. |\n| 보안, 권한, 금전 또는 되돌릴 수 없는 작업 | 소유자 승인과 다른 모델 계열의 리뷰를 요구하고 해당 보안 및 릴리스 검사 결과를 첨부한다. |\n\n소유자는 저장소의 위험 경로별로 이 역할을 지정해야 한다. 역할은 리뷰 책임을 뜻하며, 도구가 이를 강제한다는 의미는 아니다. 기존의 더 엄격한 절차는 계속 적용한다. 리뷰를 받을 수 없으면 위험 작업을 보류한다."
+          }
+        }
+      ],
+      "prediction": {
+        "metric": "risk_related_followups_per_deliverable",
+        "direction": "decrease",
+        "rough_size_percent": 15,
+        "condition": "Owner assigns paths and reviewers; required gates are actually observed."
+      },
       "judgment": "Audit review evidence and risk-related fixes by matched risk class; never accept a cost saving obtained by weakening a gate."
     },
     {
       "id": "plan-and-approval",
       "title": "Resolve the brief before a costly change",
-      "gap_ids": ["missing-plan-approval"],
-      "risk": "low",
-      "sources": ["gajae-code", "superpowers"],
-      "files": [
-        {"path": "AGENTS.md", "mode": "managed-block", "text": "For substantial changes, resolve missing requirements, write a plan with acceptance criteria, and critique it before implementation. Follow the existing approval policy. See [planning](docs/sumbi/planning.md)."},
-        {"path": "docs/sumbi/planning.md", "mode": "managed-block", "text": "# Planning\n\nAsk only for information that blocks a correct implementation. Record the deliverable, acceptance criteria, constraints and likely failure cases. Critique the plan against those criteria before making a substantial change. Keep small reversible edits proportionate.\n\nPrepare a concrete reviewable result before requesting a final approval. Existing approvals still govern destructive or external actions. Do not treat silence as approval, and do not ask again when the requested scope is already authorized."}
+      "gap_ids": [
+        "missing-plan-approval"
       ],
-      "prediction": {"metric": "rework_time_per_success", "direction": "decrease", "rough_size_percent": 10, "condition": "Planning resolves real uncertainty without adding repeated approvals."},
+      "risk": "low",
+      "sources": [
+        "gajae-code",
+        "superpowers"
+      ],
+      "files": [
+        {
+          "path": "AGENTS.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "For substantial changes, resolve missing requirements, write a plan with acceptance criteria, and critique it before implementation. Follow the existing approval policy. See [planning](docs/sumbi/planning.md).",
+            "ko": "큰 변경은 구현 전에 빠진 요구사항을 확인하고, 인수 기준이 담긴 계획을 작성한 뒤 비판적으로 검토한다. 기존 승인 정책을 따른다. [계획 수립](docs/sumbi/planning.md)을 참고한다."
+          },
+          "text_without_links": {
+            "en": "For substantial changes, resolve missing requirements, write a plan with acceptance criteria, and critique it before implementation. Follow the existing approval policy.",
+            "ko": "큰 변경은 구현 전에 빠진 요구사항을 확인하고, 인수 기준이 담긴 계획을 작성한 뒤 비판적으로 검토한다. 기존 승인 정책을 따른다."
+          }
+        },
+        {
+          "path": "docs/sumbi/planning.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "# Planning\n\nAsk only for information that blocks a correct implementation. Record the deliverable, acceptance criteria, constraints and likely failure cases. Critique the plan against those criteria before making a substantial change. Keep small reversible edits proportionate.\n\nPrepare a concrete reviewable result before requesting a final approval. Existing approvals still govern destructive or external actions. Do not treat silence as approval, and do not ask again when the requested scope is already authorized.",
+            "ko": "# 계획 수립\n\n올바르게 구현하는 데 꼭 필요한 정보만 질문한다. 결과물, 인수 기준, 제약, 예상 실패 사례를 기록한다. 큰 변경에 착수하기 전에 이 기준으로 계획을 비판적으로 검토한다. 작고 되돌릴 수 있는 수정에는 규모에 맞는 절차를 적용한다.\n\n최종 승인을 요청하기 전에 구체적으로 검토할 수 있는 결과물을 준비한다. 파괴적 작업이나 외부 작업에는 기존 승인 절차가 계속 적용된다. 침묵을 승인으로 간주하지 않으며, 요청 범위가 이미 승인되었다면 다시 묻지 않는다."
+          }
+        }
+      ],
+      "prediction": {
+        "metric": "rework_time_per_success",
+        "direction": "decrease",
+        "rough_size_percent": 10,
+        "condition": "Planning resolves real uncertainty without adding repeated approvals."
+      },
       "judgment": "Compare rework and total elapsed time for similarly sized tasks, including planning and owner waiting time."
     },
     {
       "id": "handoff",
       "title": "Leave a useful continuation record",
-      "gap_ids": ["missing-handoff"],
-      "risk": "low",
-      "sources": ["lab"],
-      "files": [
-        {"path": "AGENTS.md", "mode": "managed-block", "text": "Leave a handoff document when work changes hands: acceptance criteria, evidence, remaining work and the next action. See [handoffs](docs/sumbi/handoff.md)."},
-        {"path": "docs/sumbi/handoff.md", "mode": "managed-block", "text": "# Handoff convention\n\nKeep each live handoff in a local location approved by the repository owner. Do not commit session transcripts, secrets or machine paths.\n\nRecord the deliverable ID and acceptance criteria, current state, files changed, checks actually run, unresolved risks, and the next action. Separate observations from assumptions. A successor should be able to resume without repeating the investigation."}
+      "gap_ids": [
+        "missing-handoff"
       ],
-      "prediction": {"metric": "restart_time_per_success", "direction": "decrease", "rough_size_percent": 15, "condition": "A successor uses the handoff instead of repeating investigation."},
+      "risk": "low",
+      "sources": [
+        "lab"
+      ],
+      "files": [
+        {
+          "path": "AGENTS.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "Leave a handoff document when work changes hands: acceptance criteria, evidence, remaining work and the next action. See [handoffs](docs/sumbi/handoff.md).",
+            "ko": "작업을 넘길 때는 인수 기준, 증거, 남은 작업, 다음 행동을 담은 인계 문서를 남긴다. [인계](docs/sumbi/handoff.md)를 참고한다."
+          },
+          "text_without_links": {
+            "en": "Leave a handoff document when work changes hands: acceptance criteria, evidence, remaining work and the next action.",
+            "ko": "작업을 넘길 때는 인수 기준, 증거, 남은 작업, 다음 행동을 담은 인계 문서를 남긴다."
+          }
+        },
+        {
+          "path": "docs/sumbi/handoff.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "# Handoff convention\n\nKeep each live handoff in a local location approved by the repository owner. Do not commit session transcripts, secrets or machine paths.\n\nRecord the deliverable ID and acceptance criteria, current state, files changed, checks actually run, unresolved risks, and the next action. Separate observations from assumptions. A successor should be able to resume without repeating the investigation.",
+            "ko": "# 인계 규칙\n\n진행 중인 인계 문서는 저장소 소유자가 승인한 로컬 위치에 둔다. 세션 대화록, 비밀 정보, 기기 경로는 커밋하지 않는다.\n\n결과물 ID와 인수 기준, 현재 상태, 변경 파일, 실제 실행한 검사, 미해결 위험, 다음 행동을 기록한다. 관찰과 가정을 구분한다. 후임자가 조사를 반복하지 않고 작업을 이어 갈 수 있어야 한다."
+          }
+        }
+      ],
+      "prediction": {
+        "metric": "restart_time_per_success",
+        "direction": "decrease",
+        "rough_size_percent": 15,
+        "condition": "A successor uses the handoff instead of repeating investigation."
+      },
       "judgment": "Compare resumed deliverables with similar scope; include time spent writing and reading the handoff."
     },
     {
       "id": "friction-line",
       "title": "Record harness obstacles consistently",
-      "gap_ids": ["missing-friction-line"],
-      "risk": "low",
-      "sources": ["lab"],
-      "files": [
-        {"path": "AGENTS.md", "mode": "managed-block", "text": "End a work report with `Harness friction: none` or one short description of the harness obstacle. Keep sensitive details in local notes. See [friction feedback](docs/sumbi/friction.md)."},
-        {"path": "docs/sumbi/friction.md", "mode": "managed-block", "text": "# Friction feedback\n\nUse the final friction line to identify an instruction, tool or check that blocked or repeated work. Describe the failing layer and its consequence briefly; do not include prompts, transcripts, secrets or machine identifiers in shared output.\n\nReview repeated obstacles before adding more instructions. Prefer a reliable check or a simpler workflow when it addresses the cause. A report is evidence to investigate, not proof that the proposed fix saves cost."}
+      "gap_ids": [
+        "missing-friction-line"
       ],
-      "prediction": {"metric": "unclassified_harness_obstacles", "direction": "decrease", "rough_size_percent": 20, "condition": "Reports use the convention and an owner reviews recurring obstacles."},
+      "risk": "low",
+      "sources": [
+        "lab"
+      ],
+      "files": [
+        {
+          "path": "AGENTS.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "End a work report with `Harness friction: none` or one short description of the harness obstacle. Keep sensitive details in local notes. See [friction feedback](docs/sumbi/friction.md).",
+            "ko": "작업 보고서는 `Harness friction: none` 또는 하네스 때문에 막힌 점을 짧게 설명하는 한 줄로 끝낸다. 민감한 내용은 로컬 메모에 둔다. [마찰 피드백](docs/sumbi/friction.md)을 참고한다."
+          },
+          "text_without_links": {
+            "en": "End a work report with `Harness friction: none` or one short description of the harness obstacle. Keep sensitive details in local notes.",
+            "ko": "작업 보고서는 `Harness friction: none` 또는 하네스 때문에 막힌 점을 짧게 설명하는 한 줄로 끝낸다. 민감한 내용은 로컬 메모에 둔다."
+          }
+        },
+        {
+          "path": "docs/sumbi/friction.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "# Friction feedback\n\nUse the final friction line to identify an instruction, tool or check that blocked or repeated work. Describe the failing layer and its consequence briefly; do not include prompts, transcripts, secrets or machine identifiers in shared output.\n\nReview repeated obstacles before adding more instructions. Prefer a reliable check or a simpler workflow when it addresses the cause. A report is evidence to investigate, not proof that the proposed fix saves cost.",
+            "ko": "# 마찰 피드백\n\n보고서 마지막의 하네스 마찰 항목에는 작업을 막거나 반복하게 한 지침, 도구, 검사를 적는다. 어디에서 막혔고 어떤 영향을 받았는지 짧게 설명한다. 공유하는 출력에는 프롬프트, 대화록, 비밀 정보, 기기 식별자를 넣지 않는다.\n\n지침을 추가하기 전에 반복되는 하네스 마찰을 검토한다. 원인을 해결할 수 있다면 신뢰할 수 있는 검사나 더 단순한 작업 절차를 우선한다. 보고서는 조사의 근거로 삼되, 제안한 수정이 비용을 줄인다는 증명으로 간주하지 않는다."
+          }
+        }
+      ],
+      "prediction": {
+        "metric": "unclassified_harness_obstacles",
+        "direction": "decrease",
+        "rough_size_percent": 20,
+        "condition": "Reports use the convention and an owner reviews recurring obstacles."
+      },
       "judgment": "Compare obstacle classification coverage first, then matched success and cost after a separate corrective intervention."
     },
     {
       "id": "parallel-worktrees",
       "title": "Give parallel agents separate working copies",
-      "gap_ids": ["missing-worktree-rule"],
-      "risk": "low",
-      "sources": ["superpowers", "lab"],
-      "files": [
-        {"path": "AGENTS.md", "mode": "managed-block", "text": "Parallel agents use separate worktrees and explicit file ownership. Do not edit another agent's working copy. See [parallel work](docs/sumbi/parallel.md)."},
-        {"path": "docs/sumbi/parallel.md", "mode": "managed-block", "text": "# Parallel work\n\nAssign each parallel agent a separate branch and worktree, plus an explicit set of files it owns. Agree on shared interfaces before editing. Check the working copy and branch before making changes.\n\nIntegrate through reviewed changes. Preserve another agent's uncommitted work, and resolve overlaps with its owner. Never remove a worktree or branch merely because a task appears finished."}
+      "gap_ids": [
+        "missing-worktree-rule"
       ],
-      "prediction": {"metric": "conflict_recovery_time_per_success", "direction": "decrease", "rough_size_percent": 20, "condition": "Parallel work has non-overlapping ownership and reviewed integration."},
+      "risk": "low",
+      "sources": [
+        "superpowers",
+        "lab"
+      ],
+      "files": [
+        {
+          "path": "AGENTS.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "Parallel agents use separate worktrees and explicit file ownership. Do not edit another agent's working copy. See [parallel work](docs/sumbi/parallel.md).",
+            "ko": "병렬 에이전트는 별도 워크트리를 사용하고 파일 소유권을 명확히 정한다. 다른 에이전트의 작업 사본은 수정하지 않는다. [병렬 작업](docs/sumbi/parallel.md)을 참고한다."
+          },
+          "text_without_links": {
+            "en": "Parallel agents use separate worktrees and explicit file ownership. Do not edit another agent's working copy.",
+            "ko": "병렬 에이전트는 별도 워크트리를 사용하고 파일 소유권을 명확히 정한다. 다른 에이전트의 작업 사본은 수정하지 않는다."
+          }
+        },
+        {
+          "path": "docs/sumbi/parallel.md",
+          "mode": "managed-block",
+          "text": {
+            "en": "# Parallel work\n\nAssign each parallel agent a separate branch and worktree, plus an explicit set of files it owns. Agree on shared interfaces before editing. Check the working copy and branch before making changes.\n\nIntegrate through reviewed changes. Preserve another agent's uncommitted work, and resolve overlaps with its owner. Never remove a worktree or branch merely because a task appears finished.",
+            "ko": "# 병렬 작업\n\n병렬 에이전트마다 별도 브랜치와 워크트리, 담당 파일 목록을 지정한다. 수정 전에 공통 인터페이스에 합의한다. 변경하기 전에 작업 사본과 브랜치를 확인한다.\n\n리뷰를 거친 변경으로 통합한다. 다른 에이전트의 미커밋 작업을 보존하고 겹치는 부분은 소유자와 함께 해결한다. 작업이 끝난 것 같다는 이유만으로 워크트리나 브랜치를 삭제하지 않는다."
+          }
+        }
+      ],
+      "prediction": {
+        "metric": "conflict_recovery_time_per_success",
+        "direction": "decrease",
+        "rough_size_percent": 20,
+        "condition": "Parallel work has non-overlapping ownership and reviewed integration."
+      },
       "judgment": "Compare parallel deliverables of similar size; include integration and conflict recovery time, not just worker elapsed time."
     }
   ],
@@ -109,7 +319,12 @@
     "status": "Predictions are hypotheses, not measured savings.",
     "non_inferiority_margin": "Owner must pre-register before evaluation.",
     "sample_size": "Owner must pre-register before evaluation.",
-    "decision_order": ["coverage", "comparability", "success_non_inferiority", "time_and_tokens"],
+    "decision_order": [
+      "coverage",
+      "comparability",
+      "success_non_inferiority",
+      "time_and_tokens"
+    ],
     "comparison": "Matched cohorts, lifetime costs including retries, identical follow-up windows; withhold with incomplete attribution or changed model, effort, CLI or runner.",
     "adoption": "Adopt only when success is non-inferior, time and tokens do not worsen, and at least one improves by at least 10 percent with its ratio interval strictly below 1. Preserve approvals and cross-family review."
   }

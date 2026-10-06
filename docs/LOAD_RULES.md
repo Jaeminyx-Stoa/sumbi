@@ -110,6 +110,18 @@ and undetected conventions produce no gaps. Existing paths declared under
 warn without supplying presence. See the [install guide](../sumbi/install/README.md)
 for declaration keys and safeguards.
 
+Owners can instead declare a convention `"absent"` to resolve a topic-only
+mention or unknown language coverage into a missing-rule candidate. A detected
+directive remains `present` and produces `convention-declaration-conflict`.
+Practice text follows the dominant covered script of the searched guidance
+(Hangul selects Korean; a Latin/Hangul tie or no covered letters selects English),
+unless top-level `language = "en" | "ko"` overrides it in `.sumbi/config.toml`.
+Front matter and code do not vote. Metadata used for prediction and judgment
+does not change language. Ignored practice documents are omitted and entry
+blocks use the corresponding link-free rule text; this preserves placement
+without implying that a linked document will be available to another agent.
+An ignored `.sumbi/` is supported because its ledger and backups are local.
+
 The install API exposes `read_starts`, `observed_starts`, and
 `annotate_placement` for callers supplying normalized sessions or an explicit
 window. Plan construction remains offline and can be used without log reads.

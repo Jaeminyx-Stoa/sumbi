@@ -152,14 +152,24 @@ Seeds a sensible first harness in the current repository, starting from what is 
    path lists in `[conventions]` in `.sumbi/config.toml`. Existing paths establish
    `present` with `declared` evidence without reading their content. Missing
    paths warn and do not establish presence; unsafe paths are rejected.
+   The string `"absent"` confirms a missing convention even when its topic is
+   mentioned or coverage is unknown. A detected directive remains `present`
+   and produces a declaration-conflict warning.
 3. **Candidates.** Practices from the curated catalog (below) that address the detected gaps. Each practice states the files it adds or changes, its risk level, its expected effect, and how sumbi will judge it.
 4. **Plan, then apply.**
    - `--dry-run` (the default) prints the plan as diffs.
    - `--apply` writes it: new files or managed blocks only, never overwriting, with backups.
    - Every applied practice is recorded as an intervention (practice id, version, provenance, prediction) in `.sumbi/interventions.jsonl`.
-   - `--revert BACKUP_ID` restores only unchanged applied files using versioned
-     backup hashes, refuses modified files individually, and appends a revert
-     audit while preserving local backup protection.
+   - Practice text is English or Korean: a top-level config override wins,
+     otherwise the dominant covered script of searched guidance selects it
+     (Hangul selects Korean, with English as fallback). Hashes and the ledger
+     record the selected language; prediction and judgment metadata stay neutral.
+   - Ignored practice documents are omitted; entry blocks use equivalent
+     link-free text. An ignored `.sumbi/` is supported for local ledger and backups.
+   - `--revert BACKUP_ID` restores unchanged applied files using versioned backup
+     hashes. For edited existing files, it removes only unchanged added blocks
+     and their single added blank separator lines, refusing edited blocks. Modified
+     created files are preserved. The append-only audit records each block outcome.
 5. **Baseline.** If agent logs exist, `collect` runs over a recent window before anything is applied, so the next round has something to compare against.
 
 **Catalog (the default source).** Curated, vendored and versioned in this repository. Practices are distilled from harnesses with a track record and re-expressed in sumbi's own words, with the sources credited:

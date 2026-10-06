@@ -424,6 +424,7 @@
       "docs/extra.md",
       "src/AGENTS.md"
     ],
+    "practice_language": "en",
     "warnings": [
       {
         "kind": "root-not-versioned"
