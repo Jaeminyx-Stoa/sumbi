@@ -70,7 +70,8 @@ class InventoryTests(OfflineTest):
         self.assertEqual(report["cost"]["instructions"], {
             key: {"paths": [], "characters": 0, "estimated_tokens": 0, "root_estimated_tokens": 0}
             for key in ("codex", "claude", "gemini", "copilot", "cursor")})
-        self.assertEqual(report["warnings"], [])
+        expected = [{"kind": "root-not-versioned"}] if report["versioning"]["root_versioned"] is False else []
+        self.assertEqual(report["warnings"], expected)
         self.assert_gaps(report, BASE_GAPS | {"missing-agents"})
 
     def test_claude_only_truth(self):
@@ -135,7 +136,8 @@ class InventoryTests(OfflineTest):
                          {"codex": 120, "claude": 137, "gemini": 8, "copilot": 8, "cursor": 14})
         self.assertEqual({key: value["root_estimated_tokens"] for key, value in report["cost"]["instructions"].items()},
                          {"codex": 109, "claude": 137, "gemini": 8, "copilot": 8, "cursor": 14})
-        self.assertEqual(report["warnings"], [])
+        expected = [{"kind": "root-not-versioned"}] if report["versioning"]["root_versioned"] is False else []
+        self.assertEqual(report["warnings"], expected)
         self.assert_gaps(report, set())
 
     def test_export_has_no_source_contents(self):

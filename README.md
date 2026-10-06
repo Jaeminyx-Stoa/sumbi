@@ -4,17 +4,22 @@
 >
 > sumbi gives coding agents room to catch their breath.
 
-sumbi is a self-improving harness for coding agents. Seed a sensible harness in any repository, watch the friction and waste in how your agents work, and keep only the changes that verifiably raise the task success rate while cutting the time and tokens each success costs.
+sumbi helps you improve the harness around coding agents. Inspect and seed a
+repository's instructions, measure session costs and outcomes, and propose
+changes for review using pre-registered comparisons.
 
-**Status:** M1a and M1b provide offline harness installation and read-only local
+**Status:** alpha software. Offline harness installation and read-only local
 session measurement for Claude Code and Codex through one `sumbi` command.
 Install records a repository-scoped 14-day baseline before applying practices.
-M1d adds a deliverable ledger, recorded or read-only live GitHub pull-request
+A deliverable ledger joins recorded or read-only live GitHub pull-request
 outcomes, PR roles and token cost per success. Checks at merge use an explicit
 basis: historical requirements, current policy, or all visible results when no
-checks are required. Unreadable policy remains unknown. M2 adds `sumbi compare`:
+checks are required. Unreadable policy remains unknown. `sumbi compare` provides
 pre-registered dispatch cohorts, score intervals, deterministic cost bootstraps,
-confounder flags and verdict proposals. Propagation remains planned.
+confounder flags and verdict proposals. Native session adapters support Claude
+Code and Codex; pull-request outcome measurement supports GitHub. Automatic
+propagation and candidate discovery remain planned. No comparison applies a
+change automatically.
 Local verification additionally measures fixed dispatched-worker units using
 declared script exit evidence; its weaker acceptance and worker-only cost scope
 are explicit.
@@ -30,8 +35,9 @@ logs; the native adapter defaults remain unchanged.
 pip install git+https://github.com/Jaeminyx-Stoa/sumbi
 ```
 
-The repository is private for now. Installation needs GitHub repository access
-until it is public.
+Until the owner publishes the repository, installation requires repository
+access. Package-index installation is a separate release step; this quickstart
+uses the source repository.
 
 In the repository you want to seed:
 
@@ -50,36 +56,40 @@ sumbi deliver --outcome-source local-verify --repository . --verify scripts/chec
 
 Replace the example UTC bounds with your measurement window. Collection prints
 a summary and writes `out/collect.json`. Install keeps its baseline and backups
-local through `.sumbi/.gitignore`; `.sumbi/interventions.jsonl` remains committable.
+local through `.sumbi/.gitignore`. The intervention ledger is outside those
+ignores and contains relative target paths; review it before committing or
+sharing it.
 Use `--home DIR` on measurement subcommands to select a local agent-log home.
 Comparison windows, margin, sample size and follow-up days come from the
-[documented pre-registration schema](docs/MEASUREMENT.md#registration-json-schema).
+[documented pre-registration schema](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/docs/MEASUREMENT.md#registration-json-schema).
 Use `SUMBI_SALT` or `--salt-file FILE` for keyed pseudonyms before sharing reports;
 without either, output explicitly identifies keys as unsalted.
 For local verification, pre-register `outcome_source: local-verify` and use
-`sumbi compare --registration local-registration.json --repository .` with the
+`sumbi compare --registration local-registration.json --repository . --verify scripts/check.sh` with the
 same bare verification declaration. It measures worker costs, with dispatch
 overhead separate, and cannot certify human acceptance or later reverts. See
-[local verification limits](docs/MEASUREMENT.md#local-verification-fixed-worker-session-outcomes).
+[local verification limits](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/docs/MEASUREMENT.md#local-verification-fixed-worker-session-outcomes).
 
 `sumbi --help` lists the subcommands, `sumbi --version` prints the version, and
 `python -m sumbi` runs the same CLI from a checkout. See
-[measurement behavior and options](docs/MEASUREMENT.md) and
-[install behavior and safety](sumbi/install/README.md).
+[measurement behavior and options](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/docs/MEASUREMENT.md) and
+[install behavior and safety](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/sumbi/install/README.md).
 
-## What it will do
+## Implemented scope
 
 - **Install (`sumbi install`).**
   - Takes stock of the harness a repository already has (instructions, skills, hooks, CI gates) and finds the gaps.
-  - Applies proven practices from a curated catalog that distills Superpowers, gstack, gajae code and two in-house harness labs.
-  - Discovering new candidates on GitHub only produces proposals for review; nothing is installed from the internet.
-- **Measure (`sumbi collect`).** Read agent session logs (Claude Code and Codex first) and outcomes (CI runs, pull requests, reverts). It emits counts, durations, labels and IDs — never transcripts.
-- **Judge.**
-  - Count success per deliverable by outside signals.
+  - Applies additive practices from a curated catalog that distills Superpowers, gstack, gajae code and two in-house harness labs.
+  - Installation uses the bundled catalog and makes no network request.
+- **Measure (`sumbi collect`, `sumbi deliver`).** Read native Claude Code and Codex logs or opt-in agent-neutral events, plus GitHub pull-request outcomes. The open format supports local verification outcomes without assigning GitHub ownership. Reports contain counts, durations, labels and IDs; raw text is restricted to an explicitly requested local review file.
+- **Compare (`sumbi compare`).**
+  - Count success per dispatched deliverable using recorded outcome evidence.
   - Compare rounds on cost per success: time, and tokens split into new input, cache writes, cache reads and output.
   - Flag confounders, and decline to judge when the data is incomplete.
-- **Propagate.** Deliver short notices to every agent through standard hooks and `AGENTS.md`, scoped by repository.
-- **Seed a lab.** A starter kit for the harness lab itself, including a retro skill in the Agent Skills format.
+
+Propagation through hooks, a harness-lab starter kit, and discovery of new
+catalog candidates are roadmap work. Discovery is designed to create review
+proposals rather than install untrusted code.
 
 ## Principles
 
@@ -89,10 +99,12 @@ overhead separate, and cannot certify human acceptance or later reverts. See
 4. No verdict ever weakens an approval, a review or a safety gate.
 5. Change little at a time. Prefer devices (scripts, checks, ordering) over new rules, and keep always-loaded instructions short.
 
-The design is in [docs/DESIGN.md](docs/DESIGN.md).
+The design is in [docs/DESIGN.md](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/docs/DESIGN.md).
+Release gates and owner-controlled publication steps are in
+[the release guide](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/docs/RELEASE.md).
 
 ## License
 
-[MIT](LICENSE). The license does not cover the sumbi name or logo.
+[MIT](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/LICENSE). The license does not cover the sumbi name or logo.
 
 The install catalog distills practices from Superpowers, gstack and gajae code (all MIT); the catalog credits them.
