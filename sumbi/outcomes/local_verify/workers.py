@@ -1,6 +1,6 @@
 """Fixed worker-session units and local verification outcome measurements."""
 
-from sumbi.sessions.session import Session
+from sumbi.sessions.builder import collect as collect_sessions
 
 from collections import Counter
 from datetime import timedelta
@@ -112,7 +112,7 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
         arm_counts = {arm: Counter() for arm in verification_windows or {}}
         for agent in agents if agents is not None else DEFAULT_AGENTS:
             measured = Coverage()
-            sessions = ADAPTERS[agent].collect(home, scan, measured, session_factory=Session)
+            sessions = collect_sessions(ADAPTERS[agent], home, scan, measured)
             adapters[agent] = {**measured.as_dict(), "sessions_read": len(sessions)}
             for session in sessions:
                 if not session.start_at or not session.start_cwd:

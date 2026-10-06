@@ -98,6 +98,7 @@ class ToolInput:
 class ToolOutput:
     tool_call_id: str | None
     output: Value = None
+    text_blocks: bool = False
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,8 @@ class ToolEvidence:
     branch: Value = None
     at: datetime | None = None
     own_time: bool = False
+    apply: bool = True
+    include_empty_refs: bool = False
 
 
 @dataclass(frozen=True)
@@ -119,6 +122,9 @@ class TokenUsage:
     selection: Literal["delta", "maximal_output", "cumulative_including_cache"] = "delta"
     message_id: str | None = None
     evidence: ToolEvidence = ToolEvidence()
+    # Some native snapshots report total input including cache reads. Retain
+    # that observation to detect resets without changing new_input's v1 meaning.
+    input_total: int | None = None
 
 
 @dataclass(frozen=True)
@@ -136,6 +142,8 @@ class ToolEnd:
     suffix: str = ""
     at: datetime | None = None
     own_time: bool = False
+    count: bool = True
+    interval: bool = True
 
 
 @dataclass(frozen=True)
@@ -152,6 +160,9 @@ class CommandExecution:
     pairing: Literal["explicit", "launch", "interval"] = "explicit"
     command_supplied: bool = True
     suffix: str = ""
+    deferred: bool = False
+    require_pair: bool = False
+    infer_cwd: bool = False
 
 
 @dataclass(frozen=True)
@@ -164,6 +175,7 @@ class FileEdit:
 class Counter:
     kind: Literal["compactions", "api_errors", "user_input_requests"]
     identity: str | None = None
+    suffix: str = ""
 
 
 @dataclass(frozen=True)
@@ -193,7 +205,7 @@ class LocalText:
 
 @dataclass(frozen=True)
 class Diagnostic:
-    category: str
+    category: Value
     counter: Literal["unknown", "invalid_token_records"] = "unknown"
     evidence_gap: bool = False
     token_gap: bool = False

@@ -4,11 +4,8 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
-import hashlib
-import json
-from sumbi.core.records import Coverage
 from sumbi.core.time import Window
-from sumbi.core.values import TOKEN_KINDS, timestamp
+from sumbi.core.values import TOKEN_KINDS
 from sumbi.core.privacy import pseudonym
 from sumbi.events.tool_paths import resolve_path
 
@@ -86,19 +83,6 @@ class Session:
 
     def id(self):
         return pseudonym("session", self.agent + ":" + self.raw_id)
-
-    def accept(self, event: dict, coverage: Coverage) -> bool:
-        digest = hashlib.sha256(json.dumps(event, sort_keys=True, separators=(",", ":")).encode()).digest()
-        if digest in self.seen:
-            coverage.duplicate_events += 1
-            return False
-        self.seen.add(digest)
-        when = timestamp(event.get("timestamp"))
-        if when:
-            self.times.add(when)
-        elif "timestamp" in event:
-            coverage.invalid_timestamps += 1
-        return True
 
     def cwd(self, value: object, when: datetime | None):
         if isinstance(value, str) and value:

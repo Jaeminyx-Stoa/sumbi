@@ -1,6 +1,6 @@
 """Deliverable judgments, event links and token cost per success (offline)."""
 
-from sumbi.sessions.session import Session
+from sumbi.sessions.builder import collect as collect_sessions
 
 from collections import Counter
 from datetime import timedelta
@@ -247,7 +247,7 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
         coverage, links, project_spend = {}, {}, {}
         for agent in agents if agents is not None else DEFAULT_AGENTS:
             measured = Coverage()
-            found = ADAPTERS[agent].collect(home, scan, measured, collect_links=True, session_factory=Session)
+            found = collect_sessions(ADAPTERS[agent], home, scan, measured, collect_links=True)
             coverage[agent] = {**measured.as_dict(), "sessions_read": len(found),
                                "sessions_in_period": sum(s.in_window(window) for s in found),
                                "sessions_in_lifetime_scan": sum(s.in_window(scan) for s in found)}
