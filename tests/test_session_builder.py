@@ -273,6 +273,13 @@ class BuilderTests(unittest.TestCase):
             self.record(2, e.CommandExecution("1", exit_code=0, phase="end", pairing="launch", require_pair=True)))
         self.assertFalse(session.commands)
 
+    def test_invalid_open_cwd_and_null_are_both_unknown_for_conflict_comparison(self):
+        session, coverage = self.fold(self.open_record(1, e.Context("relative", cwd_valid=False),
+            e.Diagnostic("invalid_context_cwd", evidence_gap=True)),
+            self.open_record(2, e.Context(None), seconds=1))
+        self.assertEqual(coverage.unknown_record_types, {"invalid_context_cwd": 1})
+        self.assertEqual(session.cwd_events, [(START + timedelta(seconds=1), "relative")])
+
 
 if __name__ == "__main__":
     unittest.main()

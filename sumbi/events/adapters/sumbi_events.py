@@ -90,7 +90,8 @@ def _translate(event, when):
         cwd = event.get("cwd")
         if "cwd" in event and cwd is not None and local_cwd(cwd) is None:
             yield _gap("invalid_context_cwd")
-        yield Context(cwd if isinstance(cwd, str) else None, "cwd" in event, metadata=_metadata(event))
+        yield Context(cwd if isinstance(cwd, str) else None, "cwd" in event, metadata=_metadata(event),
+                      cwd_valid=cwd is None or local_cwd(cwd) is not None)
     elif kind == "token_usage":
         yield from _usage(event, when)
     elif kind in ("tool_start", "tool_end"):

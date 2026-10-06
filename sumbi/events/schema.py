@@ -73,6 +73,9 @@ class Context:
     metadata: Metadata = Metadata()
     attribution: bool = True
     execution_context: bool = False
+    # Preserve a translator's path-validation observation when comparing cwd
+    # conflicts, while retaining raw cwd history on the Session surface.
+    cwd_valid: bool | None = None
 
 
 @dataclass(frozen=True)

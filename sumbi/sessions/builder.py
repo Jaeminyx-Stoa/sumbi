@@ -106,7 +106,7 @@ def _context(state, event, when, order, window, coverage, links):
     if event.cwd_supplied and (event.execution_context or state.explicit):
         # Open cwd validation belongs to its translator. Normalize only the
         # conflict comparison; retain the original cwd on the Session surface.
-        cwd = execution_cwd(event.cwd) if state.explicit else event.cwd
+        cwd = (None if event.cwd_valid is False else execution_cwd(event.cwd)) if state.explicit else event.cwd
         state.contexts.append((when, cwd))
     _metadata(state, event.metadata, when, window, coverage)
 
