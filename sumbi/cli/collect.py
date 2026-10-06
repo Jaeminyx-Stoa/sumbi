@@ -1,3 +1,5 @@
+"""Run read-only collection and route public JSON, summaries, and optional private review."""
+
 from __future__ import annotations
 
 import json
@@ -15,7 +17,8 @@ def run(args, window, agents, rules):
     try:
         salt = read_salt(args.salt_file)
         report, review = collect(args.home, window, agents=agents, rules=rules,
-                                 idle_minutes=args.idle_minutes, local_review=bool(args.local_review), salt=salt)
+            idle_minutes=args.idle_minutes,
+            local_review=bool(args.local_review), salt=salt)
         data = json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
         if args.json == "-":
             print(data, end="")

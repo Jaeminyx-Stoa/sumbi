@@ -1,9 +1,5 @@
-"""Immutable sumbi-events v1 observations and optional native evidence.
-
-The eight public event types share their meaning with docs/EVENTS.md. Native
-logs can additionally report snapshots, request intervals and bounded counters.
-These are observations, not accounting or outcome decisions. Nothing here
-depends on Session, a measurement window, or a vendor record shape.
+"""Define immutable v1 observations and optional native snapshots, intervals, and counters.
+Record envelopes carry translation evidence without session accounting or outcome decisions.
 """
 
 from dataclasses import dataclass
@@ -61,7 +57,8 @@ class SessionStart:
     parent_session_id: str | None = None
     role: Literal["worker", "orchestrator"] = "orchestrator"
     agent: str | None = None
-    provenance: Literal["first-observed-cwd", "session-header", "sumbi-events-v1"] = "sumbi-events-v1"
+    provenance: Literal["first-observed-cwd", "session-header",
+        "sumbi-events-v1"] = "sumbi-events-v1"
     metadata: Metadata = Metadata()
 
 
@@ -231,8 +228,8 @@ class Diagnostic:
 
 
 Event: TypeAlias = (SessionStart | Context | TokenUsage | ToolStart | ToolEnd |
-                    CommandExecution | FileEdit | Counter | Request | SessionEnd |
-                    Resume | LocalText | Metadata | ToolEvidence | Diagnostic)
+    CommandExecution | FileEdit | Counter | Request | SessionEnd |
+    Resume | LocalText | Metadata | ToolEvidence | Diagnostic)
 
 
 @dataclass(frozen=True)

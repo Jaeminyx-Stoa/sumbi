@@ -10,7 +10,7 @@ from . import walk, versioning, instructions, imports, capabilities, enforcement
 
 
 def inventory(repository: Path | str = ".", budget: int = 2000, *,
-              exclude: list[str] | tuple[str, ...] = ()) -> dict:
+    exclude: list[str] | tuple[str, ...] = ()) -> dict:
     """Return only relative paths, counts, public labels and static diagnostics."""
     root = Path(repository).resolve()
     if not root.is_dir() or budget < 1:
@@ -25,7 +25,7 @@ def inventory(repository: Path | str = ".", budget: int = 2000, *,
     convention_sections = conventions.scan(context)
     # Keep conditional-rule reads after convention diagnostics, as before.
     context.conditional_rules = [p for p in context.instructions["claude_rules"]
-                                 if conditional_paths(context.content(p))]
+        if conditional_paths(context.content(p))]
     cost_section = cost.scan(context)
     return {
         "exclusions": exclusions,

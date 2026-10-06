@@ -12,8 +12,8 @@ MIX_DISTANCE = 0.20
 def fraction(numerator, denominator):
     """Accounting fractions are observed censuses, without sampling intervals."""
     return {"numerator": numerator, "denominator": denominator,
-            "value": numerator / denominator if denominator else None,
-            "interval_95": None, "interval_method": "not_applicable_census"}
+        "value": numerator / denominator if denominator else None,
+        "interval_95": None, "interval_method": "not_applicable_census"}
 
 
 def flag(name, blocking, evidence):
@@ -70,7 +70,8 @@ class OutcomeSource(Protocol):
     task_breakdowns: bool
     finalized_elapsed_only: bool
 
-    def measure(self, home, period, registration, windows, *, agents, salt) -> tuple[list[Unit], dict]: ...
+    def measure(self, home, period, registration, windows, *, agents, salt) -> tuple[list[Unit],
+        dict]: ...
     def source_gates(self, arms, *, candidates, report, stage) -> list[dict]: ...
     def coverage_reasons(self, arms, *, candidates, report, windows) -> list[str]: ...
     def public_fields(self, report, comparison) -> dict: ...

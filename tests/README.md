@@ -7,11 +7,20 @@ synthetic inputs and recorded GitHub responses; they never need network access.
 python -m unittest discover -s tests
 ```
 
+## Layout
+
+Tests mirror the package layers in `core/`, `events/`, `sessions/`, `measure/`,
+`outcomes/`, `judge/`, `cli/` and `install/`. CLI tests cover composed command
+flows; outcome tests cover the GitHub and local-verification sources. Shared
+synthetic inputs remain in `fixtures/`, and the CLI corpus remains in
+`characterization/`. Build, layer and style checks stay at the test root.
+Package markers let standard `unittest` discovery find every nested test.
+
 ## Normalized event seams
 
-`test_event_adapters.py` checks immutable translation observations without a
+`events/test_event_adapters.py` checks immutable translation observations without a
 measurement window, session factory, attribution, or outcome decisions.
-`test_session_builder.py` folds synthetic normalized events directly and pins
+`sessions/test_session_builder.py` folds synthetic normalized events directly and pins
 streaming snapshot selection, cumulative counter resets and corrections,
 deduplication, tool/request pairing, execution context, dispatch conflicts and
 metadata completeness. Existing native and open-format accounting and local

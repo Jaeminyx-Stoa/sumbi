@@ -13,7 +13,7 @@ def wilson(successes, total):
     center = (p + z2 / (2 * total)) / (1 + z2 / total)
     radius = z * math.sqrt(p * (1 - p) / total + z2 / (4 * total * total)) / (1 + z2 / total)
     return {"numerator": successes, "denominator": total, "rate": p,
-            "wilson_95": [max(0.0, center - radius), min(1.0, center + radius)]}
+        "wilson_95": [max(0.0, center - radius), min(1.0, center + radius)]}
 
 
 def estimate(rows, metric):
@@ -21,5 +21,5 @@ def estimate(rows, metric):
     values = [row["elapsed_seconds"] if metric == "time" else row["tokens"][metric] for row in rows]
     numerator = sum(values) if values and all(v is not None for v in values) else None
     return {"numerator": numerator, "denominator": successes,
-            "value": numerator / successes if numerator is not None and successes else None,
-            "interval_95": None, "interval_method": "percentile_bootstrap"}
+        "value": numerator / successes if numerator is not None and successes else None,
+        "interval_95": None, "interval_method": "percentile_bootstrap"}

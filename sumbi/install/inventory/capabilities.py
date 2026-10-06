@@ -24,7 +24,8 @@ def scan(context: InventoryContext) -> dict:
     capabilities = {}
     for key, prefix in areas.items():
         files = [p for p in paths if p.startswith(prefix)]
-        entries = [p for p in files if PurePosixPath(p).name == "SKILL.md"] if key.endswith("skills") else files
+        entries = [p for p in files
+            if PurePosixPath(p).name == "SKILL.md"] if key.endswith("skills") else files
         capabilities[key] = {**entry(entries), "file_count": len(files)}
     context.capabilities = capabilities
     context.skill_descriptions = skill_descriptions(context, areas)
@@ -36,7 +37,8 @@ def skill_descriptions(context: InventoryContext, areas: dict) -> list[dict]:
     paths, content = context.paths, context.content
     descriptions = []
     for path in paths:
-        if PurePosixPath(path).name != "SKILL.md" or not path.startswith(tuple(areas[k] for k in ("claude_skills", "agent_skills"))):
+        if PurePosixPath(path).name != "SKILL.md" or not path.startswith(tuple(areas[k]
+            for k in ("claude_skills", "agent_skills"))):
             continue
         text = content(path)
         metadata = SKILL_FRONT_MATTER.match(text)
@@ -50,17 +52,20 @@ def skill_descriptions(context: InventoryContext, areas: dict) -> list[dict]:
                     description = textwrap.dedent(body).strip()
                     if indicator.startswith(">"):
                         description = " ".join(description.splitlines())
-                elif len(description) >= 2 and description[0] == description[-1] and description[0] in "\"'":
+                elif (len(description) >= 2 and description[0] == description[-1]
+                    and description[0] in "\"'"):
                     description = description[1:-1]
         descriptions.append({"path": path, "characters": len(description),
-                             "estimated_tokens": estimate_tokens(description)})
+            "estimated_tokens": estimate_tokens(description)})
 
     return descriptions
 
 
 def configurations(context: InventoryContext) -> list[dict]:
     paths, structured = context.paths, context.structured
-    config_paths = [p for p in (".claude/settings.json", ".codex/config.toml", ".codex/hooks.json", ".mcp.json") if p in paths]
+    config_paths = [p
+        for p in (".claude/settings.json", ".codex/config.toml", ".codex/hooks.json",
+            ".mcp.json") if p in paths]
     configs, prompt_hooks = [], []
     for path in config_paths:
         data = structured(path, path.endswith(".toml"))
@@ -79,13 +84,14 @@ def configurations(context: InventoryContext) -> list[dict]:
                 if event.lower().replace("_", "").replace("-", "") == "userpromptsubmit":
                     prompt_hooks.append({"path": path, "event": "UserPromptSubmit", "count": count})
         permissions = data.get("permissions", {})
-        permission_count = sum(len(v) for v in permissions.values() if isinstance(v, list)) if isinstance(permissions, dict) else 0
+        permission_count = sum(len(v) for v in permissions.values()
+            if isinstance(v, list)) if isinstance(permissions, dict) else 0
         mcp = data.get("mcpServers", data.get("mcp_servers", {}))
         configs.append({"path": path, "hooks": hook_count,
-                        "permission_entries": permission_count,
-                        "mcp_servers": len(mcp) if isinstance(mcp, dict) else 0,
-                        "approval_policy_present": "approval_policy" in data,
-                        "sandbox_mode_present": "sandbox_mode" in data})
+            "permission_entries": permission_count,
+            "mcp_servers": len(mcp) if isinstance(mcp, dict) else 0,
+            "approval_policy_present": "approval_policy" in data,
+            "sandbox_mode_present": "sandbox_mode" in data})
 
     context.prompt_hooks = prompt_hooks
     return configs

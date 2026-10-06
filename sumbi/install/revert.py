@@ -34,7 +34,8 @@ def _manifest(root: Path, backup_id: str) -> list[dict]:
     data = read_bytes(root, base + "/manifest.json")
     try:
         manifest = json.loads(data, object_pairs_hook=_object)
-        if type(manifest["version"]) is not int or manifest["version"] != 1 or manifest["status"] != "applied":
+        if (type(manifest["version"]) is not int or manifest["version"] != 1
+            or manifest["status"] != "applied"):
             raise ValueError
         files = manifest["files"]
         if not isinstance(files, list) or not files:
@@ -52,7 +53,8 @@ def _manifest(root: Path, backup_id: str) -> list[dict]:
                 raise ValueError
             # Apply records S_IMODE, including supported POSIX special bits.
             # File-type bits and non-integer values remain invalid.
-            if type(entry["absent"]) is not bool or type(entry["mode"]) is not int or not 0 <= entry["mode"] <= 0o7777:
+            if type(entry["absent"]) is not bool or type(
+                entry["mode"]) is not int or not 0 <= entry["mode"] <= 0o7777:
                 raise ValueError
             before = entry["before_hash"]
             if entry["absent"]:
@@ -62,7 +64,8 @@ def _manifest(root: Path, backup_id: str) -> list[dict]:
                 raise ValueError
             if path == LEDGER:
                 continue  # Ledger history is never replaced by a backup.
-            if not isinstance(entry["applied_hash"], str) or not HASH.fullmatch(entry["applied_hash"]):
+            if not isinstance(entry["applied_hash"],
+                str) or not HASH.fullmatch(entry["applied_hash"]):
                 raise ValueError
             original = None if entry["absent"] else read_bytes(root, base + "/files/" + path)
             if digest(original) != before:
@@ -70,7 +73,8 @@ def _manifest(root: Path, backup_id: str) -> list[dict]:
             blocks = validate_blocks(entry.get("blocks", []))
             if blocks:
                 applied = (original or b"") + b"".join(
-                    block["separator"].encode("ascii") + block["bytes"].encode("utf-8") for block in blocks)
+                    block["separator"].encode("ascii") + block["bytes"].encode("utf-8")
+                    for block in blocks)
                 if digest(applied) != entry["applied_hash"]:
                     raise ValueError
             targets.append({**entry, "original": original, "blocks": blocks})
@@ -78,7 +82,8 @@ def _manifest(root: Path, backup_id: str) -> list[dict]:
             raise ValueError
         return targets
     except (TypeError, KeyError, ValueError, UnicodeError):
-        raise InstallError("Backup manifest is unsupported or invalid; no files reverted.") from None
+        raise InstallError(
+            "Backup manifest is unsupported or invalid; no files reverted.") from None
 
 
 def _history(root: Path) -> tuple[bytes, int, list[dict]]:
@@ -98,15 +103,18 @@ def _history(root: Path) -> tuple[bytes, int, list[dict]]:
 
 def _normalize(results: list[dict]) -> list[dict]:
     return [{**entry,
-             "status": "already-reverted" if entry["status"] in {"restored", "blocks-removed"} else entry["status"],
-             **({"blocks": [{**block, "status": "already-reverted"}
-                            if block["status"] == "removed" else block for block in entry["blocks"]]}
-                if "blocks" in entry else {})} for entry in results]
+        "status": "already-reverted" if entry["status"] in {"restored", "blocks-removed"}
+        else entry["status"],
+        **({"blocks": [{**block, "status": "already-reverted"}
+            if block["status"] == "removed" else block
+            for block in entry["blocks"]]}
+            if "blocks" in entry else {})} for entry in results]
 
 
 def _block_results(entry: dict, status: str, reason: str | None = None) -> dict:
     return {"blocks": [{"id": block["id"], "status": status,
-                        **({"reason": reason} if reason else {})} for block in entry["blocks"]]} if entry["blocks"] else {}
+        **({"reason": reason} if reason else {})}
+        for block in entry["blocks"]]} if entry["blocks"] else {}
 
 
 def _restore_entry(root: Path, entry: dict, finished: set[str], written: list) -> dict:
@@ -124,34 +132,37 @@ def _restore_entry(root: Path, entry: dict, finished: set[str], written: list) -
         return {"path": path, "status": "restored", **_block_results(entry, "removed")}
     if current is None or entry["absent"] or not entry["blocks"]:
         return {"path": path, "status": "refused", "reason": "content-changed",
-                **_block_results(entry, "refused", "content-changed")}
+            **_block_results(entry, "refused", "content-changed")}
     after, blocks = remove_blocks(current, entry["blocks"], finished)
     if after != current:
         _write(root, path, current, after, mode)
         written.append((path, current, after, mode))
     refused = any(block["status"] == "refused" for block in blocks)
     return {"path": path, "status": "refused" if refused else "blocks-removed", "blocks": blocks,
-            **({"reason": "block-content-changed"} if refused else {})}
+        **({"reason": "block-content-changed"} if refused else {})}
 
 
-def _restore_targets(root: Path, targets: list[dict], prior: list[dict], written: list) -> list[dict]:
-    files = [entry for record in prior for entry in record.get("files", []) if isinstance(entry, dict)]
+def _restore_targets(root: Path, targets: list[dict], prior: list[dict],
+    written: list) -> list[dict]:
+    files = [entry for record in prior for entry in record.get("files", [])
+        if isinstance(entry, dict)]
     finished = {entry["path"] for entry in files
-                if entry.get("status") in {"restored", "blocks-removed", "already-reverted"}}
+        if entry.get("status") in {"restored", "blocks-removed", "already-reverted"}}
     results = []
     for entry in targets:
         path = entry["path"]
         if path in finished:
-            results.append({"path": path, "status": "already-reverted", **_block_results(entry, "already-reverted")})
+            results.append({"path": path, "status": "already-reverted",
+                **_block_results(entry, "already-reverted")})
             continue
         blocks = {block["id"] for item in files if item.get("path") == path
-                  for block in item.get("blocks", []) if isinstance(block, dict)
-                  and block.get("status") in {"removed", "already-reverted"}}
+            for block in item.get("blocks", []) if isinstance(block, dict)
+            and block.get("status") in {"removed", "already-reverted"}}
         try:
             results.append(_restore_entry(root, entry, blocks, written))
         except (OSError, InstallError):
             results.append({"path": path, "status": "refused", "reason": "unsafe-or-unavailable",
-                            **_block_results(entry, "refused", "unsafe-or-unavailable")})
+                **_block_results(entry, "refused", "unsafe-or-unavailable")})
     return results
 
 
@@ -184,20 +195,23 @@ def revert_install(repository: Path | str, backup_id: str) -> dict:
     try:
         targets = _manifest(root, backup_id)
         ledger, mode, history = _history(root)
-        prior = [record for record in history if record.get("action") == "revert" and record.get("backup_id") == backup_id]
+        prior = [record for record in history if record.get("action") == "revert"
+            and record.get("backup_id") == backup_id]
         results = _restore_targets(root, targets, prior, written)
         if _normalize(results) != (_normalize(prior[-1].get("files", [])) if prior else None):
             record = {"action": "revert", "backup_id": backup_id, "files": results,
-                      "utc_time": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
-            _write(root, LEDGER, ledger, ledger + (json.dumps(record, sort_keys=True) + "\n").encode(), mode)
+                "utc_time": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")}
+            _write(root, LEDGER, ledger, ledger
+                + (json.dumps(record, sort_keys=True) + "\n").encode(), mode)
         return {"backup_id": backup_id, "files": results,
-                "refused": sum(entry["status"] == "refused" for entry in results)}
+            "refused": sum(entry["status"] == "refused" for entry in results)}
     except BaseException as error:
         failed = _rollback(root, written)
         if isinstance(error, (KeyboardInterrupt, SystemExit)):
             raise
         if failed:
-            raise InstallError("Revert failed; recovery needs owner attention in .sumbi/backups.") from None
+            raise InstallError(
+                "Revert failed; recovery needs owner attention in .sumbi/backups.") from None
         if isinstance(error, InstallError):
             raise
         raise InstallError("Revert failed; files restored to pre-revert bytes.") from None

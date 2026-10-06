@@ -44,9 +44,10 @@ class Attributor:
             directory = path if path.is_dir() else path.parent
             if directory.is_dir():
                 try:
-                    result = subprocess.run(["git", "-C", str(directory), "rev-parse", "--show-toplevel"],
-                                            capture_output=True, text=True, timeout=5,
-                                            env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+                    result = subprocess.run(["git", "-C", str(directory), "rev-parse",
+                        "--show-toplevel"],
+                        capture_output=True, text=True, timeout=5,
+                        env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
                     if result.returncode == 0 and result.stdout.strip():
                         root = normalize_path(result.stdout.strip())
                 except (OSError, subprocess.TimeoutExpired, UnicodeError):
@@ -60,7 +61,7 @@ class Attributor:
         link = self.link(path)
         root_link = self.link(root) if root != normalize_path(path) else link
         if root_link["bucket"] == "unassigned" or root_link["evidence"] in (
-                "git_origin_out_of_scope", "git_origin_candidate"):
+            "git_origin_out_of_scope", "git_origin_candidate"):
             return root_link
         if link["bucket"] != "project" and root_link["bucket"] == "project":
             link = root_link
@@ -74,14 +75,17 @@ class Attributor:
             return self.cache[normalized]
         origin, state = None, "path_only"
         try:
-            if not normalized.startswith("//") and (os.name == "nt" or not ntpath.splitdrive(cwd)[0]) and Path(cwd).is_dir():
+            if not normalized.startswith("//") and (os.name == "nt"
+                or not ntpath.splitdrive(cwd)[0]) and Path(cwd).is_dir():
                 options = dict(
                     capture_output=True, text=True, timeout=5,
                     env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"},
                 )
-                repo = subprocess.run(["git", "-C", cwd, "rev-parse", "--is-inside-work-tree"], **options)
+                repo = subprocess.run(["git", "-C", cwd, "rev-parse", "--is-inside-work-tree"],
+                    **options)
                 if repo.returncode == 0 and repo.stdout.strip() == "true":
-                    result = subprocess.run(["git", "-C", cwd, "config", "--get", "remote.origin.url"], **options)
+                    result = subprocess.run(["git", "-C", cwd, "config", "--get",
+                        "remote.origin.url"], **options)
                     if result.returncode == 0 and result.stdout.strip():
                         origin = normalize_origin(result.stdout)
                         state = "origin" if origin else "unsupported_origin"
@@ -95,38 +99,42 @@ class Attributor:
         path = normalize_path(cwd)
         matches = []
         evidence = "path_pattern"
-        if state in ("unsupported_origin", "origin_unavailable") and any(r.origins for r in self.rules):
+        if state in ("unsupported_origin", "origin_unavailable") and any(r.origins
+            for r in self.rules):
             return {"project_key": pseudonym("project", path), "rule": None,
-                    "evidence": state, "bucket": "unassigned"}
+                "evidence": state, "bucket": "unassigned"}
         if origin:
             matches = [r.name for r in self.rules if any(
                 fnmatch.fnmatchcase(origin, normalize_origin(p) or p) for p in r.origins)]
             evidence = "git_origin_candidate"
             if not matches and any(r.origins for r in self.rules):
                 return {"project_key": pseudonym("project", origin), "rule": None,
-                        "evidence": "git_origin_out_of_scope", "bucket": "other"}
+                    "evidence": "git_origin_out_of_scope", "bucket": "other"}
         if not matches:
             matches = [r.name for r in self.rules if any(
                 fnmatch.fnmatchcase(path, normalize_path(p)) for p in r.paths)]
             evidence = "path_pattern" if state == "path_only" else "path_pattern_" + state
         key = pseudonym("project", origin or path)
         if len(set(matches)) > 1:
-            return {"project_key": key, "rule": None, "evidence": "ambiguous_rules", "bucket": "unassigned"}
+            return {"project_key": key, "rule": None, "evidence": "ambiguous_rules",
+                "bucket": "unassigned"}
         if not self.rules:
-            return {"project_key": key, "rule": None, "evidence": "git_origin_candidate" if origin else "cwd_candidate",
-                    "bucket": "project"}
+            return {"project_key": key, "rule": None, "evidence": "git_origin_candidate"
+                if origin else "cwd_candidate",
+                "bucket": "project"}
         return {"project_key": key, "rule": matches[0] if matches else None,
-                "evidence": evidence if matches else "unmatched_path", "bucket": "project" if matches else "other"}
+            "evidence": evidence if matches else "unmatched_path", "bucket": "project"
+            if matches else "other"}
 
     def session_link(self, paths: set[str]) -> dict:
         links = [self.link(path) for path in sorted(paths)]
         if not links:
             return {"bucket": "unassigned", "project_key": None, "rule": None,
-                    "evidence": "missing_cwd", "links": []}
+                "evidence": "missing_cwd", "links": []}
         signatures = {(x["project_key"], x["rule"], x["bucket"]) for x in links}
         if len(signatures) > 1:
             return {"bucket": "unassigned", "project_key": None, "rule": None,
-                    "evidence": "multiple_projects", "links": links}
+                "evidence": "multiple_projects", "links": links}
         return {**links[0], "links": links}
 
 
@@ -152,4 +160,4 @@ class RepositoryAttributor(Attributor):
             matched, bucket, evidence = False, "unassigned", state
         identity = (self.repository_origin or self.path) if matched else (origin or path)
         return {"project_key": pseudonym("project", identity),
-                "rule": "repository" if matched else None, "evidence": evidence, "bucket": bucket}
+            "rule": "repository" if matched else None, "evidence": evidence, "bucket": bucket}

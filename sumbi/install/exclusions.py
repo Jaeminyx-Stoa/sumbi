@@ -14,7 +14,7 @@ DEFAULT_EXCLUDES = tuple(f"**/{name}" for name in (
     ".git", ".sumbi", "node_modules", "vendor", ".venv", "venv", "dist",
     "build", "__pycache__", ".tmp",
 )) + tuple(f"**/{tests}/**/{data}" for tests in ("test", "tests")
-          for data in ("fixtures", "testdata"))
+    for data in ("fixtures", "testdata"))
 
 
 def _validate(patterns: object) -> tuple[str, ...]:
@@ -51,7 +51,8 @@ def matches(relative: str, pattern: str) -> bool:
             return i == len(parts)
         if glob[j] == "**":
             return match(i, j + 1) or (i < len(parts) and match(i + 1, j))
-        return i < len(parts) and fnmatchcase(parts[i].casefold(), glob[j].casefold()) and match(i + 1, j + 1)
+        return i < len(parts) and fnmatchcase(parts[i].casefold(),
+            glob[j].casefold()) and match(i + 1, j + 1)
 
     return match(0, 0)
 
@@ -68,7 +69,7 @@ def local_git(root: Path, *arguments: str, data: bytes | None = None):
     try:
         return subprocess.run(
             ["git", "-C", str(root), "-c", "core.fsmonitor=false",
-             "-c", "core.untrackedCache=false", *arguments], input=data,
+                "-c", "core.untrackedCache=false", *arguments], input=data,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             env={**os.environ, "LC_ALL": "C"}, timeout=30, check=False,
         )
@@ -90,13 +91,14 @@ class GitIgnore:
         if result.returncode == 0 and result.stdout.strip() == b"true":
             self.versioned = True
             result = self._run("ls-files", "--others", "--ignored",
-                               "--exclude-standard", "--directory", "-z")
+                "--exclude-standard", "--directory", "-z")
             if result is not None and result.returncode == 0:
                 self.ignored = {os.fsdecode(p).rstrip("/")
-                                for p in result.stdout.split(b"\0") if p}
+                    for p in result.stdout.split(b"\0") if p}
             else:
                 self.available = False
-        elif (result.returncode == 0 and result.stdout.strip() == b"false") or b"not a git repository" in result.stderr:
+        elif (result.returncode == 0
+            and result.stdout.strip() == b"false") or b"not a git repository" in result.stderr:
             self.versioned = False
         else:
             self.available = False
@@ -119,7 +121,7 @@ class GitIgnore:
         if not self.available or not self.versioned:
             return False
         result = self._run("check-ignore", "--stdin", "-z",
-                           data=os.fsencode(relative) + b"\0")
+            data=os.fsencode(relative) + b"\0")
         if result is None or result.returncode not in (0, 1):
             self.available = False
             return False

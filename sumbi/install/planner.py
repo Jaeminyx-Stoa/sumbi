@@ -53,7 +53,7 @@ def managed_blocks(data: bytes) -> dict[str, str]:
 
 def block(identifier: str, text: str, newline: str = "\n") -> bytes:
     return (f"<!-- sumbi:begin {identifier} -->\n{text.rstrip()}\n"
-            f"<!-- sumbi:end {identifier} -->\n").replace("\n", newline).encode("utf-8")
+        f"<!-- sumbi:end {identifier} -->\n").replace("\n", newline).encode("utf-8")
 
 
 def digest(data: bytes | None) -> str | None:
@@ -71,8 +71,8 @@ class Change:
         old = (self.before or b"").decode("utf-8").replace("\r\n", "\n").splitlines(keepends=True)
         new = self.after.decode("utf-8").replace("\r\n", "\n").splitlines(keepends=True)
         return "".join(difflib.unified_diff(old, new,
-                       fromfile=f"a/{self.path}" if self.before is not None else "/dev/null",
-                       tofile=f"b/{self.path}", n=0))
+            fromfile=f"a/{self.path}" if self.before is not None else "/dev/null",
+            tofile=f"b/{self.path}", n=0))
 
 
 @dataclass(frozen=True)
@@ -87,10 +87,11 @@ class Plan:
 
     def as_dict(self) -> dict:
         return {"catalog_version": VERSION, "inventory": self.report,
-                "gaps": self.gaps, "practices": self.practices,
-                "changes": [{"path": c.path, "before_hash": digest(c.before),
-                             "after_hash": digest(c.after), "diff": c.diff()} for c in self.changes],
-                "notes": self.notes}
+            "gaps": self.gaps, "practices": self.practices,
+            "changes": [{"path": c.path, "before_hash": digest(c.before),
+                "after_hash": digest(c.after), "diff": c.diff()}
+                for c in self.changes],
+            "notes": self.notes}
 
 
 class _Targets:
@@ -108,7 +109,7 @@ class _Targets:
             return self.ignore_results[target]
         repositories = self.report["versioning"]["nested_repositories"]["paths"]
         scope = next((p for p in sorted(repositories, key=len, reverse=True)
-                      if target.startswith(p + "/")), "")
+            if target.startswith(p + "/")), "")
         if scope not in self.git_contexts:
             self.git_contexts[scope] = GitIgnore(self.root / scope)
         context = self.git_contexts[scope]
@@ -134,8 +135,8 @@ class _Targets:
 
 
 def build_plan(repository: Path | str = ".", *, budget: int = 2000,
-               select: list[str] | None = None,
-               exclude: list[str] | tuple[str, ...] = ()) -> Plan:
+    select: list[str] | None = None,
+    exclude: list[str] | tuple[str, ...] = ()) -> Plan:
     root = Path(repository).resolve()
     report = inventory(root, budget, exclude=exclude)
     targets = _Targets(root, report)
@@ -160,9 +161,11 @@ def build_plan(repository: Path | str = ".", *, budget: int = 2000,
         report["warnings"].append({"kind": "practice-docs-ignored", "practice_ids": ignored_docs})
     if targets.ignored(".sumbi/"):
         report["warnings"].append({"kind": "local-install-metadata",
-            "message": "The .sumbi/ interventions ledger and backups are local by design; ignored metadata is supported."})
-    changes = [Change(path, targets.before[path], data) for path, data in sorted(targets.after.items())
-               if data != (targets.before[path] or b"")]
+            "message": "The .sumbi/ interventions ledger and backups are local by design; "
+            "ignored metadata is supported."})
+    changes = [Change(path, targets.before[path], data) for path,
+        data in sorted(targets.after.items())
+        if data != (targets.before[path] or b"")]
     return Plan(root, report, gaps, proposals, changes, targets.notes, tuple(exclude))
 
 
@@ -170,18 +173,21 @@ def _plan_practice(practice: dict, targets: _Targets) -> tuple[dict | None, bool
     identifier, report = practice["id"], targets.report
     language = report["practice_language"]
     ignored_docs = {item["path"] for item in practice["files"]
-                    if item["path"].startswith("docs/sumbi/") and targets.ignored(item["path"])}
+        if item["path"].startswith("docs/sumbi/") and targets.ignored(item["path"])}
     unavailable_docs = ignored_docs | {item["path"] for item in practice["files"]
-                                       if item["path"].startswith("docs/sumbi/") and targets.excluded(item["path"])}
+        if item["path"].startswith("docs/sumbi/")
+        and targets.excluded(item["path"])}
     rendered = []
     for item in practice["files"]:
         relative = item["path"]
-        paths = report["instructions"]["claude"]["paths"] if identifier == "shared-instructions" else [relative]
+        paths = (report["instructions"]["claude"]["paths"]
+            if identifier == "shared-instructions" else [relative])
         for target in paths:
             if targets.excluded(target) or target in ignored_docs or targets.ignored(target):
                 targets.notes.append({"id": identifier, "status": "excluded-target-preserved"})
                 continue
-            texts = item["text_without_links"] if unavailable_docs and "text_without_links" in item else item["text"]
+            texts = (item["text_without_links"] if unavailable_docs
+                and "text_without_links" in item else item["text"])
             text = texts[language]
             if identifier == "shared-instructions":
                 text = _shared_text(target, targets)
@@ -194,14 +200,15 @@ def _plan_practice(practice: dict, targets: _Targets) -> tuple[dict | None, bool
     payload = {**practice, "language": language, "files": rendered}
     content_hash = digest(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode())
     return {"id": identifier, "risk": practice["risk"], "language": language,
-            "files": sorted({item["path"] for item in rendered}), "content_hash": content_hash,
-            "prediction": practice["prediction"], "judgment": practice["judgment"],
-            "provenance": practice["sources"]}, bool(ignored_docs)
+        "files": sorted({item["path"] for item in rendered}), "content_hash": content_hash,
+        "prediction": practice["prediction"], "judgment": practice["judgment"],
+        "provenance": practice["sources"]}, bool(ignored_docs)
 
 
 def _shared_text(target: str, targets: _Targets) -> str | None:
     report = targets.report
-    agent_paths = report["instructions"]["agents"]["paths"] + (["AGENTS.md"] if "AGENTS.md" in targets.after else [])
+    agent_paths = report["instructions"]["agents"]["paths"] + (["AGENTS.md"]
+        if "AGENTS.md" in targets.after else [])
     shared = shared_target(target, agent_paths)
     if shared not in agent_paths or targets.excluded(shared) or targets.ignored(shared):
         raise InstallError("Shared instructions require an existing or selected AGENTS.md.")
@@ -211,14 +218,16 @@ def _shared_text(target: str, targets: _Targets) -> str | None:
     return "@" + "../" * depth + "AGENTS.md"
 
 
-def _append_block(data: bytes, identifier: str, text: str, target: str, notes: list[dict]) -> bytes | None:
+def _append_block(data: bytes, identifier: str, text: str, target: str,
+    notes: list[dict]) -> bytes | None:
     existing = managed_blocks(data)
     if identifier in existing:
         if existing[identifier] != text.rstrip():
             notes.append({"id": identifier, "path": target, "status": "existing-block-preserved"})
         return None
     if data and not data.endswith(b"\n"):
-        raise InstallError("A managed target lacks a final newline; add it manually before planning.")
+        raise InstallError(
+            "A managed target lacks a final newline; add it manually before planning.")
     newline = "\r\n" if b"\r\n" in data else "\n"
     separator = newline.encode() if data and not data.endswith((newline * 2).encode()) else b""
     updated = data + separator + block(identifier, text, newline)

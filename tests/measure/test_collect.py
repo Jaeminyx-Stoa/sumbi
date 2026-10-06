@@ -22,7 +22,7 @@ from sumbi.core.privacy import pseudonym
 from sumbi.core.values import timestamp
 from sumbi.measure.report import collect, text_summary
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).parents[1] / "fixtures"
 WINDOW = Window(timestamp("2030-01-01T00:00:00Z"), timestamp("2030-01-01T00:10:00Z"))
 
 
@@ -593,8 +593,8 @@ class ContractTests(unittest.TestCase):
     def test_offline_core_has_no_project_rules_and_no_network_access(self):
         # All links depend on caller configuration; adapters expose no project defaults.
         self.assertEqual(Attributor([]).rules, [])
-        for path in (Path(__file__).parent.parent / "sumbi").rglob("*.py"):
-            if path.relative_to(Path(__file__).parent.parent).as_posix() == "sumbi/outcomes/github/live.py":
+        for path in (Path(__file__).parents[2] / "sumbi").rglob("*.py"):
+            if path.relative_to(Path(__file__).parents[2]).as_posix() == "sumbi/outcomes/github/live.py":
                 continue  # Only the explicitly selected live outcome adapter uses HTTP.
             source = path.read_text(encoding="utf-8")
             self.assertNotIn("import socket", source)

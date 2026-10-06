@@ -25,13 +25,15 @@ def scan(context: InventoryContext) -> dict:
         context_root = next(p for p in (base, *base.parents) if p in contexts)
         git_context = contexts[context_root]
         marker = base / ".git"
-        if base != root and (".git" in dirs or ".git" in files) and not marker.is_symlink() and not getattr(marker, "is_junction", lambda: False)():
+        if base != root and (".git" in dirs
+            or ".git" in files) and not marker.is_symlink() and not getattr(marker,
+                "is_junction", lambda: False)():
             candidate = GitIgnore(base)
             contexts[base] = candidate
             context_root, git_context = base, candidate
             if candidate.available:
                 ignored.update((base.relative_to(root) / p).as_posix()
-                               for p in candidate.ignored)
+                    for p in candidate.ignored)
             if candidate.versioned:
                 nested.append(base.relative_to(root).as_posix())
         kept = []

@@ -11,15 +11,15 @@ def newcombe(before_successes, before_n, after_successes, after_n):
     """Newcombe (1998), method 10, after minus before; no correction."""
     before, after = wilson(before_successes, before_n), wilson(after_successes, after_n)
     result = {"before": before, "after": after, "difference": None,
-              "interval_95": None, "interval_method": "newcombe_method_10"}
+        "interval_95": None, "interval_method": "newcombe_method_10"}
     if not before_n or not after_n:
         return result
     p, q = after["rate"], before["rate"]
     pl, pu = after["wilson_95"]
     ql, qu = before["wilson_95"]
     result.update(difference=p - q,
-                  interval_95=[p - q - math.hypot(p - pl, qu - q),
-                               p - q + math.hypot(pu - p, q - ql)])
+        interval_95=[p - q - math.hypot(p - pl, qu - q),
+            p - q + math.hypot(pu - p, q - ql)])
     return result
 
 
@@ -63,13 +63,15 @@ def bootstrap(before, after, metrics, *, seed=1729, resamples=5000):
     if type(seed) is not int or type(resamples) is not int or resamples < 100:
         raise ValueError("Bootstrap requires an integer seed and at least 100 resamples")
     arms = {"before": before, "after": after}
-    estimates = {arm: {metric: estimate(rows, metric) for metric in metrics} for arm, rows in arms.items()}
+    estimates = {arm: {metric: estimate(rows, metric) for metric in metrics} for arm,
+        rows in arms.items()}
     samples = {arm: {metric: [] for metric in metrics} for arm in arms}
     ratios = {metric: [] for metric in metrics}
     rng = random.Random(seed)
     for _ in range(resamples):
         draw = {arm: [rows[rng.randrange(len(rows))] for _ in rows] for arm, rows in arms.items()}
-        results = {arm: {metric: estimate(rows, metric)["value"] for metric in metrics} for arm, rows in draw.items()}
+        results = {arm: {metric: estimate(rows, metric)["value"] for metric in metrics} for arm,
+            rows in draw.items()}
         for metric in metrics:
             for arm in arms:
                 if results[arm][metric] is not None:
@@ -78,7 +80,8 @@ def bootstrap(before, after, metrics, *, seed=1729, resamples=5000):
             if b is not None and b > 0 and a is not None:
                 ratios[metric].append(a / b)
     def bounds(values):
-        return [percentile(values, 0.025), percentile(values, 0.975)] if len(values) == resamples else None
+        return [percentile(values, 0.025),
+            percentile(values, 0.975)] if len(values) == resamples else None
     comparison = {}
     for metric in metrics:
         for arm in arms:
@@ -89,7 +92,7 @@ def bootstrap(before, after, metrics, *, seed=1729, resamples=5000):
         value = a / b if b is not None and b > 0 and a is not None else None
         interval = bounds(ratios[metric])
         comparison[metric] = {"numerator": a, "denominator": b, "value": value,
-                              "interval_95": interval, "interval_method": "percentile_bootstrap",
-                              "defined_resamples": len(ratios[metric]),
-                              "classification": classify_ratio(value, interval)}
+            "interval_95": interval, "interval_method": "percentile_bootstrap",
+            "defined_resamples": len(ratios[metric]),
+            "classification": classify_ratio(value, interval)}
     return estimates, comparison

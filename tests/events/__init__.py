@@ -1,0 +1,1 @@
+"""Normalized event adapter tests."""

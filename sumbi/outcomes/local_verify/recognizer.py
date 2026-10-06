@@ -22,9 +22,9 @@ def declared_commands(repository: Path, commands=None):
         except (OSError, UnicodeError, tomllib.TOMLDecodeError):
             raise ValueError("Verification config must be valid readable TOML") from None
     if (not isinstance(commands, (list, tuple)) or not commands
-            or any(not isinstance(s, str) or not s or s.startswith(("/", "\\"))
-                   or re.match(r"^[A-Za-z]:", s) or ".." in s.replace("\\", "/").split("/")
-                   or any(c in s for c in "\r\n\x00") for s in commands)):
+        or any(not isinstance(s, str) or not s or s.startswith(("/", "\\"))
+            or re.match(r"^[A-Za-z]:", s) or ".." in s.replace("\\", "/").split("/")
+            or any(c in s for c in "\r\n\x00") for s in commands)):
         raise ValueError("Verification requires repository-relative script declarations")
     return tuple(sorted({normalize(s) for s in commands}))
 
@@ -100,7 +100,7 @@ def recognize(command, declared):
                 return "unmatched_shape" if mentions(value) else "other"
             program = basename(parts[0])
         if any(p and all(c in ";&|<>()" for c in p)
-               or any(c in p for c in "\n\r`$") for p in parts):
+            or any(c in p for c in "\n\r`$") for p in parts):
             return "unmatched_shape" if mentions(value) else "other"
         if program in READS:
             return "read"

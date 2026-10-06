@@ -17,7 +17,8 @@ FRONT_MATTER = re.compile(r"\A---\s*\n.*?\n---(?:\s*\n|$)", re.S)
 
 
 def load_lexicon() -> dict:
-    return json.loads((Path(__file__).parents[2] / "catalog" / "conventions.v1.json").read_text(encoding="utf-8"))
+    return json.loads(
+        (Path(__file__).parents[2] / "catalog" / "conventions.v1.json").read_text(encoding="utf-8"))
 
 
 def detect(root: Path, paths: list[str], content, warnings: list[dict]) -> tuple[dict, int, str]:
@@ -27,22 +28,24 @@ def detect(root: Path, paths: list[str], content, warnings: list[dict]) -> tuple
     counts = Counter()
     languages = lexicon["languages"].values()
     covered = {category for language in languages for category in language["scripts"]}
-    exclusions = [re.compile(pattern, re.I) for language in languages for pattern in language["exclude_lines"]]
+    exclusions = [re.compile(pattern, re.I) for language in languages
+        for pattern in language["exclude_lines"]]
     directives = {key: [re.compile(pattern, re.I) for language in languages
-                        for pattern in language["directives"].get(key, [])] for key in conventions}
+        for pattern in language["directives"].get(key, [])] for key in conventions}
     topics = {key: [re.compile(pattern, re.I) for language in languages
-                    for pattern in language.get("topics", {}).get(key, [])] for key in conventions}
+        for pattern in language.get("topics", {}).get(key, [])] for key in conventions}
     denials = {key: [re.compile(pattern, re.I) for language in languages
-                     for pattern in language.get("denials", {}).get(key, [])] for key in conventions}
+        for pattern in language.get("denials", {}).get(key, [])]
+        for key in conventions}
     for path in paths:
         guidance = FRONT_MATTER.sub("", content(path))
         guidance = _without_code(guidance, inline=False)
         counts.update(scripts(_without_code(guidance)))
         text = "\n".join(line for line in guidance.splitlines()
-                         if not any(pattern.search(line) for pattern in exclusions))
+            if not any(pattern.search(line) for pattern in exclusions))
         for key, patterns in directives.items():
             directive_text = "\n".join(line for line in text.splitlines()
-                                       if not any(pattern.search(line) for pattern in denials[key]))
+                if not any(pattern.search(line) for pattern in denials[key]))
             if any(pattern.search(directive_text) for pattern in patterns):
                 conventions[key]["evidence"].append({"path": path, "kind": "directive"})
             elif any(pattern.search(guidance) for pattern in topics[key]):
@@ -59,7 +62,8 @@ def detect(root: Path, paths: list[str], content, warnings: list[dict]) -> tuple
             convention["status"] = "absent"
         elif convention["evidence"]:
             convention["status"] = "unknown"
-    dominant = max(sorted(covered), key=lambda category: (counts[category], category == "Latin"), default=None)
+    dominant = max(sorted(covered),
+        key=lambda category: (counts[category], category == "Latin"), default=None)
     language = config.get("language", "ko" if dominant == "Hangul" and counts[dominant] else "en")
     return conventions, lexicon["version"], language
 
@@ -99,7 +103,8 @@ def _declarations(root: Path, declarations, conventions: dict, warnings: list) -
             if target.exists():
                 conventions[key]["evidence"].append({"path": path, "kind": "declared"})
             else:
-                warnings.append({"kind": "convention-declaration-missing", "convention": key, "path": path})
+                warnings.append({"kind": "convention-declaration-missing", "convention": key,
+                    "path": path})
 
 
 def scan(context: InventoryContext) -> dict:
@@ -110,6 +115,7 @@ def scan(context: InventoryContext) -> dict:
         | {item["path"] for item in imports if item["status"] == "resolved"}
         | {p for group in capabilities.values() for p in group["paths"]}
     )
-    conventions, lexicon_version, language = detect(context.root, convention_paths, context.content, context.warnings)
+    conventions, lexicon_version, language = detect(context.root, convention_paths,
+        context.content, context.warnings)
     return {"conventions": conventions, "convention_lexicon_version": lexicon_version,
-            "convention_search_paths": convention_paths, "practice_language": language}
+        "convention_search_paths": convention_paths, "practice_language": language}

@@ -35,7 +35,8 @@ class _IgnoreChecks:
             _key(relative) == _key(p) or _key(relative).startswith(_key(p) + "/")), key=len)
         for index, scope in enumerate(scopes):
             if scope not in self.contexts:
-                self.contexts[scope] = GitIgnore(self.root if scope == "." else safe_path(self.root, scope))
+                self.contexts[scope] = GitIgnore(self.root if scope == "."
+                    else safe_path(self.root, scope))
             context = self.contexts[scope]
             target = scopes[index + 1] if index + 1 < len(scopes) else relative
             local = target if scope == "." else target[len(scope):].lstrip("/") or "."
@@ -73,7 +74,7 @@ def read_starts(home: Path, *, now: datetime | None = None) -> tuple[list, Windo
 def _git_identity(directory: Path) -> tuple[Path, Path] | None:
     """Return worktree root/common directory from git, never a folder-name guess."""
     result = local_git(directory, "rev-parse", "--path-format=absolute",
-                       "--show-toplevel", "--git-common-dir")
+        "--show-toplevel", "--git-common-dir")
     if result is None or result.returncode:
         return None
     values = os.fsdecode(result.stdout).splitlines()
@@ -90,26 +91,29 @@ def observed_starts(root: Path, report: dict, sessions, window: Window | None = 
     repositories = report["versioning"]["nested_repositories"]["paths"]
     patterns = tuple(e["pattern"] for e in report["exclusions"]["patterns"])
     _count_starts(root, sessions, window, repositories, patterns,
-                  counts, coverage, roles, agent_roles, provenance)
+        counts, coverage, roles, agent_roles, provenance)
     paths = {}
     for (agent, path, kind, repository, role, evidence), count in sorted(counts.items()):
-        row = paths.setdefault((agent, path, kind, repository), {"agent": agent, "path": path, "kind": kind,
-            "repository": repository, "count": 0, "roles": {"top-level": 0, "worker": 0}, "start_evidence": {}})
+        row = paths.setdefault((agent, path, kind, repository),
+            {"agent": agent, "path": path, "kind": kind,
+                "repository": repository, "count": 0, "roles": {"top-level": 0, "worker": 0},
+                "start_evidence": {}})
         if kind == "same-repository-worktree":
             row["scope"] = kind
         row["count"] += count
         row["roles"][role] += count
         row["start_evidence"][evidence] = row["start_evidence"].get(evidence, 0) + count
     return {"status": "observed" if roles else "no-starts-found", "sessions": sum(roles.values()),
-            "placement_sessions": sum(counts.values()),
-            "start_evidence": dict(sorted(provenance.items())),
-            "roles": {role: roles[role] for role in ("top-level", "worker")},
-            "agents": [{"agent": agent, "roles": {role: agent_roles[agent, role]
-                for role in ("top-level", "worker")},
-                "placement_sessions": sum(row["count"] for row in paths.values() if row["agent"] == agent)}
-                for agent in sorted({agent for agent, _ in agent_roles})],
-            "paths": list(paths.values()),
-            "coverage": dict(sorted(coverage.items()))}
+        "placement_sessions": sum(counts.values()),
+        "start_evidence": dict(sorted(provenance.items())),
+        "roles": {role: roles[role] for role in ("top-level", "worker")},
+        "agents": [{"agent": agent, "roles": {role: agent_roles[agent, role]
+            for role in ("top-level", "worker")},
+            "placement_sessions": sum(row["count"] for row in paths.values()
+                if row["agent"] == agent)}
+            for agent in sorted({agent for agent, _ in agent_roles})],
+        "paths": list(paths.values()),
+        "coverage": dict(sorted(coverage.items()))}
 
 
 def _ancestors(cwd: str) -> list[str]:
@@ -143,7 +147,7 @@ def _entry(directory: str, rule: dict, root: Path, contents: dict) -> str:
 
 
 def _loaded(target: str, row: dict, rule: dict, report: dict, root: Path,
-            contents: dict[str, bytes]) -> bool | None:
+    contents: dict[str, bytes]) -> bool | None:
     ancestors = _ancestors(row["path"])
     scope = rule["scope"]
     if scope == "unknown":
@@ -156,7 +160,8 @@ def _loaded(target: str, row: dict, rule: dict, report: dict, root: Path,
         entries = [_entry(directory, rule, root, contents) for directory in dirs]
         return _key(target) in {_key(p) for p in entries}
     if scope == "ancestors":
-        entries = [_join(p, name) for p in ancestors for name in rule.get("launch_entries", [rule["entry"]])]
+        entries = [_join(p, name) for p in ancestors
+            for name in rule.get("launch_entries", [rule["entry"]])]
         if _key(target) in {_key(p) for p in entries}:
             return True
         if rule.get("imports") == "launch":
@@ -178,15 +183,18 @@ def _loaded(target: str, row: dict, rule: dict, report: dict, root: Path,
             prefix = _join(boundary, rule["rule_directory"]) + "/"
             data = _bytes(root, target, contents)
             frontmatter = data.decode("utf-8-sig").split("---", 2) if data else []
-            return _key(target).startswith(_key(prefix)) and target.endswith(rule["rule_suffix"]) and bool(
-                len(frontmatter) == 3 and not frontmatter[0].strip()
-                and rule["required_frontmatter"] in [line.strip() for line in frontmatter[1].splitlines()])
+            return _key(target).startswith(_key(prefix)) and target.endswith(
+                rule["rule_suffix"]) and bool(
+                    len(frontmatter) == 3 and not frontmatter[0].strip()
+                    and rule["required_frontmatter"] in [line.strip()
+                        for line in frontmatter[1].splitlines()])
         return _key(target) == _key(_join(boundary, rule["entry"]))
     return None
 
 
 def _recommendation(row: dict, rule: dict, report: dict, root: Path, contents: dict) -> str:
-    directory = _scope(row, report) if rule["scope"] in {"git-root-to-cwd", "repository"} else row["path"]
+    directory = _scope(row, report) if rule["scope"] in {"git-root-to-cwd",
+        "repository"} else row["path"]
     try:
         return _entry(directory, rule, root, contents)
     except InstallError:
@@ -194,7 +202,8 @@ def _recommendation(row: dict, rule: dict, report: dict, root: Path, contents: d
     return _join(directory, rule["entry"])
 
 
-def annotate_placement(plan, sessions, window: Window | None = None, coverage: dict | None = None) -> None:
+def annotate_placement(plan, sessions, window: Window | None = None,
+    coverage: dict | None = None) -> None:
     """Attach counts and warnings; never relocate or apply a target implicitly."""
     rules = load_rules()
     starts = observed_starts(plan.root, plan.report, sessions, window)
@@ -204,8 +213,10 @@ def annotate_placement(plan, sessions, window: Window | None = None, coverage: d
         starts["adapter_coverage"] = coverage
         for agent, measured in coverage.items():
             if measured.get("status") == "unavailable" or any(measured.get(k) for k in
-                    ("broken_lines", "unreadable_files", "invalid_timestamps", "unknown_record_types")):
-                plan.report["warnings"].append({"kind": "start-coverage-incomplete", "agent": agent})
+                ("broken_lines", "unreadable_files", "invalid_timestamps",
+                    "unknown_record_types")):
+                plan.report["warnings"].append({"kind": "start-coverage-incomplete",
+                    "agent": agent})
     plan.report["observed_starts"] = starts
     if any(starts["coverage"].get(k) for k in ("worker_start_unknown", "gitignore_unknown_cwd")):
         plan.report["warnings"].append({"kind": "start-coverage-incomplete"})
@@ -221,21 +232,25 @@ def annotate_placement(plan, sessions, window: Window | None = None, coverage: d
             added = change.after[len(change.before or b""):].decode("utf-8-sig")
             for line in _without_code(added).splitlines():
                 if line.startswith("@"):
-                    target = posixpath.normpath(posixpath.join(str(PurePosixPath(change.path).parent), line[1:]))
+                    target = posixpath.normpath(
+                        posixpath.join(str(PurePosixPath(change.path).parent), line[1:]))
                     if target in contents:
-                        report["claude_imports"].append({"source": change.path, "path": target, "status": "resolved"})
+                        report["claude_imports"].append({"source": change.path, "path": target,
+                            "status": "resolved"})
     report["claude_imports"] = [{**item, "source": _key(item["source"]),
-                                **({"path": _key(item["path"])} if "path" in item else {})}
-                               for item in report["claude_imports"]]
+        **({"path": _key(item["path"])} if "path" in item else {})}
+        for item in report["claude_imports"]]
     instruction_targets = [c.path for c in plan.changes if PurePosixPath(c.path).name in
-                           {"AGENTS.md", "AGENTS.override.md", "CLAUDE.md", "GEMINI.md", "copilot-instructions.md"}
-                           or "/.cursor/rules/" in "/" + c.path]
+        {"AGENTS.md", "AGENTS.override.md", "CLAUDE.md", "GEMINI.md",
+            "copilot-instructions.md"}
+        or "/.cursor/rules/" in "/" + c.path]
     for agent in sorted({r["agent"] for r in starts["paths"]}):
         rule = by_agent.get(agent)
         rows = [r for r in starts["paths"] if r["agent"] == agent]
         total = sum(r["count"] for r in rows)
         if rule is None or rule["support"] == "unverified":
-            plan.report["warnings"].append({"kind": "load-rules-unverified", "agent": agent, "starts": total})
+            plan.report["warnings"].append({"kind": "load-rules-unverified", "agent": agent,
+                "starts": total})
             continue
         for target in instruction_targets:
             states = []
@@ -252,19 +267,21 @@ def annotate_placement(plan, sessions, window: Window | None = None, coverage: d
                 for loaded, row in states:
                     if loaded is not False:
                         continue
-                    recommendations[_recommendation(row, rule, report, plan.root, contents)] += row["count"]
+                    recommendations[_recommendation(row, rule, report, plan.root,
+                        contents)] += row["count"]
                 plan.report["warnings"].append({"kind": "target-not-loaded", "agent": agent,
                     "target": target, "starts": total, "missed_starts": missed,
                     "unknown_starts": unknown, "support": rule["support"],
                     "recommended_paths": [{"path": p, "starts": n} for p, n in
-                                          sorted(recommendations.items(), key=lambda item: (-item[1], item[0]))]})
+                        sorted(recommendations.items(),
+                            key=lambda item: (-item[1], item[0]))]})
             elif unknown:
                 plan.report["warnings"].append({"kind": "target-load-unknown", "agent": agent,
                     "target": target, "starts": total, "unknown_starts": unknown})
 
 
 def _count_starts(root: Path, sessions, window, repositories, patterns,
-                  counts, coverage, roles, agent_roles, provenance) -> None:
+    counts, coverage, roles, agent_roles, provenance) -> None:
     base = normalize_path(str(root.resolve()))
     seen = set()
     ignored = _IgnoreChecks(root, repositories)
@@ -276,7 +293,8 @@ def _count_starts(root: Path, sessions, window, repositories, patterns,
             coverage["duplicate_sessions"] += 1
             continue
         seen.add(identity)
-        role = "worker" if session.parent_raw_id or getattr(session, "is_worker", False) else "top-level"
+        role = "worker" if session.parent_raw_id or getattr(session, "is_worker",
+            False) else "top-level"
         dated = [e for e in session.cwd_events if e[0] is not None]
         when = getattr(session, "start_at", None) or min((t for t, _ in dated), default=None)
         if window is not None and not window.contains(when):
@@ -292,7 +310,8 @@ def _count_starts(root: Path, sessions, window, repositories, patterns,
             if path not in identities:
                 identities[path] = _git_identity(Path(cwd)) if git_identity else None
             candidate = identities[path]
-            if candidate is None or candidate[1] != git_identity[1] or candidate[0] == git_identity[0]:
+            if (candidate is None or candidate[1] != git_identity[1]
+                or candidate[0] == git_identity[0]):
                 coverage["outside_workspace"] += 1
                 continue
             same_worktree = True
@@ -324,17 +343,19 @@ def _count_starts(root: Path, sessions, window, repositories, patterns,
         agent_roles[session.agent, role] += 1
         evidence = getattr(session, "start_evidence", None)
         if role == "worker" and (evidence not in {"session-header", "first-observed-cwd"}
-                or not getattr(session, "start_cwd", None)):
+            or not getattr(session, "start_cwd", None)):
             coverage["worker_start_unknown"] += 1
             continue
         evidence = evidence or "first-observed-cwd"
         provenance[evidence] += 1
-        scope = None if same_worktree else next((p for p in sorted(repositories, key=len, reverse=True)
-                      if path == normalize_path(str(root / p))
-                      or path.startswith(normalize_path(str(root / p)) + "/")), None)
+        scope = None if same_worktree else next((p
+            for p in sorted(repositories, key=len, reverse=True)
+            if path == normalize_path(str(root / p))
+            or path.startswith(normalize_path(str(root / p)) + "/")), None)
         if scope:
             relative = scope + relative[len(scope):]
-        kind = "same-repository-worktree" if same_worktree else "workspace-root" if relative == "." else "nested-repository" if scope else "subfolder"
+        kind = ("same-repository-worktree" if same_worktree else "workspace-root"
+            if relative == "." else "nested-repository" if scope else "subfolder")
         counts[session.agent, relative, kind, scope, role, evidence] += 1
 
 

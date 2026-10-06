@@ -1,0 +1,1 @@
+"""Declared machine outcome tests."""

@@ -11,8 +11,8 @@ class Window:
 
     def __post_init__(self):
         if (self.since.tzinfo is None or self.until.tzinfo is None
-                or self.since.utcoffset().total_seconds() != 0
-                or self.until.utcoffset().total_seconds() != 0 or self.since >= self.until):
+            or self.since.utcoffset().total_seconds() != 0
+            or self.until.utcoffset().total_seconds() != 0 or self.since >= self.until):
             raise ValueError("Window bounds must be UTC and since must precede until")
 
     def contains(self, when: datetime | None) -> bool:

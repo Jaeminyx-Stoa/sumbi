@@ -17,7 +17,7 @@ BASELINE_PATH = re.compile(r"\.sumbi/baseline/[0-9]{8}T[0-9]{6}\.[0-9]{6}Z\.json
 
 
 def record_baseline(*, repository: Path, home: Path | None = None,
-             salt: bytes | None = None, now: datetime | None = None) -> dict:
+    salt: bytes | None = None, now: datetime | None = None) -> dict:
     """Write a counts-only report for the previous 14 UTC days, before apply."""
     # Use the installer's checked, exclusive publication for repository metadata.
 
@@ -40,14 +40,14 @@ def record_baseline(*, repository: Path, home: Path | None = None,
     _write(repository, relative, None, data, 0o600)
     sessions = report["summary"]["sessions"]
     return {"status": "recorded" if sessions else "no sessions found", "file": relative,
-            "sessions": sessions}
+        "sessions": sessions}
 
 
 PENDING = "pending (collect not available)"
 
 
 def baseline(repository: Path, *, run: bool = False, home: Path | None = None,
-             salt: bytes | None = None) -> dict:
+    salt: bytes | None = None) -> dict:
     entry = record_baseline
     if not callable(entry):
         return {"status": PENDING}
@@ -65,9 +65,9 @@ def baseline(repository: Path, *, run: bool = False, home: Path | None = None,
     # Only recognized statuses and validated, relative artifact IDs cross into
     # committable intervention records; arbitrary collector text stays local.
     if (isinstance(result, dict) and isinstance(result.get("status"), str)
-            and result["status"] in {"recorded", "no sessions found"}
-            and isinstance(result.get("file"), str)
-            and BASELINE_PATH.fullmatch(result["file"])
-            and type(result.get("sessions")) is int and result["sessions"] >= 0):
+        and result["status"] in {"recorded", "no sessions found"}
+        and isinstance(result.get("file"), str)
+        and BASELINE_PATH.fullmatch(result["file"])
+        and type(result.get("sessions")) is int and result["sessions"] >= 0):
         return {key: result[key] for key in ("status", "file", "sessions")}
     return {"status": "recorded", "entry_point": "sumbi.collect.baseline"}

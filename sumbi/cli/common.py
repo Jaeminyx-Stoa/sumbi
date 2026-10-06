@@ -1,3 +1,5 @@
+"""Parse shared CLI values and project rules, and publish command output atomically."""
+
 from __future__ import annotations
 
 import argparse
@@ -26,7 +28,8 @@ class RuleAction(argparse.Action):
         else:
             if not rules:
                 parser.error("A matching pattern must follow --project")
-            getattr(rules[-1], "origins" if option_string == "--match-origin" else "paths").append(values)
+            getattr(rules[-1], "origins" if option_string == "--match-origin"
+                else "paths").append(values)
 
 
 def utc(value: str):
@@ -52,7 +55,7 @@ def atomic_write(path: Path, text: str, *, private: bool = False):
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n", dir=path.parent,
-                                         prefix=".sumbi-", delete=False) as stream:
+            prefix=".sumbi-", delete=False) as stream:
             temporary = Path(stream.name)
             stream.write(text)
         if private:
@@ -65,12 +68,16 @@ def atomic_write(path: Path, text: str, *, private: bool = False):
 
 def configure_outcome_source(command):
     command.add_argument("--outcome-source", choices=("github", "local-verify"),
-                         help="Local verification reports verifier_never_passed with exit-code counts; compare blocks before non-inferiority")
+        help="Local verification reports verifier_never_passed with "
+        "exit-code counts; compare blocks before non-inferiority")
     command.add_argument("--ledger", type=Path)
     command.add_argument("--outcomes", metavar="github|DIR")
-    command.add_argument("--repository", type=Path, help="Repository scope for local verification units")
-    command.add_argument("--verify", action="append", help="Repository-relative executed verification script")
-    command.add_argument("--scan-until", type=utc, help="Lifetime observation end for local verification")
+    command.add_argument("--repository", type=Path,
+        help="Repository scope for local verification units")
+    command.add_argument("--verify", action="append",
+        help="Repository-relative executed verification script")
+    command.add_argument("--scan-until", type=utc,
+        help="Lifetime observation end for local verification")
     command.add_argument("--active-minutes", type=idle, default=5.0)
 
 
@@ -83,9 +90,11 @@ def configure_collection(command, *, deliver=False, comparison=False):
     for option in ("--project", "--match-origin", "--match-path"):
         command.add_argument(option, action=RuleAction)
     command.add_argument("--idle-minutes", type=idle, default=5.0)
-    command.add_argument("--json", default="out/compare.json" if comparison else "out/deliver.json" if deliver else "out/collect.json", metavar="OUT")
+    command.add_argument("--json", default="out/compare.json" if comparison
+        else "out/deliver.json" if deliver else "out/collect.json", metavar="OUT")
     if not deliver:
         command.add_argument("--local-review", type=Path, metavar="OUT")
     else:
         command.set_defaults(local_review=None)
-    command.add_argument("--salt-file", type=Path, help="Local pseudonym key file (overrides SUMBI_SALT)")
+    command.add_argument("--salt-file", type=Path,
+        help="Local pseudonym key file (overrides SUMBI_SALT)")

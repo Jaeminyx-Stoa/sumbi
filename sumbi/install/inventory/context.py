@@ -37,7 +37,8 @@ class InventoryContext:
         if path not in self.texts:
             try:
                 raw = read_bytes(self.root, path)
-                self.texts[path] = (raw or b"").decode("utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
+                self.texts[path] = (raw or b"").decode("utf-8-sig").replace("\r\n",
+                    "\n").replace("\r", "\n")
             except (InstallError, UnicodeError, OSError):
                 self.warnings.append({"kind": "unreadable-or-oversized", "path": path})
                 self.texts[path] = ""

@@ -42,7 +42,8 @@ def scan(context: InventoryContext) -> list[dict]:
             if escaped or not relative:
                 imports.append({"source": source, "status": "external-not-read"})
                 continue
-            if excluded_by(relative, patterns) or any(p.as_posix() in ignored for p in (PurePosixPath(relative), *PurePosixPath(relative).parents)):
+            if excluded_by(relative, patterns) or any(p.as_posix() in ignored
+                for p in (PurePosixPath(relative), *PurePosixPath(relative).parents)):
                 imports.append({"source": source, "status": "excluded-not-read"})
                 continue
             status = "resolved" if relative in paths else "missing-or-link"

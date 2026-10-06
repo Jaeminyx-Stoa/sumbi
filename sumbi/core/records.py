@@ -24,7 +24,7 @@ class Coverage:
 
     def as_dict(self):
         return {name: (dict(sorted(value.items())) if isinstance(value, Counter) else value)
-                for name, value in vars(self).items()}
+            for name, value in vars(self).items()}
 
 
 def records(path: Path, coverage: Coverage, *, ignore_blank: bool = False):

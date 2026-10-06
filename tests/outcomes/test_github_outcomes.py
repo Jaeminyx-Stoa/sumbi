@@ -20,10 +20,10 @@ from sumbi.outcomes.github.deliver import deliverable_basis, judge
 from sumbi.outcomes.github.live import GitHubOutcomes, NoRedirect, PLAN_UNAVAILABLE, github_token
 from sumbi.outcomes.github.ledger import COLUMNS, Deliverable, read_ledger
 from sumbi.outcomes.github.recorded import FixtureOutcomes
-from test_deliver import START, WINDOW, REPO, time, pull
+from outcomes.test_deliver import START, WINDOW, REPO, time, pull
 
 END = datetime.fromisoformat(time(32).replace("Z", "+00:00"))
-FIXTURE = Path(__file__).parent / "fixtures/github/responses.json"
+FIXTURE = Path(__file__).parents[1] / "fixtures/github/responses.json"
 
 
 class GitHubTests(unittest.TestCase):

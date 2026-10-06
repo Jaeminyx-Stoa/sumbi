@@ -100,6 +100,7 @@ proposals rather than install untrusted code.
 5. Change little at a time. Prefer devices (scripts, checks, ordering) over new rules, and keep always-loaded instructions short.
 
 The design is in [docs/DESIGN.md](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/docs/DESIGN.md).
+The implementation layers and extension points are in [the architecture guide](docs/ARCHITECTURE.md).
 Release gates and owner-controlled publication steps are in
 [the release guide](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/docs/RELEASE.md).
 

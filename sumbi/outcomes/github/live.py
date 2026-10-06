@@ -42,12 +42,13 @@ def github_token():
     if executable:
         try:
             result = subprocess.run([executable, "auth", "token"], capture_output=True,
-                                    text=True, timeout=15, check=False)
+                text=True, timeout=15, check=False)
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout.strip()
         except (OSError, subprocess.SubprocessError, UnicodeError):
             pass
-    raise ValueError("GitHub authentication required: set GITHUB_TOKEN or GH_TOKEN, or sign in with gh")
+    raise ValueError(
+        "GitHub authentication required: set GITHUB_TOKEN or GH_TOKEN, or sign in with gh")
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -62,7 +63,7 @@ def _write(path, data):
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n",
-                                         dir=path.parent, delete=False, prefix=".sumbi-") as stream:
+            dir=path.parent, delete=False, prefix=".sumbi-") as stream:
             temporary = Path(stream.name)
             temporary.chmod(0o600)
             json.dump(data, stream, ensure_ascii=True, allow_nan=False)
@@ -82,13 +83,15 @@ class GitHubOutcomes(FixtureOutcomes):
     """
 
     def __init__(self, ledger, *, cache=None, record=None):
-        self.cache = outside_repository(cache if cache is not None else Path.home() / ".cache/sumbi/outcomes")
+        self.cache = outside_repository(cache if cache is not None
+            else Path.home() / ".cache/sumbi/outcomes")
         self.record = outside_repository(record) if record is not None else None
         if self.record and (self.record == self.cache or self.record.is_relative_to(self.cache)
-                            or self.cache.is_relative_to(self.record)):
+            or self.cache.is_relative_to(self.record)):
             raise ValueError("GitHub cache and record directories must not overlap")
         self._token = github_token()
-        self._secrets = {self._token, *[os.environ.get(k, "").strip() for k in ("GITHUB_TOKEN", "GH_TOKEN")]} - {""}
+        self._secrets = {self._token,
+            *[os.environ.get(k, "").strip() for k in ("GITHUB_TOKEN", "GH_TOKEN")]} - {""}
         if any(ord(c) < 32 or ord(c) > 126 for c in self._token):
             raise ValueError("GitHub credential has an invalid format")
         self._opener = urllib.request.build_opener(NoRedirect())
@@ -114,7 +117,8 @@ class GitHubOutcomes(FixtureOutcomes):
         if isinstance(value, str):
             for secret in sorted(self._secrets, key=len, reverse=True):
                 value = value.replace(secret, "[credential]")
-            return re.sub(r"\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)\b", "[credential]", value)
+            return re.sub(r"\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)\b",
+                "[credential]", value)
         if isinstance(value, list):
             return [self._redact(v) for v in value]
         if isinstance(value, dict):
@@ -127,7 +131,8 @@ class GitHubOutcomes(FixtureOutcomes):
         endpoint = path.split("?", 1)[0]
 
         def pull(pr):
-            fields = ("number", "state", "created_at", "closed_at", "merged_at", "merge_commit_sha", "title", "body")
+            fields = ("number", "state", "created_at", "closed_at", "merged_at",
+                "merge_commit_sha", "title", "body")
             result = {k: pr[k] for k in fields}
             result["head"] = {"sha": pr["head"]["sha"]}
             result["base"] = {"ref": pr["base"]["ref"]}
@@ -144,13 +149,15 @@ class GitHubOutcomes(FixtureOutcomes):
             return [{"type": "required_status_checks", "parameters": {"required_status_checks": [
                 {"context": c["context"], "integration_id": c.get("integration_id")}
                 for c in rule["parameters"]["required_status_checks"]]}}
-                if rule["type"] == "required_status_checks" else {"type": rule["type"]} for rule in raw]
+                if rule["type"] == "required_status_checks" else {"type": rule["type"]}
+                for rule in raw]
         if "/branches/" in endpoint:
             protection = raw.get("protection", {})
             checks = protection.get("required_status_checks", {})
             enabled = protection.get("enabled", raw["protected"])
             enforcement = checks["enforcement_level"] if checks else "off"
-            if type(raw["protected"]) is not bool or type(enabled) is not bool or enforcement not in ("off", "non_admins", "everyone"):
+            if type(raw["protected"]) is not bool or type(
+                enabled) is not bool or enforcement not in ("off", "non_admins", "everyone"):
                 raise ValueError("GitHub branch policy was malformed")
             return {"protected": raw["protected"], "protection": {
                 "enabled": enabled,
@@ -158,28 +165,17 @@ class GitHubOutcomes(FixtureOutcomes):
                     "enforcement_level": enforcement,
                     "contexts": checks.get("contexts", []),
                     "checks": [{"context": c["context"], "app_id": c.get("app_id")}
-                               for c in checks.get("checks", [])]}}}
+                        for c in checks.get("checks", [])]}}}
         if endpoint.endswith("/statuses"):
             # GitHub commit-status objects omit sha; the request supplies it.
             return [{k: s[k] for k in ("context", "updated_at", "state")} for s in raw]
         if endpoint.endswith("/commits"):
             return [{"sha": c["sha"], "commit": {"message": c["commit"]["message"],
-                    "committer": {"date": c["commit"]["committer"]["date"]}}} for c in raw]
+                "committer": {"date": c["commit"]["committer"]["date"]}}} for c in raw]
         raise ValueError("GitHub response endpoint is unsupported")
 
     def _get(self, path, *, missing=False, policy=False):
-        key = hashlib.sha256(path.encode("utf-8")).hexdigest()
-        destination = self.cache / (key + ".json")
-        payload = None
-        try:
-            if destination.stat().st_size <= MAX_BYTES:
-                cached = json.loads(destination.read_text(encoding="utf-8"))
-                age = time.time() - cached["fetched_at"]
-                if 0 <= age < CACHE_SECONDS:
-                    payload = cached
-                    self.cache_hits += 1
-        except (OSError, ValueError, KeyError, TypeError):
-            pass
+        key, destination, payload = self._cached_response(path)
         if payload is None:
             for retry in range(4):
                 captured_at = self._asof.timestamp()
@@ -197,10 +193,12 @@ class GitHubOutcomes(FixtureOutcomes):
                     filtered = self._redact(self._filter(path, raw))
                     for obj in filtered if isinstance(filtered, list) else [filtered]:
                         if isinstance(obj, dict):
-                            values = [obj.get("title"), obj.get("body"), obj.get("commit", {}).get("message")]
+                            values = [obj.get("title"), obj.get("body"),
+                                obj.get("commit", {}).get("message")]
                             if any(isinstance(v, str) and len(v) > MAX_TEXT for v in values):
                                 raise ValueError("GitHub response text exceeds the scan limit")
-                    payload = {"fetched_at": time.time(), "observed_at": captured_at, "response": filtered}
+                    payload = {"fetched_at": time.time(), "observed_at": captured_at,
+                        "response": filtered}
                     _write(destination, payload)
                     break
                 except urllib.error.HTTPError as exc:
@@ -216,7 +214,8 @@ class GitHubOutcomes(FixtureOutcomes):
                     if limited and retry < 3:
                         try:
                             delay = max(0, float(headers.get("Retry-After", 0)),
-                                        float(headers.get("X-RateLimit-Reset", 0)) - time.time()) + 1
+                                float(headers.get("X-RateLimit-Reset",
+                                    0)) - time.time()) + 1
                         except (ValueError, TypeError):
                             delay = 60 * (retry + 1)
                         if not 0 <= delay <= 3600:
@@ -231,21 +230,20 @@ class GitHubOutcomes(FixtureOutcomes):
                         # Match the exact plan message only on the rules endpoint.
                         try:
                             plan_unavailable = (code == 403 and "/rules/branches/" in path
-                                                and json.loads(error_body).get("message") == PLAN_UNAVAILABLE)
+                                and json.loads(error_body).get(
+                                    "message") == PLAN_UNAVAILABLE)
                         except (ValueError, AttributeError, UnicodeError):
                             plan_unavailable = False
                         payload = {"fetched_at": time.time(), "observed_at": captured_at,
-                                   "response": [] if plan_unavailable else None}
+                            "response": [] if plan_unavailable else None}
                         _write(destination, payload)
                         break
-                    raise ValueError("GitHub request failed (HTTP " + str(code) + "); check access or retry later") from None
+                    raise ValueError("GitHub request failed (HTTP " + str(code)
+                        + "); check access or retry later") from None
                 except (urllib.error.URLError, OSError, UnicodeError, json.JSONDecodeError,
-                        KeyError, TypeError, AttributeError):
+                    KeyError, TypeError, AttributeError):
                     raise ValueError("GitHub response was unavailable or malformed") from None
-        self._asof = min(self._asof, datetime.fromtimestamp(payload.get("observed_at", payload["fetched_at"]), timezone.utc))
-        if self.record:
-            _write(self.record / "responses" / (key + ".json"), payload)
-        return payload["response"]
+        return self._record_response(key, payload)
 
     def _pages(self, path, key=None):
         collected = []
@@ -266,9 +264,11 @@ class GitHubOutcomes(FixtureOutcomes):
         # Listing, rather than search, avoids search's indexing lag and 1000-result cap.
         pulls = []
         for page in range(1, 10001):
-            rows = self._get(prefix + "/pulls?state=all&sort=created&direction=desc&per_page=100&page=" + str(page))
+            rows = self._get(prefix
+                + "/pulls?state=all&sort=created&direction=desc&per_page=100&page=" + str(page))
             pulls.extend(p for p in rows if utc(p["created_at"], "GitHub PR timestamp") >= start)
-            if len(rows) < 100 or any(utc(p["created_at"], "GitHub PR timestamp") < start for p in rows):
+            if len(rows) < 100 or any(utc(p["created_at"], "GitHub PR timestamp") < start
+                for p in rows):
                 break
         else:
             raise ValueError("GitHub PR capture is incomplete")
@@ -301,9 +301,11 @@ class GitHubOutcomes(FixtureOutcomes):
         end = self._asof
         if start >= end:
             raise ValueError("GitHub observation must follow ledger dispatch")
-        raw = {"repository": repo, "coverage_start": start.isoformat(), "observed_at": end.isoformat(),
-               "pulls_complete": True, "commits_complete": True, "pulls": entries,
-               "commits": [c for c in commits.values() if start <= utc(c["commit"]["committer"]["date"], "GitHub commit timestamp") < end]}
+        raw = {"repository": repo, "coverage_start": start.isoformat(),
+            "observed_at": end.isoformat(),
+            "pulls_complete": True, "commits_complete": True, "pulls": entries,
+            "commits": [c for c in commits.values()
+                if start <= utc(c["commit"]["committer"]["date"], "GitHub commit timestamp") < end]}
         self._load(raw)
         self._recordings[repo] = raw
         self._record_repo(repo)
@@ -317,17 +319,19 @@ class GitHubOutcomes(FixtureOutcomes):
             try:
                 results = self._merge_results(pr)
                 value = self._policy_checks({"required": [], "results": results}, pr.merged_at,
-                                            (pr.head_sha, pr.merge_sha))[0]
+                    (pr.head_sha, pr.merge_sha))[0]
                 if entry["checks_at_merge"] is None:
                     evidence = {"required": self._policy(identity), "results": results}
                     entry["current_policy_evidence"] = evidence
-                    checks, basis, reason = self._policy_checks(evidence, pr.merged_at, (pr.head_sha, pr.merge_sha))
+                    checks, basis, reason = self._policy_checks(evidence, pr.merged_at,
+                        (pr.head_sha, pr.merge_sha))
                 else:
                     checks, basis, reason = pr.checks, pr.checks_basis, pr.checks_reason
             except (KeyError, TypeError, AttributeError):
                 raise ValueError("GitHub check response was malformed") from None
             entry["observed_checks_at_merge"] = value
-            pr = replace(pr, observed_checks=value, checks=checks, checks_basis=basis, checks_reason=reason)
+            pr = replace(pr, observed_checks=value, checks=checks, checks_basis=basis,
+                checks_reason=reason)
             self.pulls[identity] = pr
             self._record_repo(identity.rsplit("#", 1)[0])
         return pr
@@ -347,7 +351,8 @@ class GitHubOutcomes(FixtureOutcomes):
         classic = self._get(prefix + "/branches/" + branch, policy=True)
         rules = []
         for page in range(1, 10001):
-            rows = self._get(prefix + "/rules/branches/" + branch + "?per_page=100&page=" + str(page), policy=True)
+            rows = self._get(prefix + "/rules/branches/" + branch + "?per_page=100&page="
+                + str(page), policy=True)
             if rows is None:
                 rules = None
                 break
@@ -363,7 +368,7 @@ class GitHubOutcomes(FixtureOutcomes):
 
         def add(context, app_id=None):
             if (not isinstance(context, str) or not context or (app_id is not None
-                    and (type(app_id) is not int or app_id <= 0))):
+                and (type(app_id) is not int or app_id <= 0))):
                 raise ValueError("GitHub required check was malformed")
             required.add((context, app_id))
 
@@ -381,7 +386,8 @@ class GitHubOutcomes(FixtureOutcomes):
             if rule["type"] == "required_status_checks":
                 for c in rule["parameters"]["required_status_checks"]:
                     add(c["context"], c["integration_id"])
-        value = [{"context": n, "app_id": app} for n, app in sorted(required, key=lambda r: (r[0], r[1] or 0))]
+        value = [{"context": n, "app_id": app} for n,
+            app in sorted(required, key=lambda r: (r[0], r[1] or 0))]
         self._policies[key] = value
         return value
 
@@ -400,18 +406,42 @@ class GitHubOutcomes(FixtureOutcomes):
                 if utc(c["started_at"], "GitHub check timestamp") > pr.merged_at:
                     continue
                 c = dict(c)
-                if not c["completed_at"] or utc(c["completed_at"], "GitHub check timestamp") > pr.merged_at:
+                if not c["completed_at"] or utc(c["completed_at"],
+                    "GitHub check timestamp") > pr.merged_at:
                     # A later completion cannot prove its earlier conclusion.
                     c.update(status="in_progress", conclusion=None, completed_at=None)
                 runs.append(c)
             states = [{**s, "sha": sha} for s in statuses
-                      if utc(s["updated_at"], "GitHub status timestamp") <= pr.merged_at]
+                if utc(s["updated_at"], "GitHub status timestamp") <= pr.merged_at]
             names = sorted({c["name"] for c in runs} | {s["context"] for s in states})
             if names:
                 return {"head_sha": sha, "captured_at": pr.merged_at.isoformat(),
-                        "required": [], "check_runs": runs, "statuses": states}
+                    "required": [], "check_runs": runs, "statuses": states}
         return None
 
     def _record_repo(self, repo):
         if self.record:
-            _write(self.record / (hashlib.sha256(repo.encode()).hexdigest() + ".json"), self._recordings[repo])
+            _write(self.record / (hashlib.sha256(repo.encode()).hexdigest() + ".json"),
+                self._recordings[repo])
+
+    def _record_response(self, key, payload):
+        self._asof = min(self._asof,
+            datetime.fromtimestamp(payload.get("observed_at", payload["fetched_at"]), timezone.utc))
+        if self.record:
+            _write(self.record / "responses" / (key + ".json"), payload)
+        return payload["response"]
+
+    def _cached_response(self, path):
+        key = hashlib.sha256(path.encode("utf-8")).hexdigest()
+        destination = self.cache / (key + ".json")
+        payload = None
+        try:
+            if destination.stat().st_size <= MAX_BYTES:
+                cached = json.loads(destination.read_text(encoding="utf-8"))
+                age = time.time() - cached["fetched_at"]
+                if 0 <= age < CACHE_SECONDS:
+                    payload = cached
+                    self.cache_hits += 1
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        return key, destination, payload

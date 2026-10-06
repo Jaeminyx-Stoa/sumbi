@@ -21,7 +21,7 @@ from sumbi.core.values import timestamp
 from sumbi.outcomes.github.recorded import FixtureOutcomes
 from sumbi.measure.report import collect, text_summary as collect_summary
 
-FIXTURES = Path(__file__).parent / "fixtures/open_events"
+FIXTURES = Path(__file__).parents[1] / "fixtures/open_events"
 SCRIPT = "scripts/check.sh"
 SALT = b"synthetic-flow-key"
 

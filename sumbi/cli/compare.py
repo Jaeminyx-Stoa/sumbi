@@ -17,7 +17,9 @@ def configure_parser(command):
     command.add_argument("--record", type=Path, metavar="DIR")
     command.add_argument("--registration", type=Path, required=True)
     command.add_argument("--interventions", type=Path, metavar="FILE",
-                         help="Optional install intervention JSONL; exclude and count actual apply-time exposure gaps")
-    command.add_argument("--intervention-id", help="Apply record ID (defaults to registration ID; must match it)")
+        help="Optional install intervention JSONL; exclude and count "
+        "actual apply-time exposure gaps")
+    command.add_argument("--intervention-id",
+        help="Apply record ID (defaults to registration ID; must match it)")
     command.add_argument("--seed", type=int, default=1729)
     command.add_argument("--resamples", type=int, default=5000)
