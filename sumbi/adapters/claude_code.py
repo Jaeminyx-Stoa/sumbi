@@ -1,6 +1,7 @@
 """Claude Code JSONL: one maximal usage snapshot per assistant message."""
 
 from pathlib import Path
+import re
 
 from sumbi.evidence import tool_evidence
 from sumbi.deliver_evidence import branch, branch_query, tool_refs
@@ -16,12 +17,37 @@ FIELDS = {"new_input": "input_tokens", "cache_write": "cache_creation_input_toke
           "cache_read": "cache_read_input_tokens", "output": "output_tokens"}
 
 
+def bash_exit_code(event, block, *, run_in_background=False):
+    """Use Bash's machine result and anchored error envelope, never stdout."""
+    result = mapping(event.get("toolUseResult"))
+    if run_in_background or result.get("interrupted") or result.get("backgroundTaskId") or result.get("taskId"):
+        return None
+    for field in ("exitCode", "exit_code"):
+        value = result.get(field)
+        if type(value) is int:
+            return value
+    content = block.get("content")
+    if block.get("is_error") is True and isinstance(content, str):
+        match = re.match(r"\AExit code(?::)? (-?\d+)\n", content)
+        if match:
+            return int(match.group(1))
+        return None
+    # A foreground Bash result envelope records successful completion without
+    # a numeric exit field. Missing, interrupted and deferred results stay unknown.
+    if (block.get("is_error") is not True and result.get("interrupted") is False
+            and isinstance(result.get("stdout"), str) and isinstance(result.get("stderr"), str)):
+        return 0
+    return None
+
+
 def collect(home: Path, window: Window, coverage: Coverage, *, local_review: bool = False,
             collect_links: bool = False) -> list[Session]:
     root = home / ".claude" / "projects"
     sessions: dict[str, Session] = {}
     messages: dict[str, dict] = {}
     tool_names = {}
+    bash_calls = {}
+    start_cwds = {}
     files = sorted(root.glob("*/*.jsonl")) + sorted(root.glob("*/**/subagents/**/*.jsonl"))
     for path in dict.fromkeys(files):
         parts = path.relative_to(root).parts
@@ -39,6 +65,14 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
             if not session.accept(event, coverage):
                 continue
             when = timestamp(event.get("timestamp"))
+            if when is not None and (session.start_at is None or when < session.start_at):
+                session.start_at = when
+            if (when is not None and isinstance(event.get("cwd"), str) and event["cwd"]
+                    and (raw_id not in start_cwds or when < start_cwds[raw_id])):
+                start_cwds[raw_id] = when
+                session.start_cwd = event["cwd"]
+                session.start_evidence = "first-observed-cwd"
+            session.is_worker = child
             order = (len(session.seen), len(session.seen))
             session.cwd(event.get("cwd"), when)
             if event.get("version"):
@@ -116,12 +150,22 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                     continue
                 if kind == "assistant" and block.get("type") == "tool_use":
                     identity = block.get("id") or str(key) + ":" + str(index)
+                    if block.get("name") == "Bash":
+                        bash_calls[raw_id, identity] = (mapping(block.get("input")).get("command"), when,
+                            mapping(block.get("input")).get("cwd", event.get("cwd")),
+                            mapping(block.get("input")).get("run_in_background", False) is not False)
+                    if block.get("name") in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+                        session.edit(identity, when)
                     session.count("tool_calls", identity, when, window)
                     session.interval("tool", identity, when, None)
                     if block.get("name") == "AskUserQuestion":
                         session.count("user_input_requests", identity, when, window)
                 elif kind == "user" and block.get("type") == "tool_result":
                     identity = block.get("tool_use_id") or str(key) + ":" + str(index)
+                    if (raw_id, identity) in bash_calls:
+                        command, started, cwd, background = bash_calls[raw_id, identity]
+                        session.execution(identity, when, command,
+                            bash_exit_code(event, block, run_in_background=background), started_at=started, cwd=cwd)
                     session.count("tool_results", identity, when, window)
                     if block.get("is_error") is True:
                         session.count("tool_errors", identity, when, window)

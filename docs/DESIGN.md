@@ -34,7 +34,16 @@ Self-improvement that is not filtered by outcomes can make things worse. Context
    - Work abandoned before any pull request existed is recorded too.
    - States: `success`, `failed`, `in_progress`, `immature` (merged, but the revert and follow-up window has not closed).
    - First-pass success and eventual success after retries are counted separately.
-2. **Success uses outside signals:** merged, required checks green at merge, no revert or follow-up fix inside the window, and human acceptance where it applies. Self-reports are context only.
+2. **Success uses an explicitly declared machine outcome source.** With
+   `github`, success requires outside signals: merged, required checks green at
+   merge, no revert or follow-up fix inside the window, and human acceptance
+   where it applies. With `local-verify`, a dispatched worker session succeeds
+   only when its last recognized verification execution started after the last
+   known edit, ran the declared script in the configured repository, and exited
+   zero. This changes the previous outside-signals-only invariant: the agent
+   triggers the local check, and there is no human acceptance or revert window.
+   The exit result is machine evidence, not the agent's completion prose.
+   Sources cannot be mixed between comparison arms. Self-reports remain context.
 3. **Two cost views.**
    - *Operational:* period spend ÷ period successes, for watching trends.
    - *Intervention verdicts:* lifetime cost of a cohort of deliverables ÷ its successes, with identical follow-up windows.
@@ -197,6 +206,7 @@ Windows are `[start, end)` everywhere. Errors, caps and unsupported fields are r
 | L0 manual | Spec for entering deliverables, cost and outcomes by hand | Any repository, any agent |
 | L1 sessions | Tokens, time and friction from logs | Claude Code, Codex |
 | L2 outcomes | CI, pull requests, reverts | GitHub |
+| L2 local outcomes | Declared script exits after known edits; worker session units | Codex, Claude Code; weaker than external acceptance |
 | L3 propagation | Notices and rules through hooks, `AGENTS.md`, skills | Claude Code, Codex, agents that read `AGENTS.md` |
 
 ## Milestones and acceptance

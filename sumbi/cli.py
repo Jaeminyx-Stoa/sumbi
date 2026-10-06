@@ -78,21 +78,29 @@ def parser() -> argparse.ArgumentParser:
     configure_collection(commands.add_parser("collect", help="Measure local session logs without transcripts"))
     command = commands.add_parser("deliver", help="Join a dispatch ledger with recorded or live GitHub outcomes")
     configure_collection(command, deliver=True)
-    command.add_argument("--ledger", type=Path, required=True)
-    command.add_argument("--outcomes", required=True, metavar="github|DIR")
+    configure_outcome_source(command)
     command.add_argument("--cache", type=Path, metavar="DIR", help="Private GitHub response cache outside repositories")
     command.add_argument("--record", type=Path, metavar="DIR", help="Record filtered GitHub responses for offline replay")
     command.add_argument("--follow-up-days", type=idle, default=7.0)
     command = commands.add_parser("compare", help="Propose a verdict for one pre-registered intervention")
     configure_collection(command, deliver=True, comparison=True)
-    command.add_argument("--ledger", type=Path, required=True)
-    command.add_argument("--outcomes", required=True, metavar="github|DIR")
+    configure_outcome_source(command)
     command.add_argument("--cache", type=Path, metavar="DIR")
     command.add_argument("--record", type=Path, metavar="DIR")
     command.add_argument("--registration", type=Path, required=True)
     command.add_argument("--seed", type=int, default=1729)
     command.add_argument("--resamples", type=int, default=5000)
     return root
+
+
+def configure_outcome_source(command):
+    command.add_argument("--outcome-source", choices=("github", "local-verify"))
+    command.add_argument("--ledger", type=Path)
+    command.add_argument("--outcomes", metavar="github|DIR")
+    command.add_argument("--repository", type=Path, help="Repository scope for local verification units")
+    command.add_argument("--verify", action="append", help="Repository-relative executed verification script")
+    command.add_argument("--scan-until", type=utc, help="Lifetime observation end for local verification")
+    command.add_argument("--active-minutes", type=idle, default=5.0)
 
 
 def configure_collection(command, *, deliver=False, comparison=False):
@@ -142,6 +150,47 @@ def main(argv: list[str] | None = None) -> int:
     if any(p.is_relative_to(source.resolve()) for p in resolved for source in sources):
         root.error("Output destinations must be outside session-log directories")
     if args.command in ("deliver", "compare"):
+        source = args.outcome_source or (registration.outcome_source if args.command == "compare" else "github")
+        if args.command == "compare" and registration.outcome_source != source:
+            root.error("Registration and both arms must use the same outcome source")
+        if source == "local-verify":
+            if args.repository is None:
+                root.error("Local verification requires --repository")
+            if any(v is not None for v in (args.ledger, args.outcomes, args.cache, args.record)):
+                root.error("Local verification uses worker sessions rather than ledger or GitHub options")
+            protected = [args.repository / ".sumbi" / "config.toml"]
+            if args.command == "compare":
+                protected.append(args.registration)
+            if any(p.resolve() in resolved for p in protected):
+                root.error("Local output must not overwrite config or registration")
+            try:
+                from sumbi.local_outcomes import deliver_local, text_summary as local_summary
+                salt = read_salt(args.salt_file)
+                options = dict(agents=agents, verify=args.verify, scan_until=args.scan_until,
+                               active_minutes=args.active_minutes, salt=salt)
+                if args.command == "compare":
+                    from sumbi.local_compare import compare_local, text_summary as local_summary
+                    report = compare_local(args.home, args.repository, args.registration,
+                                           **options, seed=args.seed, resamples=args.resamples)
+                else:
+                    report = deliver_local(args.home, window, args.repository, **options)
+                data = json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
+                if args.json == "-":
+                    print(data, end="")
+                else:
+                    atomic_write(Path(args.json), data)
+            except ValueError as exc:
+                print(str(exc), file=sys.stderr)
+                return 1
+            except OSError:
+                print("Local collection or output failed; no source was modified.", file=sys.stderr)
+                return 1
+            print(local_summary(report), file=sys.stderr if args.json == "-" else sys.stdout)
+            return 0
+        if args.ledger is None or args.outcomes is None:
+            root.error("GitHub outcomes require --ledger and --outcomes")
+        if args.repository is not None or args.verify is not None or args.scan_until is not None:
+            root.error("Local verification options require local-verify outcome source")
         live = args.outcomes == "github"
         outcome_dir = None if live else Path(args.outcomes)
         if not live and (args.cache is not None or args.record is not None):

@@ -23,6 +23,7 @@ class Registration:
     before: Window
     after: Window
     confounders: tuple[dict, ...]
+    outcome_source: str = "github"
 
     @property
     def preregistered(self):
@@ -34,7 +35,10 @@ def read_registration(path: Path) -> Registration:
         raw = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique)
         fields = {"intervention_id", "applied_at", "registered_at", "predictions",
                   "non_inferiority_margin_pp", "sample_size_per_arm", "follow_up_days", "before", "after"}
-        if not isinstance(raw, dict) or not fields <= set(raw) or set(raw) - fields - {"confounders"}:
+        if not isinstance(raw, dict) or not fields <= set(raw) or set(raw) - fields - {"confounders", "outcome_source"}:
+            raise ValueError
+        source = raw.get("outcome_source", "github")
+        if source not in ("github", "local-verify"):
             raise ValueError
         def bounded(value):
             return isinstance(value, str) and re.fullmatch(LABEL, value)
@@ -78,7 +82,7 @@ def read_registration(path: Path) -> Registration:
                 raise ValueError
             events.append({"at": utc(event["at"], "Registration"), "label": event["label"]})
         return Registration(raw["intervention_id"], applied, registered, tuple(safe_predictions),
-                            margin, size, days, before, after, tuple(events))
+                            margin, size, days, before, after, tuple(events), source)
     except (OSError, UnicodeError, ValueError, TypeError, KeyError, OverflowError):
         raise ValueError("Registration must match the documented comparison JSON schema") from None
 
