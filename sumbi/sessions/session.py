@@ -14,7 +14,7 @@ EVIDENCE_TYPES = ("cwd", "tool_path", "previous_event", "unassigned")
 
 
 COUNT_KINDS = ("compactions", "tool_calls", "tool_results", "tool_errors", "api_errors",
-               "user_input_requests", "counter_resets")
+    "user_input_requests", "counter_resets")
 
 
 @dataclass
@@ -66,7 +66,8 @@ class Session:
     metadata_incomplete: dict[str, bool] = field(default_factory=dict)
 
     def public_agent(self):
-        return "sumbi-events:" + pseudonym("agent", self.emitter_agent or "unknown") if self.agent == "sumbi-events" else self.agent
+        return "sumbi-events:" + pseudonym("agent", self.emitter_agent
+            or "unknown") if self.agent == "sumbi-events" else self.agent
 
     def execution(self, identity, when, command, code, *, started_at=None, cwd=None):
         if when is not None:
@@ -127,7 +128,8 @@ class Session:
                 cwd, paths = data
                 if cwd:
                     command_cwd = resolve_path(cwd, context_cwd)
-                turn_paths.update(p for raw in paths if (p := resolve_path(raw, command_cwd or context_cwd)))
+                turn_paths.update(p for raw in paths
+                    if (p := resolve_path(raw, command_cwd or context_cwd)))
                 continue
             values, own_cwd, own_paths = data
             # A Claude line's cwd belongs to that message; Codex context is in force
@@ -141,18 +143,22 @@ class Session:
                 link = attributor.event_link(cwd)
                 evidence = "cwd"
             else:
-                paths = turn_paths | {p for raw in own_paths if (p := resolve_path(raw, context_cwd))}
+                paths = turn_paths | {p for raw in own_paths
+                    if (p := resolve_path(raw, context_cwd))}
                 if paths:
                     links = [attributor.event_link(p) for p in sorted(paths)]
                     signatures = {(x["bucket"], x["project_key"], x["rule"]) for x in links}
                     link = links[0] if len(signatures) == 1 else {
-                        "bucket": "unassigned", "project_key": None, "rule": None, "evidence": "conflicting_tool_paths"}
+                        "bucket": "unassigned", "project_key": None, "rule": None,
+                        "evidence": "conflicting_tool_paths"}
                     evidence = "tool_path"
-                elif previous is not None and previous["bucket"] != "unassigned" and previous_when is not None \
-                        and (when - previous_when).total_seconds() < idle_minutes * 60:
+                elif (previous is not None and previous["bucket"] != "unassigned"
+                    and previous_when is not None
+                    and (when - previous_when).total_seconds() < idle_minutes * 60):
                     link, evidence = previous, "previous_event"
                 else:
-                    link = {"bucket": "unassigned", "project_key": None, "rule": None, "evidence": "missing_evidence"}
+                    link = {"bucket": "unassigned", "project_key": None, "rule": None,
+                        "evidence": "missing_evidence"}
                     evidence = "unassigned"
             previous, previous_when = link, when
             if not window.contains(when):
@@ -161,11 +167,13 @@ class Session:
 
     def allocations(self, window, attributor, idle_minutes):
         rows = {}
-        for when, order, values, link, evidence, cwd in self.event_allocations(window, attributor, idle_minutes):
+        for when, order, values, link, evidence, cwd in self.event_allocations(window,
+            attributor, idle_minutes):
             identity = link["bucket"], link["project_key"], link["rule"]
-            row = rows.setdefault(identity, {**link, "events": 0, "tokens": dict.fromkeys(TOKEN_KINDS),
-                                            "evidence_counts": dict.fromkeys(EVIDENCE_TYPES, 0),
-                                            "evidence_tokens": dict.fromkeys(EVIDENCE_TYPES, 0)})
+            row = rows.setdefault(identity,
+                {**link, "events": 0, "tokens": dict.fromkeys(TOKEN_KINDS),
+                    "evidence_counts": dict.fromkeys(EVIDENCE_TYPES, 0),
+                    "evidence_tokens": dict.fromkeys(EVIDENCE_TYPES, 0)})
             row["events"] += 1
             if self.agent == "sumbi-events":
                 missing = row.setdefault("not_reported_events", dict.fromkeys(TOKEN_KINDS, 0))
@@ -178,15 +186,20 @@ class Session:
                 if value is not None:
                     row["tokens"][key] = (row["tokens"][key] or 0) + value
         for row in rows.values():
-            row["tokens"]["total"] = sum(row["tokens"][k] or 0 for k in TOKEN_KINDS if k != "reasoning_output")
+            row["tokens"]["total"] = sum(row["tokens"][k] or 0 for k in TOKEN_KINDS
+                if k != "reasoning_output")
             if self.agent == "sumbi-events":
                 missing = row.pop("not_reported_events")
                 row["tokens"]["not_reported_events"] = missing
                 row["tokens"]["evidence_incomplete"] = self.token_evidence_incomplete
-                row["tokens"]["complete_total"] = row["tokens"]["total"] if not self.token_evidence_incomplete and not any(missing[k] for k in TOKEN_KINDS[:4]) else None
+                row["tokens"]["complete_total"] = (row["tokens"]["total"]
+                    if not self.token_evidence_incomplete
+                    and not any(missing[k] for k in TOKEN_KINDS[:4]) else None)
             total = row["tokens"]["total"]
-            row["fallback_share"] = row["evidence_tokens"]["previous_event"] / total if total else 0.0
-        return sorted(rows.values(), key=lambda r: (r["bucket"], r["project_key"] or "", r["rule"] or ""))
+            row["fallback_share"] = (row["evidence_tokens"]["previous_event"] / total if total
+                else 0.0)
+        return sorted(rows.values(),
+            key=lambda r: (r["bucket"], r["project_key"] or "", r["rule"] or ""))
 
     def count(self, kind: str, key: object, when: datetime | None, window: Window):
         identity = (kind, str(key))
@@ -240,38 +253,46 @@ class Session:
         span = window.overlap(times[0], times[-1]) if times else 0.0
         thresholds = sorted({2.0, 5.0, 10.0, idle_minutes})
         active = {format(n, "g"): round(sum(window.overlap(a, b) for a, b in zip(times, times[1:])
-                                          if (b - a).total_seconds() <= n * 60), 6) for n in thresholds}
+            if (b - a).total_seconds() <= n * 60), 6)
+            for n in thresholds}
         durations = {}
         for kind in ("tool", "request"):
             intervals = [(a, b) for (k, _), (a, b) in self.intervals.items() if k == kind]
             durations[kind] = {"measurement": "observed", "seconds": round(sum(
                 window.overlap(a, b) for a, b in intervals), 6),
-                "paired_intervals": sum(window.overlap(a, b) > 0 or (a == b and window.contains(a)) for a, b in intervals),
-                "unpaired_starts": sum(key[0] == kind and key not in self.intervals and window.contains(t)
-                                       for key, t in self.starts.items()),
-                "unpaired_ends": sum(key[0] == kind and key not in self.intervals and window.contains(t)
-                                     for key, t in self.ends.items())}
+                "paired_intervals": sum(window.overlap(a, b) > 0
+                    or (a == b and window.contains(a)) for a, b in intervals),
+                "unpaired_starts": sum(key[0] == kind and key not in self.intervals
+                    and window.contains(t)
+                    for key, t in self.starts.items()),
+                "unpaired_ends": sum(key[0] == kind and key not in self.intervals
+                    and window.contains(t)
+                    for key, t in self.ends.items())}
         total = sum(self.tokens[k] or 0 for k in TOKEN_KINDS if k != "reasoning_output")
         allocations = self.allocations(window, attributor, idle_minutes)
-        result = {"id": self.id(), "parent_id": pseudonym("session", self.agent + ":" + self.parent_raw_id)
-                if self.parent_raw_id else None, "agent": self.public_agent(),
-                "project": attributor.session_link(self.project_paths(window)),
-                "allocations": allocations,
-                "spend_allocation": "events",
-                "models": sorted(self.models), "efforts": sorted(self.efforts),
-                "cli_versions": sorted(self.versions),
-                "tokens": {**self.tokens, "total": total, "measurement": "observed",
-                           "total_basis": "reported_components_excluding_reasoning_subset"},
-                "counts": {k: self.counts[k] for k in COUNT_KINDS},
-                "time": {"wall_span": {"measurement": "observed", "seconds": round(span, 6)},
-                         "active": {"measurement": "estimated", "idle_minutes": idle_minutes,
-                                    "seconds": active[format(idle_minutes, "g")],
-                                    "sensitivity_seconds": active}, "durations": durations}}
+        result = {"id": self.id(),
+            "parent_id": pseudonym("session", self.agent + ":" + self.parent_raw_id)
+            if self.parent_raw_id else None, "agent": self.public_agent(),
+            "project": attributor.session_link(self.project_paths(window)),
+            "allocations": allocations,
+            "spend_allocation": "events",
+            "models": sorted(self.models), "efforts": sorted(self.efforts),
+            "cli_versions": sorted(self.versions),
+            "tokens": {**self.tokens, "total": total, "measurement": "observed",
+                "total_basis": "reported_components_excluding_reasoning_subset"},
+            "counts": {k: self.counts[k] for k in COUNT_KINDS},
+            "time": {"wall_span": {"measurement": "observed", "seconds": round(span, 6)},
+                "active": {"measurement": "estimated", "idle_minutes": idle_minutes,
+                    "seconds": active[format(idle_minutes, "g")],
+                    "sensitivity_seconds": active}, "durations": durations}}
         if self.agent == "sumbi-events":
             events = [values for at, _, kind, (values, *_) in self.attribution_events
-                      if kind == "usage" and window.contains(at)]
-            missing = {kind: sum(values.get(kind) is None for values in events) for kind in TOKEN_KINDS}
+                if kind == "usage" and window.contains(at)]
+            missing = {kind: sum(values.get(kind) is None for values in events)
+                for kind in TOKEN_KINDS}
             result["tokens"]["not_reported_events"] = missing
             result["tokens"]["evidence_incomplete"] = self.token_evidence_incomplete
-            result["tokens"]["complete_total"] = total if events and not self.token_evidence_incomplete and not any(missing[k] for k in TOKEN_KINDS[:4]) else None
+            result["tokens"]["complete_total"] = (total if events
+                and not self.token_evidence_incomplete
+                and not any(missing[k] for k in TOKEN_KINDS[:4]) else None)
         return result

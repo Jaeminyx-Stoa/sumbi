@@ -21,12 +21,13 @@ def checked_relative(relative: str) -> PurePosixPath:
     """Validate portable path grammar without consulting the filesystem."""
     part = PurePosixPath(relative)
     components = relative.split("/")
-    reserved = {"CON", "PRN", "AUX", "NUL"} | {prefix + str(n) for prefix in ("COM", "LPT") for n in range(1, 10)}
+    reserved = {"CON", "PRN", "AUX", "NUL"} | {prefix + str(n) for prefix in ("COM", "LPT")
+        for n in range(1, 10)}
     if (not relative or part.is_absolute() or "\\" in relative or ":" in relative
-            or any(p in {"", ".", ".."} or p.endswith((".", " "))
-                   or p.split(".", 1)[0].upper() in reserved
-                   or any(ord(c) < 32 or c in '<>"|?*' for c in p)
-                   for p in components)):
+        or any(p in {"", ".", ".."} or p.endswith((".", " "))
+            or p.split(".", 1)[0].upper() in reserved
+            or any(ord(c) < 32 or c in '<>"|?*' for c in p)
+            for p in components)):
         raise InstallError("Unsafe repository-relative path.")
     return part
 
@@ -62,7 +63,8 @@ def _without_code(text: str, *, inline: bool = True) -> str:
     fence = None
     for line in text.splitlines(keepends=True):
         if fence is not None:
-            if re.match(r"^ {0,3}" + re.escape(fence[0]) + "{" + str(fence[1]) + r",}[ \t]*(?:\n)?$", line):
+            if re.match(r"^ {0,3}" + re.escape(fence[0]) + "{" + str(fence[1])
+                + r",}[ \t]*(?:\n)?$", line):
                 fence = None
             lines.append("\n")
             continue
@@ -80,7 +82,7 @@ def _without_code(text: str, *, inline: bool = True) -> str:
     while index < len(runs):
         opening = runs[index]
         closing = next((j for j in range(index + 1, len(runs))
-                        if len(runs[j][0]) == len(opening[0])), None)
+            if len(runs[j][0]) == len(opening[0])), None)
         if closing is None:
             index += 1
             continue
@@ -102,7 +104,7 @@ def _checked(root: Path, relative: str, expected: bytes | None) -> Path:
 
 
 def _write(root: Path, relative: str, expected: bytes | None,
-           data: bytes, mode: int) -> None:
+    data: bytes, mode: int) -> None:
     """Stage bytes in the destination directory, recheck, then replace."""
     path = _checked(root, relative, expected)
     path.parent.mkdir(parents=True, exist_ok=True)

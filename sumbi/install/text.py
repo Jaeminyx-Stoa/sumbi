@@ -4,7 +4,8 @@ from collections import Counter
 import math
 import unicodedata
 
-ESTIMATE_RULE = "script-aware-v1: ceil(other_characters / 4) + Hangul/Han/Hiragana/Katakana characters"
+ESTIMATE_RULE = ("script-aware-v1: ceil(other_characters / 4) + "
+    "Hangul/Han/Hiragana/Katakana characters")
 CJK_SCRIPTS = {"Hangul", "Han", "Hiragana", "Katakana"}
 
 
@@ -21,7 +22,7 @@ def script(character: str) -> str | None:
 
 def scripts(text: str) -> Counter:
     return Counter(category for character in text if unicodedata.category(character).startswith("L")
-                   and (category := script(character)))
+        and (category := script(character)))
 
 
 def estimate_tokens(text: str) -> int:

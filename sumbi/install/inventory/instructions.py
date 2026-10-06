@@ -46,7 +46,8 @@ def conditional_paths(text: str) -> bool:
                 continue
             if not following.startswith((" ", "\t", "-")):
                 break
-            item = YAML_COMMENT.split(following.strip().removeprefix("-").strip(), maxsplit=1)[0].strip()
+            item = YAML_COMMENT.split(following.strip().removeprefix("-").strip(),
+                maxsplit=1)[0].strip()
             if item not in empty:
                 return True
     return False

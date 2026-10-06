@@ -41,10 +41,12 @@ LINT_FILES = {
     ".clippy.toml", ".golangci.yml", ".golangci.yaml", "biome.json",
 }
 LINT_PREFIXES = (".eslintrc", "eslint.config.", ".stylelintrc", "stylelint.config.")
-FORMAT_FILES = {".clang-format", ".yapf", ".editorconfig", "rustfmt.toml", ".rustfmt.toml", "biome.json"}
+FORMAT_FILES = {".clang-format", ".yapf", ".editorconfig", "rustfmt.toml", ".rustfmt.toml",
+    "biome.json"}
 FORMAT_PREFIXES = (".prettierrc", "prettier.config.")
 TYPE_FILES = {"mypy.ini", ".mypy.ini", "pyrightconfig.json", "tsconfig.json"}
-PR_TEMPLATES = {"pull_request_template.md", ".github/pull_request_template.md", "docs/pull_request_template.md"}
+PR_TEMPLATES = {"pull_request_template.md", ".github/pull_request_template.md",
+    "docs/pull_request_template.md"}
 PROJECT_SCRIPT_GROUPS = (
     ("project", "scripts"), ("tool", "pdm", "scripts"), ("tool", "poe", "tasks"),
     ("tool", "hatch", "envs", "default", "scripts"),
@@ -81,7 +83,8 @@ def _workflows(context: InventoryContext) -> list[dict]:
                         if match.group(3) and not match.group(3).startswith("#"):
                             warnings.append({"kind": "workflow-job-details-unknown", "path": path})
                     property_line = WORKFLOW_PROPERTY.match(line)
-                    if property_line and jobs and len(property_line.group(1)) > job_indent and property_indent is None:
+                    if property_line and jobs and len(
+                        property_line.group(1)) > job_indent and property_indent is None:
                         property_indent = len(property_line.group(1))
                     name = WORKFLOW_NAME.match(line)
                     if name and jobs and len(name.group(1)) == property_indent:
@@ -91,7 +94,7 @@ def _workflows(context: InventoryContext) -> list[dict]:
                         else:
                             jobs[-1]["name"] = value.strip("\"'")
             workflows.append({"path": path, "jobs": jobs, "job_count": len(jobs),
-                              "parser": "block YAML subset"})
+                "parser": "block YAML subset"})
             if not jobs:
                 warnings.append({"kind": "workflow-jobs-unknown", "path": path})
 
@@ -103,9 +106,10 @@ def scan(context: InventoryContext) -> dict:
     workflow_entries = _workflows(context)
     codeowners = [p for p in ("CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS") if p in paths]
     templates = [p for p in paths if p.lower() in PR_TEMPLATES
-                 or p.lower().startswith(".github/pull_request_template/")]
-    git_hooks = [p for p in paths if p in {".pre-commit-config.yaml", "lefthook.yml", "lefthook.yaml"}
-                 or p.startswith((".husky/", ".githooks/"))]
+        or p.lower().startswith(".github/pull_request_template/")]
+    git_hooks = [p for p in paths
+        if p in {".pre-commit-config.yaml", "lefthook.yml", "lefthook.yaml"}
+        or p.startswith((".husky/", ".githooks/"))]
     sources = _Sources()
     lint, formatting, typing = sources.lint, sources.formatting, sources.typing
     test_sources = sources.test_sources
@@ -119,10 +123,10 @@ def scan(context: InventoryContext) -> dict:
         _documented_tests(context, path, sources)
 
     return {"workflows": workflow_entries, "codeowners": entry(codeowners),
-            "pr_templates": entry(templates), "git_hooks": entry(git_hooks),
-            "lint": entry(sorted(set(lint))), "format": entry(sorted(set(formatting))),
-            "type_check": entry(sorted(set(typing))), "test_sources": test_sources,
-            "required_checks": "unknown (offline)", "rulesets": "unknown (offline)"}
+        "pr_templates": entry(templates), "git_hooks": entry(git_hooks),
+        "lint": entry(sorted(set(lint))), "format": entry(sorted(set(formatting))),
+        "type_check": entry(sorted(set(typing))), "test_sources": test_sources,
+        "required_checks": "unknown (offline)", "rulesets": "unknown (offline)"}
 
 
 def _file_checks(context: InventoryContext, path: str, sources: _Sources) -> None:
@@ -145,7 +149,8 @@ def _package_checks(context: InventoryContext, path: str, sources: _Sources) -> 
         data = structured(path)
         scripts = data.get("scripts", {})
         if isinstance(scripts, dict):
-            if any(PACKAGE_TEST_SCRIPT.match(key) and isinstance(v, str) and v.strip() for key, v in scripts.items()):
+            if any(PACKAGE_TEST_SCRIPT.match(key) and isinstance(v, str) and v.strip() for key,
+                v in scripts.items()):
                 test_sources.append({"path": path, "kind": "package-script"})
             for prefix, group in (("lint", lint), ("format", formatting), ("typecheck", typing)):
                 if any(key.startswith(prefix) for key in scripts):
@@ -164,12 +169,14 @@ def _project_checks(context: InventoryContext, path: str, sources: _Sources) -> 
         data = structured(path, True)
         tool = data.get("tool", {})
         if isinstance(tool, dict):
-            for keys, group in (({"ruff", "pylint", "flake8"}, lint), ({"black", "isort", "ruff"}, formatting), ({"mypy", "pyright"}, typing)):
+            for keys, group in (({"ruff", "pylint", "flake8"}, lint),
+                ({"black", "isort", "ruff"}, formatting), ({"mypy", "pyright"}, typing)):
                 if keys.intersection(tool):
                     group.append(path)
             if "pytest" in tool:
                 test_sources.append({"path": path, "kind": "pytest-config"})
-            scripts = tool.get("poetry", {}).get("scripts", {}) if isinstance(tool.get("poetry"), dict) else {}
+            scripts = tool.get("poetry", {}).get("scripts",
+                {}) if isinstance(tool.get("poetry"), dict) else {}
             if isinstance(scripts, dict) and "test" in scripts:
                 test_sources.append({"path": path, "kind": "project-script"})
         script_groups = []
@@ -199,7 +206,8 @@ def _ini_checks(context: InventoryContext, path: str, sources: _Sources) -> None
     ini = context.ini
     if name in {"tox.ini", "setup.cfg"}:
         config = ini(path)
-        if any(s.startswith("testenv") and config.get(s, "commands", fallback="").strip() for s in config.sections()):
+        if any(s.startswith("testenv") and config.get(s, "commands", fallback="").strip()
+            for s in config.sections()):
             test_sources.append({"path": path, "kind": "tox-command"})
         for section, group in (("flake8", lint), ("isort", formatting), ("mypy", typing)):
             if config.has_section(section):
@@ -217,10 +225,14 @@ def _nox_tests(context: InventoryContext, path: str, sources: _Sources) -> None:
         try:
             tree = ast.parse(content(path))
             for node in ast.walk(tree):
-                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute) or node.func.attr != "run":
+                if not isinstance(node, ast.Call) or not isinstance(node.func,
+                    ast.Attribute) or node.func.attr != "run":
                     continue
-                args = [a.value if isinstance(a, ast.Constant) and isinstance(a.value, str) else None for a in node.args]
-                if args and (args[0] in {"pytest", "unittest"} or args[:3] in (["python", "-m", "pytest"], ["python", "-m", "unittest"], ["python3", "-m", "pytest"], ["python3", "-m", "unittest"])):
+                args = [a.value if isinstance(a, ast.Constant) and isinstance(a.value, str)
+                    else None for a in node.args]
+                if args and (args[0] in {"pytest", "unittest"}
+                    or args[:3] in (["python", "-m", "pytest"], ["python", "-m", "unittest"],
+                        ["python3", "-m", "pytest"], ["python3", "-m", "unittest"])):
                     test_sources.append({"path": path, "kind": "nox-command"})
                     break
         except SyntaxError:

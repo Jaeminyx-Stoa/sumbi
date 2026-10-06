@@ -46,7 +46,10 @@ def find_gaps(report: dict) -> list[dict]:
                 break
     for agent, cost in report["cost"]["instructions"].items():
         if cost["estimated_tokens"] > report["cost"]["budget"]:
-            add("instruction-budget", {"agent": agent, "paths": cost["paths"], "estimated_tokens": cost["estimated_tokens"], "budget": report["cost"]["budget"]}, ["instruction-map"])
+            add("instruction-budget",
+                {"agent": agent, "paths": cost["paths"],
+                    "estimated_tokens": cost["estimated_tokens"],
+                    "budget": report["cost"]["budget"]}, ["instruction-map"])
     if not report["enforcement"]["test_sources"]:
         add("missing-test-command", {"paths": []}, ["test-and-verify"])
     for key, identifier, practice in (
@@ -57,5 +60,6 @@ def find_gaps(report: dict) -> list[dict]:
         ("plan_approval", "missing-plan-approval", "plan-and-approval"),
     ):
         if report["conventions"][key]["status"] == "absent":
-            add(identifier, {"paths": [], "searched_paths": report["convention_search_paths"]}, [practice])
+            add(identifier, {"paths": [], "searched_paths": report["convention_search_paths"]},
+                [practice])
     return gaps

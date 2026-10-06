@@ -21,10 +21,10 @@ def execution_cwd(value: object) -> str | None:
         try:
             uri = urlsplit(value)
             if (uri.netloc or "?" in value or "#" in value or "\\" in value
-                    or re.search(r"[\x00-\x1f\x7f]", value)
-                    or not re.match(r"^/[A-Za-z]:/", uri.path)
-                    or re.search(r"%(?![0-9A-Fa-f]{2})", uri.path)
-                    or re.search(r"%(?:2f|5c)", uri.path, re.I)):
+                or re.search(r"[\x00-\x1f\x7f]", value)
+                or not re.match(r"^/[A-Za-z]:/", uri.path)
+                or re.search(r"%(?![0-9A-Fa-f]{2})", uri.path)
+                or re.search(r"%(?:2f|5c)", uri.path, re.I)):
                 return None
             value = unquote(uri.path, errors="strict")[1:]
             if re.search(r"[\x00-\x1f\x7f]", value):

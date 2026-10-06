@@ -1,7 +1,5 @@
-"""Extract bounded path evidence from known tool inputs, never from prose.
-
-This module does not execute commands. Extracted strings live only in memory.
-Unsupported shell syntax is deliberately left without evidence.
+"""Extract bounded in-memory path evidence from known tool inputs without executing commands.
+Prose and unsupported shell syntax do not establish path evidence.
 """
 
 import json
@@ -36,7 +34,8 @@ PATH_WORD = r'''("[^"\r\n]+"|'[^'\r\n]+'|[^\s;&|<>]+)'''
 def shell_paths(command):
     if isinstance(command, list) and all(isinstance(x, str) for x in command):
         # A logged argv vector is already separated; preserve spaces in operands.
-        if len(command) >= 3 and command[0].rsplit("/", 1)[-1] in ("bash", "sh", "zsh") and command[1] in ("-c", "-lc"):
+        if len(command) >= 3 and command[0].rsplit("/", 1)[-1] in ("bash", "sh",
+            "zsh") and command[1] in ("-c", "-lc"):
             command = command[2]
         elif len(command) >= 3 and command[0] == "git" and command[1] == "-C":
             return [command[2]]
@@ -54,7 +53,8 @@ def shell_paths(command):
     except ValueError:
         return []
     paths = []
-    leading = re.match(r"^\s*cd\s+(?:/d\s+|--\s+)?" + PATH_WORD + r"(?=\s*(?:&&|;|$))", command, re.I)
+    leading = re.match(r"^\s*cd\s+(?:/d\s+|--\s+)?" + PATH_WORD + r"(?=\s*(?:&&|;|$))", command,
+        re.I)
     if leading:
         paths.append(leading[1].strip("\"'"))
     segments = [[]]
@@ -88,7 +88,8 @@ def tool_evidence(name, arguments):
     args = mapping(arguments)
     paths = []
     cwd = None
-    if short in ("bash", "shell", "exec_command", "run_command", "local_shell_call", "commandexecution"):
+    if short in ("bash", "shell", "exec_command", "run_command", "local_shell_call",
+        "commandexecution"):
         cwd = args.get("workdir") or args.get("cwd")
         paths.extend(shell_paths(args.get("command", args.get("cmd"))))
     elif short in ("read", "read_file", "write", "write_file", "edit", "multiedit", "view_image"):
@@ -98,10 +99,13 @@ def tool_evidence(name, arguments):
     elif short in ("apply_patch", "filechange"):
         patch = arguments if isinstance(arguments, str) else args.get("patch", args.get("input"))
         if isinstance(patch, str):
-            paths.extend(re.findall(r"(?m)^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$", patch))
+            paths.extend(
+                re.findall(r"(?m)^\*\*\* (?:Add File|Update File|Delete File|Move to): (.+)$",
+                    patch))
         changes = args.get("changes")
         if isinstance(changes, dict):
             paths.extend(changes)
         elif isinstance(changes, list):
-            paths.extend(x.get("path") for x in changes if isinstance(x, dict) and isinstance(x.get("path"), str))
+            paths.extend(x.get("path") for x in changes if isinstance(x, dict)
+                and isinstance(x.get("path"), str))
     return cwd if isinstance(cwd, str) and cwd else None, paths

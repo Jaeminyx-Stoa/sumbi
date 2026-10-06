@@ -1,1 +1,1 @@
-"""Outcomes local_verify layer."""
+"""Measure dispatched workers using declared local verification execution evidence."""

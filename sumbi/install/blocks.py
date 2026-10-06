@@ -33,7 +33,7 @@ def added_blocks(before: bytes | None, after: bytes) -> list[dict]:
         if separator not in (b"", b"\n", b"\r\n"):
             raise InstallError("Unsupported managed-block separator.")
         blocks.append({"id": identifier, "bytes": suffix[start:end].decode("utf-8"),
-                       "separator": separator.decode("ascii")})
+            "separator": separator.decode("ascii")})
         cursor = end
     if cursor != len(suffix):
         raise InstallError("Unsupported bytes after managed additions.")
@@ -47,21 +47,24 @@ def validate_blocks(entries) -> list[dict]:
     seen = set()
     for entry in entries:
         identifier = entry["id"]
-        if not isinstance(identifier, str) or not IDENTIFIER.fullmatch(identifier) or identifier in seen:
+        if not isinstance(identifier,
+            str) or not IDENTIFIER.fullmatch(identifier) or identifier in seen:
             raise ValueError
         seen.add(identifier)
         if entry["separator"] not in ("", "\n", "\r\n") or not isinstance(entry["bytes"], str):
             raise ValueError
         data = entry["bytes"].encode("utf-8")
         try:
-            if set(managed_blocks(data)) != {identifier} or _spans(data, identifier) != (0, len(data)):
+            if set(managed_blocks(data)) != {identifier} or _spans(data, identifier) != (0,
+                len(data)):
                 raise ValueError
         except InstallError:
             raise ValueError from None
     return entries
 
 
-def remove_blocks(current: bytes, entries: list[dict], finished: set[str]) -> tuple[bytes, list[dict]]:
+def remove_blocks(current: bytes, entries: list[dict], finished: set[str]) -> tuple[bytes,
+    list[dict]]:
     results, data = [], current
     for entry in entries:
         identifier = entry["id"]
@@ -70,14 +73,15 @@ def remove_blocks(current: bytes, entries: list[dict], finished: set[str]) -> tu
             continue
         span = _spans(data, identifier)
         if span is None or data[span[0]:span[1]] != entry["bytes"].encode("utf-8"):
-            results.append({"id": identifier, "status": "refused", "reason": "block-content-changed"})
+            results.append({"id": identifier, "status": "refused",
+                "reason": "block-content-changed"})
             continue
         start, end = span
         separator = entry["separator"].encode("ascii")
         # Remove at most one blank separator line, never a preceding text line's newline.
         separator_start = start - len(separator)
         if separator and data[:start].endswith(separator) and (
-                separator_start == 0 or data[separator_start - 1:separator_start] == b"\n"):
+            separator_start == 0 or data[separator_start - 1:separator_start] == b"\n"):
             start = separator_start
         data = data[:start] + data[end:]
         results.append({"id": identifier, "status": "removed"})

@@ -22,11 +22,16 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="sumbi")
     root.add_argument("--version", action="version", version="sumbi " + __version__)
     commands = root.add_subparsers(dest="command", required=True)
-    configure_register(commands.add_parser("register", help="Create a validated catalog pre-registration; never overwrite"))
-    configure_install(commands.add_parser("install", help="Inventory and seed repository practices offline"))
-    configure_collection(commands.add_parser("collect", help="Measure local session logs without transcripts"))
-    configure_deliver(commands.add_parser("deliver", help="Measure GitHub deliverables or local worker verification"))
-    configure_compare(commands.add_parser("compare", help="Propose a verdict for one pre-registered intervention"))
+    configure_register(commands.add_parser("register",
+        help="Create a validated catalog pre-registration; never overwrite"))
+    configure_install(commands.add_parser("install",
+        help="Inventory and seed repository practices offline"))
+    configure_collection(commands.add_parser("collect",
+        help="Measure local session logs without transcripts"))
+    configure_deliver(commands.add_parser("deliver",
+        help="Measure GitHub deliverables or local worker verification"))
+    configure_compare(commands.add_parser("compare",
+        help="Propose a verdict for one pre-registered intervention"))
     return root
 
 
@@ -46,12 +51,14 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         root.error(str(exc))
     agents = args.agents.split(",")
-    if not agents or any(agent not in ADAPTERS for agent in agents) or len(set(agents)) != len(agents):
+    if not agents or any(agent not in ADAPTERS
+        for agent in agents) or len(set(agents)) != len(agents):
         root.error("Agents must be a unique comma-separated selection of " + ",".join(ADAPTERS))
     rules = getattr(args, "rules", [])
     if any(not rule.origins and not rule.paths for rule in rules):
         root.error("Each project rule needs at least one matching pattern")
-    destinations = ([Path(args.json)] if args.json != "-" else []) + ([args.local_review] if args.local_review else [])
+    destinations = ([Path(args.json)] if args.json != "-" else []) + ([args.local_review]
+        if args.local_review else [])
     resolved = [p.resolve() for p in destinations]
     if len(set(resolved)) != len(resolved):
         root.error("JSON and local review must have distinct destinations")

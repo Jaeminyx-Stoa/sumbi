@@ -7,7 +7,8 @@ from sumbi.events.schema import Identity
 
 
 def digest(record):
-    return hashlib.sha256(json.dumps(record, sort_keys=True, separators=(",", ":")).encode()).digest()
+    return hashlib.sha256(json.dumps(record, sort_keys=True,
+        separators=(",", ":")).encode()).digest()
 
 
 def record_identity(record):

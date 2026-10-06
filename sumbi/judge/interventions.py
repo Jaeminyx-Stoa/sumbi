@@ -37,13 +37,15 @@ def exposure_gap(registration, path: Path | None, intervention_id=None):
     planned = registration.applied_at
     since, until = sorted((planned, actual))
     return {"actual_write_at": actual.isoformat(), "since": since.isoformat(),
-            "until": until.isoformat(), "bounds": "[since,until)",
-            "seconds": (until - since).total_seconds(),
-            "direction": "later" if actual > planned else "earlier" if actual < planned else "equal"}
+        "until": until.isoformat(), "bounds": "[since,until)",
+        "seconds": (until - since).total_seconds(),
+        "direction": "later" if actual > planned else "earlier" if actual < planned
+        else "equal"}
 
 
 def in_exposure_gap(when, gap):
-    return bool(gap and when is not None and timestamp(gap["since"]) <= when < timestamp(gap["until"]))
+    return bool(gap and when is not None
+        and timestamp(gap["since"]) <= when < timestamp(gap["until"]))
 
 
 def exposure_side(when, planned, gap):

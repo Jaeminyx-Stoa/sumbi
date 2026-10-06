@@ -13,19 +13,20 @@ from sumbi.events.schema import (
 from .common import key, record_identity
 
 KNOWN = {"assistant", "user", "system", "progress", "attachment", "summary",
-         "file-history-snapshot", "file-history-delta", "queue-operation", "pr-link",
-         "frame-link", "last-prompt", "custom-title", "agent-name", "agent-color",
-         "saved_hook_context", "worktree", "bridge_status", "legacy_bridge_status"}
+    "file-history-snapshot", "file-history-delta", "queue-operation", "pr-link",
+    "frame-link", "last-prompt", "custom-title", "agent-name", "agent-color",
+    "saved_hook_context", "worktree", "bridge_status", "legacy_bridge_status"}
 SYSTEM = {"compact_boundary", "api_error", "stop_hook_summary", "local_command",
-          "informational", "turn_duration", "request_start", "request_end"}
+    "informational", "turn_duration", "request_start", "request_end"}
 FIELDS = {"new_input": "input_tokens", "cache_write": "cache_creation_input_tokens",
-          "cache_read": "cache_read_input_tokens", "output": "output_tokens"}
+    "cache_read": "cache_read_input_tokens", "output": "output_tokens"}
 
 
 def bash_exit_code(event, block, *, run_in_background=False):
     """Use Bash's machine result and anchored error envelope, never stdout."""
     result = mapping(event.get("toolUseResult"))
-    if run_in_background or result.get("interrupted") or result.get("backgroundTaskId") or result.get("taskId"):
+    if run_in_background or result.get("interrupted") or result.get(
+        "backgroundTaskId") or result.get("taskId"):
         return None
     for field in ("exitCode", "exit_code"):
         value = result.get(field)
@@ -36,7 +37,7 @@ def bash_exit_code(event, block, *, run_in_background=False):
         match = re.match(r"\AExit code(?::)? (-?\d+)\n", content)
         return int(match.group(1)) if match else None
     if (block.get("is_error") is not True and result.get("interrupted") is False
-            and isinstance(result.get("stdout"), str) and isinstance(result.get("stderr"), str)):
+        and isinstance(result.get("stdout"), str) and isinstance(result.get("stderr"), str)):
         return 0
     return None
 
@@ -52,8 +53,10 @@ def _blocks(event, kind, blocks, when):
             name, args = block.get("name"), mapping(block.get("input"))
             if name == "Bash":
                 yield CommandExecution(identity, freeze(args.get("command")), started_at=when,
-                    cwd=freeze(args.get("cwd", event.get("cwd"))), phase="start", pairing="launch", suffix=suffix,
-                    deferred=args.get("run_in_background", False) is not False, source_identity=source)
+                    cwd=freeze(args.get("cwd", event.get("cwd"))), phase="start",
+                    pairing="launch", suffix=suffix,
+                    deferred=args.get("run_in_background", False) is not False,
+                    source_identity=source)
             if name in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
                 yield FileEdit(identity, suffix)
             yield ToolStart(identity, suffix)
@@ -61,10 +64,12 @@ def _blocks(event, kind, blocks, when):
                 yield Counter("user_input_requests", identity, suffix)
         elif kind == "user" and block.get("type") == "tool_result":
             identity = key(block.get("tool_use_id") or None)
-            source = SourceIdentity(freeze(block["tool_use_id"])) if block.get("tool_use_id") else None
+            source = SourceIdentity(freeze(block["tool_use_id"])) if block.get(
+                "tool_use_id") else None
             # Pairing and deferred-launch status are resolved by the builder.
             yield CommandExecution(identity, exit_code=bash_exit_code(event, block),
-                phase="end", pairing="launch", suffix=suffix, require_pair=True, source_identity=source)
+                phase="end", pairing="launch", suffix=suffix, require_pair=True,
+                source_identity=source)
             yield ToolEnd(identity, block.get("is_error") is True, suffix)
 
 
@@ -72,7 +77,7 @@ def _translate(event, when, parent, child):
     kind = event.get("type")
     cwd = event.get("cwd") if isinstance(event.get("cwd"), str) else None
     yield SessionStart(cwd, parent if child else None, "worker" if child else "orchestrator",
-                       "claude-code", provenance="first-observed-cwd")
+        "claude-code", provenance="first-observed-cwd")
     if event.get("version"):
         yield Metadata(cli_version=freeze(event["version"]), supplied=("cli_version",))
     message = mapping(event.get("message"))
@@ -83,11 +88,12 @@ def _translate(event, when, parent, child):
     if kind not in KNOWN:
         yield Diagnostic(freeze(kind))
     inputs = tuple(ToolInput(key(b.get("id")), b.get("name"), freeze(b.get("input")),
-                            SourceIdentity(freeze(b.get("id"))))
-                   for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use")
-    outputs = tuple(ToolOutput(key(b.get("tool_use_id")), freeze(b.get("content")), text_blocks=True,
-                              source_identity=SourceIdentity(freeze(b.get("tool_use_id"))))
-                    for b in blocks if isinstance(b, dict) and b.get("type") == "tool_result")
+        SourceIdentity(freeze(b.get("id"))))
+        for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use")
+    outputs = tuple(ToolOutput(key(b.get("tool_use_id")), freeze(b.get("content")),
+        text_blocks=True,
+        source_identity=SourceIdentity(freeze(b.get("tool_use_id"))))
+        for b in blocks if isinstance(b, dict) and b.get("type") == "tool_result")
     evidence = ToolEvidence(inputs, outputs, cwd, freeze(event.get("gitBranch")))
     usage = mapping(message.get("usage"))
     if kind != "assistant" or not usage:
@@ -103,7 +109,8 @@ def _translate(event, when, parent, child):
         if subtype in ("compact_boundary", "api_error"):
             yield Counter("compactions" if subtype == "compact_boundary" else "api_errors")
         elif subtype in ("request_start", "request_end"):
-            yield Request(key(event.get("requestId") or None), endpoint="start" if subtype == "request_start" else "end")
+            yield Request(key(event.get("requestId") or None), endpoint="start"
+                if subtype == "request_start" else "end")
     if kind == "assistant":
         if message.get("model"):
             yield Metadata(model=freeze(message["model"]), supplied=("model",))
@@ -126,15 +133,19 @@ def collect(home: Path, coverage: Coverage):
         child = "subagents" in parts
         index = parts.index("subagents") if child else None
         parent_hint = parts[index - 1] if child else path.stem
-        agent_hint = (parts[index + 1] if child else path.stem).removesuffix(".jsonl").removeprefix("agent-")
+        agent_hint = (parts[index + 1] if child
+            else path.stem).removesuffix(".jsonl").removeprefix("agent-")
         raw_id = None
         parent = None
         for event in records(path, coverage):
             if raw_id is None:
-                child = child or (path.stem.startswith("agent-") and event.get("isSidechain") is True)
+                child = child or (path.stem.startswith("agent-")
+                    and event.get("isSidechain") is True)
                 parent = str(event.get("sessionId") or parent_hint)
-                raw_id = parent + ":subagent:" + str(event.get("agentId") or agent_hint) if child else parent
+                raw_id = parent + ":subagent:" + str(event.get("agentId")
+                    or agent_hint) if child else parent
             when = timestamp(event.get("timestamp"))
-            yield Record("claude-code", raw_id, when, record_identity(event), tuple(_translate(event, when, parent, child)),
+            yield Record("claude-code", raw_id, when, record_identity(event),
+                tuple(_translate(event, when, parent, child)),
                 timestamp_supplied="timestamp" in event, fallback_id=key(event.get("uuid") or None),
                 parent_session_id=parent if child else None, worker=child)

@@ -1,8 +1,5 @@
-"""One fold from normalized observations to the stable Session surface.
-
-Named rules preserve native evidence semantics: maximal_output_snapshot,
-cumulative_usage_deltas, paired_execution, own_context_at_start, and
-immutable_dispatch. Feature evidence is derived here, never in translators.
+"""Fold normalized observations into the stable Session surface and derive feature evidence.
+Named rules retain snapshot, cumulative usage, execution pairing, context, and dispatch semantics.
 """
 
 from dataclasses import dataclass, field
@@ -43,7 +40,7 @@ def own_context_at_start(history, started_at, own_start):
     if started_at is None or any(at is None for at, _ in history):
         return None
     eligible = [(at, cwd) for at, cwd in history if at <= started_at
-                and (own_start is None or at >= own_start)]
+        and (own_start is None or at >= own_start)]
     if not eligible:
         return None
     latest = max(at for at, _ in eligible)
@@ -57,7 +54,7 @@ def _metadata(state, metadata, when, window, coverage):
         state.native_metadata.append((when, metadata.model, metadata.effort))
         return
     targets = (("model", "models", "model"), ("effort", "efforts", "effort"),
-               ("cli_version", "versions", "version"))
+        ("cli_version", "versions", "version"))
     for name, target, category in targets:
         if name not in metadata.supplied:
             continue
@@ -79,7 +76,8 @@ def _start(state, event, when, order, window, coverage, links):
     if event.provenance == "first-observed-cwd":
         if when is not None and (session.start_at is None or when < session.start_at):
             session.start_at = when
-        if when is not None and event.cwd and (state.first_cwd_at is None or when < state.first_cwd_at):
+        if when is not None and event.cwd and (state.first_cwd_at is None
+            or when < state.first_cwd_at):
             state.first_cwd_at = when
             session.start_cwd, session.start_evidence = event.cwd, event.provenance
         session.cwd(event.cwd, when)
@@ -92,7 +90,8 @@ def _start(state, event, when, order, window, coverage, links):
             session.parent_raw_id = event.parent_session_id
     else:
         state.starts.append((when, event))
-        _context(state, e.Context(event.cwd, metadata=event.metadata), when, order, window, coverage, links)
+        _context(state, e.Context(event.cwd, metadata=event.metadata), when, order, window,
+            coverage, links)
 
 
 def _context(state, event, when, order, window, coverage, links):
@@ -102,11 +101,13 @@ def _context(state, event, when, order, window, coverage, links):
         if event.attribution:
             session.context(when, order, event.cwd)
             if links and not state.explicit and when:
-                session.deliverable_events.append((when, order, "context", (branch(e.thaw(event.branch)), event.cwd)))
+                session.deliverable_events.append((when, order, "context",
+                    (branch(e.thaw(event.branch)), event.cwd)))
     if event.cwd_supplied and (event.execution_context or state.explicit):
         # Open cwd validation belongs to its translator. Normalize only the
         # conflict comparison; retain the original cwd on the Session surface.
-        cwd = (None if event.cwd_valid is False else execution_cwd(event.cwd)) if state.explicit else event.cwd
+        cwd = (None if event.cwd_valid is False
+            else execution_cwd(event.cwd)) if state.explicit else event.cwd
         state.contexts.append((when, cwd))
     _metadata(state, event.metadata, when, window, coverage)
 
@@ -129,7 +130,7 @@ def _tool_evidence(state, evidence, when, order, links, *, apply=True, fallback=
             output = e.thaw(item.output)
             if item.text_blocks and isinstance(output, list):
                 output = "\n".join(b.get("text", "") for b in output
-                                   if isinstance(b, dict) and b.get("type") == "text")
+                    if isinstance(b, dict) and b.get("type") == "text")
             identity = _source_identity(item, evidence, fallback)
             name, query = state.tool_names.get(identity, (None, False))
             refs.update(tool_refs(name, output, output=True, query=query))
@@ -154,14 +155,15 @@ def maximal_output_snapshot(state, event, when, order, links):
     previous = state.maximal.get(identity)
     if previous is None or rank > previous[0]:
         state.maximal[identity] = (rank, event.tokens.as_dict(), order, event.cwd or cwd,
-                                  paths, cwd, branch(e.thaw(event.evidence.branch)), refs)
+            paths, cwd, branch(e.thaw(event.evidence.branch)), refs)
 
 
 def paired_execution(state, event, identity, when, fallback):
     """Pair launches without repairing contradictory start/cwd evidence."""
     session = state.session
-    pairing_identity = e.thaw(event.source_identity.value) if event.source_identity is not None else (
-        identity if event.tool_call_id is not None or event.suffix else fallback)
+    pairing_identity = e.thaw(
+        event.source_identity.value) if event.source_identity is not None else (
+            identity if event.tool_call_id is not None or event.suffix else fallback)
     if event.phase == "start":
         state.launches[pairing_identity] = event
         return
@@ -182,7 +184,8 @@ def paired_execution(state, event, identity, when, fallback):
     elif event.pairing == "interval":
         own_start = launch.started_at if launch else None
         explicit = launch is not None and launch.cwd_supplied
-        start_conflict = launch is not None and (own_start is None or started is not None and started != own_start)
+        start_conflict = launch is not None and (own_start is None or started is not None
+            and started != own_start)
         cwd_conflict = explicit and event.cwd_supplied and (
             execution_cwd(e.thaw(launch.cwd)) != execution_cwd(cwd))
         started = None if start_conflict else started or own_start
@@ -199,7 +202,8 @@ def paired_execution(state, event, identity, when, fallback):
     session.execution(identity, when, command, code, started_at=started, cwd=cwd)
     if event.infer_cwd:
         if pending:
-            state.pending_cwds[identity] = started_for_cwd if event.pairing == "interval" else started
+            state.pending_cwds[identity] = (started_for_cwd if event.pairing == "interval"
+                else started)
         else:
             state.pending_cwds.pop(identity, None)
 
@@ -219,8 +223,9 @@ def _diagnostic(state, event, coverage):
 def _fold(state, event, record, order, fallback, source_fallback, window, coverage, review, links):
     session, when = state.session, record.timestamp
     identity = str(getattr(event, "tool_call_id", None) or getattr(event, "identity", None)
-                   or fallback) + (getattr(event, "suffix", "") if not (
-                       getattr(event, "tool_call_id", None) or getattr(event, "identity", None)) else "")
+        or fallback) + (getattr(event, "suffix", "") if not (
+            getattr(event, "tool_call_id", None)
+            or getattr(event, "identity", None)) else "")
     if isinstance(event, e.SessionStart):
         _start(state, event, when, order, window, coverage, links)
     elif isinstance(event, e.Context):
@@ -230,7 +235,8 @@ def _fold(state, event, record, order, fallback, source_fallback, window, covera
     elif isinstance(event, e.TokenUsage):
         if event.selection == "maximal_output":
             if event.message_id is None:
-                event = e.TokenUsage(event.tokens, event.cwd, event.selection, fallback, event.evidence)
+                event = e.TokenUsage(event.tokens, event.cwd, event.selection, fallback,
+                    event.evidence)
             maximal_output_snapshot(state, event, when, order, links)
         elif event.selection == "cumulative_including_cache":
             values = event.tokens.as_dict()
@@ -264,7 +270,8 @@ def _fold(state, event, record, order, fallback, source_fallback, window, covera
             event.end or (when if event.endpoint == "end" else None))
     elif isinstance(event, e.SessionEnd):
         if when is not None and when < window.until:
-            session.completed_at = max(when, session.completed_at or when) if event.selection == "latest" else when
+            session.completed_at = max(when, session.completed_at
+                or when) if event.selection == "latest" else when
     elif isinstance(event, e.Resume):
         if window.contains(when):
             session.completed_at = None
@@ -280,9 +287,11 @@ def cumulative_usage_deltas(state, window, coverage):
     previous = dict.fromkeys(keys, 0)
     session = state.session
     for when, order, total in sorted(state.cumulative, key=lambda entry: (entry[0], entry[1])):
-        reset = any(total[k] is not None and previous[k] is not None and total[k] < previous[k] for k in keys)
+        reset = any(total[k] is not None and previous[k] is not None and total[k] < previous[k]
+            for k in keys)
         baseline = dict.fromkeys(keys, 0) if reset else previous
-        delta = {k: total[k] - baseline[k] if total[k] is not None and baseline[k] is not None else None for k in keys}
+        delta = {k: total[k] - baseline[k] if total[k] is not None and baseline[k] is not None
+            else None for k in keys}
         if reset and window.contains(when):
             session.counts["counter_resets"] += 1
         fresh = delta.pop("input_total") - delta["cache_read"]
@@ -301,8 +310,9 @@ def immutable_dispatch(state, coverage):
     """An open session's dispatch is usable only when all starts agree."""
     signatures = state.starts
     session = state.session
-    if signatures and all(s is not None and _dispatch_signature(s) == _dispatch_signature(signatures[0])
-                          for s in signatures):
+    if signatures and all(s is not None
+        and _dispatch_signature(s) == _dispatch_signature(signatures[0])
+        for s in signatures):
         when, event = signatures[0]
         session.start_at, session.start_cwd = when, event.cwd
         session.start_evidence = event.provenance
@@ -318,13 +328,13 @@ def _dispatch_signature(entry):
         return None
     when, event = entry
     return (when, event.agent, event.cwd, event.parent_session_id, event.role,
-            *(e.thaw(getattr(event.metadata, key)) for key in ("model", "effort", "cli_version")))
+        *(e.thaw(getattr(event.metadata, key)) for key in ("model", "effort", "cli_version")))
 
 
 def _explicit_metadata(state, window, coverage):
     session = state.session
     for name, target, category in (("model", session.models, "model"),
-            ("effort", session.efforts, "effort"), ("cli_version", session.versions, "version")):
+        ("effort", session.efforts, "effort"), ("cli_version", session.versions, "version")):
         entries = [(at, value) for at, value in state.metadata.get(name, []) if at < window.until]
         prior = [(at, value) for at, value in entries if at < window.since]
         relevant = [(at, value) for at, value in entries if window.contains(at)]
@@ -347,7 +357,8 @@ def _finish(state, window, coverage, links):
     for identity, started in state.pending_cwds.items():
         if (execution := session.commands.get(identity)) is not None:
             execution.cwd = own_context_at_start(state.contexts, started, session.start_at)
-    eligible = [(at, model, effort) for at, model, effort in state.native_metadata if at and at < window.until]
+    eligible = [(at, model, effort) for at, model, effort in state.native_metadata if at
+        and at < window.until]
     prior = [entry for entry in eligible if entry[0] < window.since]
     relevant = [entry for entry in eligible if window.contains(entry[0])]
     if prior:
@@ -357,7 +368,8 @@ def _finish(state, window, coverage, links):
             session.models.add(label(e.thaw(model), "model"))
         if effort:
             session.efforts.add(label(e.thaw(effort), "effort"))
-    for (_, when), values, order, cwd, paths, command_cwd, own_branch, refs in state.maximal.values():
+    for snapshot in state.maximal.values():
+        (_, when), values, order, cwd, paths, command_cwd, own_branch, refs = snapshot
         session.tool_paths(when, order, command_cwd or (cwd if paths else None), paths)
         session.usage(when, order, values, cwd=cwd, paths=paths)
         if links:
@@ -422,7 +434,7 @@ def _state(states, record):
 
 
 def build(records: Iterable[e.Record], window: Window, coverage: Coverage, *,
-          local_review: bool = False, collect_links: bool = False) -> list[Session]:
+    local_review: bool = False, collect_links: bool = False) -> list[Session]:
     """Fold a translator stream; all accounting and feature decisions live here."""
     states = {}
     records = iter(records)
@@ -432,7 +444,8 @@ def build(records: Iterable[e.Record], window: Window, coverage: Coverage, *,
     # Adapters each have one identity scope. A first record is retained without
     # materializing native streams; open identities require conflict preflight.
     source = _prepend(first, records)
-    ordered = _open_records(source, states, coverage) if first.identity.scope == "event_id" else enumerate(source)
+    ordered = _open_records(source, states,
+        coverage) if first.identity.scope == "event_id" else enumerate(source)
     for position, record in ordered:
         state = _state(states, record)
         if state is None:
@@ -455,12 +468,16 @@ def build(records: Iterable[e.Record], window: Window, coverage: Coverage, *,
                 coverage.invalid_timestamps += 1
                 state.invalid |= state.explicit
         sequence = len(session.seen)
-        order = position if state.explicit else (record.ordinal if record.ordinal is not None else sequence, sequence)
-        fallback = record.identity.event_id if state.explicit else record.fallback_id or str(sequence)
-        source_fallback = e.thaw(record.fallback_source_identity.value) if record.fallback_source_identity is not None else (
+        order = position if state.explicit else (record.ordinal if record.ordinal is not None
+            else sequence, sequence)
+        fallback = record.identity.event_id if state.explicit else record.fallback_id or str(
+            sequence)
+        source_fallback = (e.thaw(record.fallback_source_identity.value)
+            if record.fallback_source_identity is not None else
             record.fallback_id if record.fallback_id is not None else sequence)
         for event in record.events:
-            _fold(state, event, record, order, fallback, source_fallback, window, coverage, local_review, collect_links)
+            _fold(state, event, record, order, fallback, source_fallback, window, coverage,
+                local_review, collect_links)
     for state in states.values():
         _finish(state, window, coverage, collect_links)
     return [state.session for state in states.values()]
@@ -474,4 +491,4 @@ def _prepend(first, records):
 def collect(adapter, home, window, coverage, *, local_review=False, collect_links=False):
     """Collection seam for callers that need sessions rather than observations."""
     return build(adapter.collect(home, coverage), window, coverage,
-                 local_review=local_review, collect_links=collect_links)
+        local_review=local_review, collect_links=collect_links)

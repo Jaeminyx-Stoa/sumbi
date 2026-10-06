@@ -13,7 +13,7 @@ from sumbi.events.schema import (
 from .common import digest
 
 KINDS = {"session_start", "session_end", "context", "token_usage",
-         "tool_start", "tool_end", "command_execution", "file_edit"}
+    "tool_start", "tool_end", "command_execution", "file_edit"}
 
 
 def identity(value):
@@ -33,7 +33,7 @@ def _gap(category, *, token=False, start=False, counter="unknown"):
 def _metadata(event, *, start=False):
     supplied = tuple(k for k in ("model", "effort", "cli_version") if start or k in event)
     return Metadata(*(freeze(event.get(k)) for k in ("model", "effort", "cli_version")),
-                    supplied, "explicit")
+        supplied, "explicit")
 
 
 def _usage(event, when):
@@ -43,9 +43,9 @@ def _usage(event, when):
         return
     values = {k: integer(tokens.get(k)) for k in TOKEN_KINDS} if isinstance(tokens, dict) else {}
     if (not isinstance(tokens, dict) or when is None
-            or any(tokens.get(k) is not None and values[k] is None for k in TOKEN_KINDS)
-            or values["reasoning_output"] is not None and values["output"] is not None
-            and values["reasoning_output"] > values["output"]):
+        or any(tokens.get(k) is not None and values[k] is None for k in TOKEN_KINDS)
+        or values["reasoning_output"] is not None and values["output"] is not None
+        and values["reasoning_output"] > values["output"]):
         yield _gap("", token=True, counter="invalid_token_records")
         return
     yield TokenUsage(Tokens(**values), local_cwd(event.get("cwd")))
@@ -57,9 +57,9 @@ def _command(event):
     valid_command = command is None or isinstance(command, str) or (
         isinstance(command, list) and all(isinstance(p, str) for p in command))
     malformed = (not valid_command or code is not None and type(code) is not int
-                 or any(k not in event for k in ("exit_code", "command", "cwd", "started_at"))
-                 or event.get("cwd") is not None and cwd is None
-                 or event.get("started_at") is not None and start is None)
+        or any(k not in event for k in ("exit_code", "command", "cwd", "started_at"))
+        or event.get("cwd") is not None and cwd is None
+        or event.get("started_at") is not None and start is None)
     if malformed:
         yield _gap("invalid_command_record")
         command, code, start, cwd = None, None, None, None
@@ -78,9 +78,11 @@ def _translate(event, when):
         yield _gap("unknown_event_type")
         return
     if kind == "session_start":
-        agent, cwd, parent, role = (event.get(k) for k in ("agent", "cwd", "parent_session_id", "role"))
+        agent, cwd, parent, role = (event.get(k)
+            for k in ("agent", "cwd", "parent_session_id", "role"))
         if (not identity(agent) or local_cwd(cwd) is None or role not in ("worker", "orchestrator")
-                or parent is not None and (not identity(parent) or parent == raw_id) or when is None):
+            or parent is not None and (not identity(parent) or parent == raw_id)
+            or when is None):
             yield _gap("invalid_session_start", start=True)
             return
         yield SessionStart(cwd, parent, role, agent, metadata=_metadata(event, start=True))
@@ -90,13 +92,15 @@ def _translate(event, when):
         cwd = event.get("cwd")
         if "cwd" in event and cwd is not None and local_cwd(cwd) is None:
             yield _gap("invalid_context_cwd")
-        yield Context(cwd if isinstance(cwd, str) else None, "cwd" in event, metadata=_metadata(event),
-                      cwd_valid=cwd is None or local_cwd(cwd) is not None)
+        yield Context(cwd if isinstance(cwd, str) else None, "cwd" in event,
+            metadata=_metadata(event),
+            cwd_valid=cwd is None or local_cwd(cwd) is not None)
     elif kind == "token_usage":
         yield from _usage(event, when)
     elif kind in ("tool_start", "tool_end"):
         tool_id = event.get("tool_call_id")
-        if not identity(tool_id) or kind == "tool_end" and "error" in event and type(event["error"]) is not bool:
+        if not identity(tool_id) or kind == "tool_end" and "error" in event and type(
+            event["error"]) is not bool:
             yield _gap("invalid_tool_record")
             return
         yield ToolStart(tool_id) if kind == "tool_start" else ToolEnd(tool_id, event.get("error"))
@@ -111,11 +115,13 @@ def collect(home: Path, coverage: Coverage):
         for event in records(path, coverage, ignore_blank=True):
             raw_id, event_id = event.get("session_id"), event.get("event_id")
             valid_id = identity(event_id)
-            valid_kind = type(event.get("schema_version")) is int and event["schema_version"] == 1 and (
-                isinstance(event.get("type"), str) and event["type"] in KINDS)
+            valid_kind = type(
+                event.get("schema_version")) is int and event["schema_version"] == 1 and (
+                    isinstance(event.get("type"), str) and event["type"] in KINDS)
             when = timestamp(event.get("timestamp"))
             observations = tuple(_translate(event, when)) if valid_id else (
                 _gap("invalid_event_record", token=event.get("type") == "token_usage"),)
             yield Record("sumbi-events", raw_id if identity(raw_id) else None, when,
                 Identity(digest(event), event_id if valid_id else None, "event_id"), observations,
-                observe_time=valid_id and valid_kind and identity(raw_id), usage_record=event.get("type") == "token_usage")
+                observe_time=valid_id and valid_kind and identity(raw_id),
+                usage_record=event.get("type") == "token_usage")

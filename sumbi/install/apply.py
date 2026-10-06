@@ -35,8 +35,10 @@ def _protect_local_artifacts(root: Path) -> None:
     _write(root, relative, before, data + LOCAL_IGNORES, mode)
 
 
-def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = None, intervention_id=None) -> dict:
-    if intervention_id is not None and (not isinstance(intervention_id, str) or not re.fullmatch(LABEL, intervention_id)):
+def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = None,
+    intervention_id=None) -> dict:
+    if intervention_id is not None and (not isinstance(intervention_id, str)
+        or not re.fullmatch(LABEL, intervention_id)):
         raise InstallError("Intervention ID must be a bounded public-safe label.")
     if not plan.changes:
         return {"applied": [], "baseline": {"status": "not requested (empty plan)"}}
@@ -73,10 +75,10 @@ def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = Non
         completed = {**manifest, "status": "applied"}
         relative_manifest = backup_relative + "/manifest.json"
         _write(root, relative_manifest, read_bytes(root, relative_manifest),
-               (json.dumps(completed, indent=2) + "\n").encode(), 0o600)
+            (json.dumps(completed, indent=2) + "\n").encode(), 0o600)
         return {"applied": [p["id"] for p in plan.practices],
-                "baseline": baseline_result, "backup": backup_relative,
-                "backup_id": backup_relative.rsplit("/", 1)[1]}
+            "baseline": baseline_result, "backup": backup_relative,
+            "backup_id": backup_relative.rsplit("/", 1)[1]}
     except BaseException as error:
         rollback_failed = False
         for name, data in reversed(written):
@@ -95,10 +97,12 @@ def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = Non
         if isinstance(error, (KeyboardInterrupt, SystemExit)):
             raise
         if rollback_failed:
-            raise InstallError("Apply failed; recovery needs owner attention in .sumbi/backups.") from None
+            raise InstallError(
+                "Apply failed; recovery needs owner attention in .sumbi/backups.") from None
         if isinstance(error, InstallError):
             raise
-        raise InstallError("Apply failed; prior files were restored; backups remain if created.") from None
+        raise InstallError(
+            "Apply failed; prior files were restored; backups remain if created.") from None
     finally:
         safe_path(root, ".sumbi/install.lock").unlink()
 
@@ -108,7 +112,7 @@ def _prepare_apply(plan: Plan, originals: dict, modes: dict, *, home, salt, inte
     # The public Plan object contains mutable lists. Rebuild from the trusted
     # catalog so a modified or hand-crafted object cannot bypass additions.
     fresh = build_plan(root, budget=plan.report["cost"]["budget"],
-                       select=[p["id"] for p in plan.practices], exclude=plan.exclude)
+        select=[p["id"] for p in plan.practices], exclude=plan.exclude)
     if fresh.changes != plan.changes or fresh.practices != plan.practices:
         raise InstallError("Plan no longer matches the repository and bundled catalog.")
     for change in plan.changes:
@@ -136,19 +140,20 @@ def _prepare_apply(plan: Plan, originals: dict, modes: dict, *, home, salt, inte
     backup = safe_path(root, backup_relative)
     backup.mkdir(parents=True, mode=0o700, exist_ok=False)
     records = [{"practice_id": p["id"], "catalog_version": VERSION,
-                **({"intervention_id": intervention_id} if intervention_id is not None else {}),
-                "content_hash": p["content_hash"], "language": p["language"], "files": p["files"],
-                "prediction": p["prediction"], "judgment": p["judgment"],
-                "provenance": p["provenance"], "utc_time": utc,
-                "baseline": baseline_result, "judgment_policy": load_judgment_policy()} for p in plan.practices]
+        **({"intervention_id": intervention_id} if intervention_id is not None else {}),
+        "content_hash": p["content_hash"], "language": p["language"], "files": p["files"],
+        "prediction": p["prediction"], "judgment": p["judgment"],
+        "provenance": p["provenance"], "utc_time": utc,
+        "baseline": baseline_result, "judgment_policy": load_judgment_policy()}
+        for p in plan.practices]
     # Register predictions in the recovery manifest before changing targets.
     applied = {c.path: c.after for c in plan.changes}
     blocks = {c.path: added_blocks(c.before, c.after) for c in plan.changes}
     manifest = {"version": 1, "status": "prepared", "records": records,
-                "files": [{"path": name, "before_hash": digest(data), "mode": modes[name],
-                           "applied_hash": digest(applied.get(name)) if name in applied else None,
-                           **({"blocks": blocks[name]} if name in blocks else {}),
-                           "absent": data is None} for name, data in originals.items()]}
+        "files": [{"path": name, "before_hash": digest(data), "mode": modes[name],
+            "applied_hash": digest(applied.get(name)) if name in applied else None,
+            **({"blocks": blocks[name]} if name in blocks else {}),
+            "absent": data is None} for name, data in originals.items()]}
     _save_backup(root, backup_relative, originals, manifest)
     return ledger_path, ledger, baseline_result, backup_relative, records, manifest
 
