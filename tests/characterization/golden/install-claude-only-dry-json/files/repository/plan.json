@@ -153,7 +153,7 @@
       "rulesets": "unknown (offline)"
     },
     "cost": {
-      "estimate_rule": "ceil(characters / 4), normalized line endings; unique instructions and local imports at root and largest inherited scope; all rule files included as an upper bound",
+      "estimate_rule": "script-aware-v1: ceil(other_characters / 4) + Hangul/Han/Hiragana/Katakana characters",
       "budget": 2000,
       "instructions": {
         "codex": {
@@ -189,16 +189,39 @@
           "root_estimated_tokens": 0
         }
       },
+      "conditional_instructions": {
+        "claude": {
+          "paths": [],
+          "characters": 0,
+          "estimated_tokens": 0
+        }
+      },
       "skill_descriptions": [],
       "every_prompt_hooks": []
     },
     "conventions": {
-      "review_gate": [],
-      "handoff": [],
-      "friction_line": [],
-      "parallel_worktree": [],
-      "plan_approval": []
+      "review_gate": {
+        "status": "absent",
+        "evidence": []
+      },
+      "handoff": {
+        "status": "absent",
+        "evidence": []
+      },
+      "friction_line": {
+        "status": "absent",
+        "evidence": []
+      },
+      "parallel_worktree": {
+        "status": "absent",
+        "evidence": []
+      },
+      "plan_approval": {
+        "status": "absent",
+        "evidence": []
+      }
     },
+    "convention_lexicon_version": 1,
     "convention_search_paths": [
       "CLAUDE.md"
     ],
@@ -248,7 +271,8 @@
         }
       }
     },
-    "load_rules_version": 1
+    "load_rules_version": 1,
+    "load_rules_revision": 2
   },
   "gaps": [
     {

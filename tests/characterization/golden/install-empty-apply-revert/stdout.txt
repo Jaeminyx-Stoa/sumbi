@@ -26,8 +26,14 @@ Inventory (offline; paths and parsed labels only):
   format: 0
   type_check: 0
   required checks: unknown (offline); rulesets: unknown (offline)
-  estimate: ceil(characters / 4), normalized line endings; unique instructions and local imports at root and largest inherited scope; all rule files included as an upper bound
+  estimate: script-aware-v1: ceil(other_characters / 4) + Hangul/Han/Hiragana/Katakana characters
   instruction tokens (root/largest scope): codex=0/0, claude=0/0, gemini=0/0, copilot=0/0, cursor=0/0
+  conditional instruction tokens claude: 0 (0 rules)
+  convention review_gate: absent []
+  convention handoff: absent []
+  convention friction_line: absent []
+  convention parallel_worktree: absent []
+  convention plan_approval: absent []
   budget=2000; warnings=1
   warning: {"kind": "root-not-versioned"}
 Gaps: missing-agents, missing-test-command, missing-risk-review, missing-handoff, missing-friction-line, missing-worktree-rule, missing-plan-approval
