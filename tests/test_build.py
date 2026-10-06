@@ -67,11 +67,15 @@ class BuildTests(unittest.TestCase):
                 self.assertIsNone(fields["Dynamic"])
                 self.assertIn(sumbi_build.STEM + "/docs/deliverables.template.csv", archive.getnames())
                 fixtures = {p.relative_to(sumbi_build.ROOT).as_posix()
-                            for parent in ("tests/fixtures", "tests/install/fixtures")
+                            for parent in ("tests/fixtures", "tests/install/fixtures",
+                                           "tests/characterization/fixtures", "tests/characterization/golden")
                             for p in (sumbi_build.ROOT / parent).rglob("*") if p.is_file()}
                 self.assertTrue({sumbi_build.STEM + "/" + p for p in fixtures} <= set(archive.getnames()))
                 self.assertEqual(len(archive.getnames()), len(set(archive.getnames())))
-                self.assertFalse(any("/local/" in p or "/out/" in p or "__pycache__" in p
+                # Reviewed golden paths include files/out/*.json. Only the
+                # checkout-root private artifacts must be excluded.
+                self.assertFalse(any(p.startswith(sumbi_build.STEM + "/local/")
+                                     or p.startswith(sumbi_build.STEM + "/out/") or "__pycache__" in p
                                      for p in archive.getnames()))
                 self.assertTrue(all(p.name.startswith(sumbi_build.STEM + "/") for p in archive.getmembers()))
                 # The archive was authored above from allow-listed relative source files.
