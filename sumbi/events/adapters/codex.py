@@ -163,7 +163,7 @@ def _translate(event, payload, when, inherited):
         parent = mapping(subagent.get("thread_spawn")).get("parent_thread_id")
         yield SessionStart(payload.get("cwd") if isinstance(payload.get("cwd"), str) else None,
             parent if isinstance(parent, str) else None, "worker" if subagent else "orchestrator",
-            provenance="session-header")
+            agent="codex", provenance="session-header")
     if kind not in KNOWN:
         yield Diagnostic(freeze(kind))
     if kind in ("session_meta", "turn_context") and not inherited:

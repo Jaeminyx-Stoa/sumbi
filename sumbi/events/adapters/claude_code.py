@@ -68,10 +68,11 @@ def _blocks(event, kind, blocks, when):
             yield ToolEnd(identity, block.get("is_error") is True, suffix)
 
 
-def _translate(event, when):
+def _translate(event, when, parent, child):
     kind = event.get("type")
     cwd = event.get("cwd") if isinstance(event.get("cwd"), str) else None
-    yield SessionStart(cwd, provenance="first-observed-cwd")
+    yield SessionStart(cwd, parent if child else None, "worker" if child else "orchestrator",
+                       "claude-code", provenance="first-observed-cwd")
     if event.get("version"):
         yield Metadata(cli_version=freeze(event["version"]), supplied=("cli_version",))
     message = mapping(event.get("message"))
@@ -134,6 +135,6 @@ def collect(home: Path, coverage: Coverage):
                 parent = str(event.get("sessionId") or parent_hint)
                 raw_id = parent + ":subagent:" + str(event.get("agentId") or agent_hint) if child else parent
             when = timestamp(event.get("timestamp"))
-            yield Record("claude-code", raw_id, when, record_identity(event), tuple(_translate(event, when)),
+            yield Record("claude-code", raw_id, when, record_identity(event), tuple(_translate(event, when, parent, child)),
                 timestamp_supplied="timestamp" in event, fallback_id=key(event.get("uuid") or None),
                 parent_session_id=parent if child else None, worker=child)

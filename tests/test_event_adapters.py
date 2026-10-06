@@ -105,6 +105,20 @@ class TranslationTests(unittest.TestCase):
         self.assertEqual(coverage.invalid_token_records, 0)
         self.assertEqual(coverage.invalid_timestamps, 0)
 
+    def test_native_starts_include_agent_role_and_parent_observations(self):
+        self.save(".claude/projects/group/session/subagents/agent-child.jsonl", [{
+            "type": "user", "sessionId": "parent", "agentId": "child",
+            "timestamp": "2030-01-01T00:00:00Z", "cwd": "/fixture/one"}])
+        self.save(".codex/sessions/group/rollout-child.jsonl", [{
+            "type": "session_meta", "timestamp": "2030-01-01T00:00:00Z", "payload": {
+                "id": "child", "cwd": "/fixture/one", "source": {
+                    "subagent": {"thread_spawn": {"parent_thread_id": "parent"}}}}}])
+        for adapter, agent in ((claude_code, "claude-code"), (codex, "codex")):
+            with self.subTest(agent=agent):
+                record = list(adapter.collect(self.home, Coverage()))[0]
+                start = next(event for event in record.events if isinstance(event, e.SessionStart))
+                self.assertEqual((start.agent, start.role, start.parent_session_id), (agent, "worker", "parent"))
+
 
 if __name__ == "__main__":
     unittest.main()
