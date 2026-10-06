@@ -273,3 +273,32 @@ If the entry point is missing, output and interventions retain the compatibility
 status `pending (collect not available)`. An execution failure in an available
 collector aborts application. Empty plans never run collection. The hook imports
 measurement directly; it no longer discovers a collector through importlib.
+
+## Implementation boundaries
+
+`inventory/` separates traversal (`walk`), entry files and conditional rules
+(`instructions`), Claude imports (`imports`), capability metadata and configuration
+(`capabilities`), static checks (`enforcement`), convention evidence (`conventions`),
+estimates (`cost`), and versioning (`versioning`). Each scanner receives one
+`InventoryContext`. Its public fields carry section data between scans; its cached
+readers retain normalized text and emit a read diagnostic only once per path.
+Scanners do not import one another. The package entry point owns scan order and
+report key order. Conditional-rule reads remain after convention detection to
+preserve diagnostic ordering. Skill metadata is read before configurations and
+its estimates are carried into the cost section.
+
+The current policy boundaries also identify the next changes without adding them:
+
+- Confirmed-absent declarations belong in convention declaration handling.
+- Localized practice text belongs at the catalog-text selection in `planner.py`;
+  `_append_block` only validates and appends the selected bytes.
+- Allowlist-ignore repositories belong at traversal's git-ignore contexts and
+  the planner's prospective-target ignore check.
+- Block-level revert belongs at the per-target hash/restoration decision in
+  `revert.py`; the current behavior still restores whole files.
+
+Apply keeps locking and rollback in `apply_plan`; preparation and backup writing
+are mechanical helpers. Placement separates start counting from report assembly.
+Install functions are limited to 80 source lines, enforced by the structural test.
+The characterization corpus remains the byte-identity gate; this refactor does
+not regenerate golden outputs.

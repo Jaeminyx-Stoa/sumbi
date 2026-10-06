@@ -16,6 +16,7 @@ from .files import MAX_BYTES, read_bytes
 from .inventory import inventory
 from .exclusions import GitIgnore, excluded_by
 
+# Match the existing managed-block grammar without reading arbitrary comments.
 MARKER = re.compile(r"^<!-- sumbi:(begin|end) ([a-z][a-z0-9-]*) -->$")
 
 
@@ -154,18 +155,10 @@ def build_plan(repository: Path | str = ".", *, budget: int = 2000,
                     text = "@" + "../" * depth + "AGENTS.md"
                     if has_import(report, target, shared):
                         continue
-                existing = managed_blocks(data)
-                if identifier in existing:
-                    if existing[identifier] != text.rstrip():
-                        notes.append({"id": identifier, "path": target, "status": "existing-block-preserved"})
+                updated = _append_block(data, identifier, text, target, notes)
+                if updated is None:
                     continue
-                if data and not data.endswith(b"\n"):
-                    raise InstallError("A managed target lacks a final newline; add it manually before planning.")
-                newline = "\r\n" if b"\r\n" in data else "\n"
-                separator = newline.encode() if data and not data.endswith((newline * 2).encode()) else b""
-                after[target] = data + separator + block(identifier, text, newline)
-                if len(after[target]) > MAX_BYTES:
-                    raise InstallError("A planned target exceeds the bounded file size.")
+                after[target] = updated
                 changed.append(target)
         if changed:
             payload = json.dumps(practice, sort_keys=True, separators=(",", ":")).encode()
@@ -175,3 +168,19 @@ def build_plan(repository: Path | str = ".", *, budget: int = 2000,
                               "provenance": practice["sources"]})
     changes = [Change(path, before[path], data) for path, data in sorted(after.items()) if data != (before[path] or b"")]
     return Plan(root, report, gaps, proposals, changes, notes, tuple(exclude))
+
+
+def _append_block(data: bytes, identifier: str, text: str, target: str, notes: list[dict]) -> bytes | None:
+    existing = managed_blocks(data)
+    if identifier in existing:
+        if existing[identifier] != text.rstrip():
+            notes.append({"id": identifier, "path": target, "status": "existing-block-preserved"})
+        return None
+    if data and not data.endswith(b"\n"):
+        raise InstallError("A managed target lacks a final newline; add it manually before planning.")
+    newline = "\r\n" if b"\r\n" in data else "\n"
+    separator = newline.encode() if data and not data.endswith((newline * 2).encode()) else b""
+    updated = data + separator + block(identifier, text, newline)
+    if len(updated) > MAX_BYTES:
+        raise InstallError("A planned target exceeds the bounded file size.")
+    return updated

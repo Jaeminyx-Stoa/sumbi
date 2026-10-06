@@ -12,6 +12,10 @@ from sumbi.events.registry import log_roots
 from .files import _write, safe_path
 
 
+# Accept only the baseline artifact timestamp grammar.
+BASELINE_PATH = re.compile(r"\.sumbi/baseline/[0-9]{8}T[0-9]{6}\.[0-9]{6}Z\.json")
+
+
 def record_baseline(*, repository: Path, home: Path | None = None,
              salt: bytes | None = None, now: datetime | None = None) -> dict:
     """Write a counts-only report for the previous 14 UTC days, before apply."""
@@ -63,7 +67,7 @@ def baseline(repository: Path, *, run: bool = False, home: Path | None = None,
     if (isinstance(result, dict) and isinstance(result.get("status"), str)
             and result["status"] in {"recorded", "no sessions found"}
             and isinstance(result.get("file"), str)
-            and re.fullmatch(r"\.sumbi/baseline/[0-9]{8}T[0-9]{6}\.[0-9]{6}Z\.json", result["file"])
+            and BASELINE_PATH.fullmatch(result["file"])
             and type(result.get("sessions")) is int and result["sessions"] >= 0):
         return {key: result[key] for key in ("status", "file", "sessions")}
     return {"status": "recorded", "entry_point": "sumbi.collect.baseline"}
