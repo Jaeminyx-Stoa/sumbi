@@ -15,6 +15,7 @@ from sumbi.cli import main, parser
 from sumbi.measure.attribution import Attributor, ProjectRule
 from sumbi.core.records import Coverage
 from sumbi.sessions.session import Session
+from sumbi.sessions.builder import collect as collect_sessions
 from sumbi.core.time import Window
 from sumbi.core.paths import normalize_origin, normalize_path
 from sumbi.core.privacy import pseudonym
@@ -164,7 +165,7 @@ class EdgeTests(SyntheticHome):
     def check_old_layout(self, parent_name):
         self.fixture("claude-code", "claude/main.jsonl", parent_name)
         self.fixture("claude-code", "claude/child.jsonl", "agent-child-one.jsonl")
-        sessions = {s.raw_id: s for s in claude_code.collect(self.home, WINDOW, Coverage(), session_factory=Session)}
+        sessions = {s.raw_id: s for s in collect_sessions(claude_code, self.home, WINDOW, Coverage())}
         self.assertEqual(set(sessions), {"session-c", "session-c:subagent:child-one"})
         parent, child = sessions["session-c"], sessions["session-c:subagent:child-one"]
         self.assertFalse(parent.is_worker)
@@ -187,7 +188,7 @@ class EdgeTests(SyntheticHome):
             records = [self.claude_event("2030-01-01T00:01:00Z", identity=name + "first", isSidechain=child),
                        self.claude_event("2030-01-01T00:02:00Z", identity=name + "last", isSidechain=not child)]
             self.write("claude-code", name, records)
-        sessions = claude_code.collect(self.home, WINDOW, Coverage(), session_factory=Session)
+        sessions = collect_sessions(claude_code, self.home, WINDOW, Coverage())
         self.assertEqual(len(sessions), 2)
         for session in sessions:
             self.assertEqual(session.is_worker, session.parent_raw_id is not None)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sumbi.sessions.session import Session
+from sumbi.sessions.builder import collect as collect_sessions
 
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -62,7 +62,7 @@ def read_starts(home: Path, *, now: datetime | None = None) -> tuple[list, Windo
         adapter = ADAPTERS[agent]
         measured = Coverage()
         try:
-            sessions.extend(adapter.collect(home, window, measured, session_factory=Session))
+            sessions.extend(collect_sessions(adapter, home, window, measured))
         except Exception:
             coverage[agent] = {**measured.as_dict(), "status": "unavailable"}
             continue

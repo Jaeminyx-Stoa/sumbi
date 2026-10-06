@@ -10,6 +10,7 @@ from sumbi.install.placement import annotate_placement, load_rules, observed_sta
 from sumbi.install.planner import build_plan
 from sumbi.core.records import Coverage
 from sumbi.sessions.session import Session
+from sumbi.events.schema import Record, Identity
 from sumbi.core.time import Window
 from .test_inventory import OfflineTest
 
@@ -130,19 +131,18 @@ class PlacementTests(OfflineTest):
 
     def test_default_start_collection_skips_opt_in_registry_adapters(self):
         home = Path.home()
-        native_sessions = [Session("claude-code", "a"), Session("codex", "b")]
+        native_records = [Record("claude-code", "a", None, Identity(b"a"), observe_time=False),
+                          Record("codex", "b", None, Identity(b"b"), observe_time=False)]
 
-        def collect_claude(home, window, measured, *, session_factory):
-            self.assertIs(session_factory, Session)
+        def collect_claude(home, measured):
             measured.files_scanned = 1
             measured.lines_read = 2
-            return native_sessions[:1]
+            return native_records[:1]
 
-        def collect_codex(home, window, measured, *, session_factory):
-            self.assertIs(session_factory, Session)
+        def collect_codex(home, measured):
             measured.files_scanned = 3
             measured.broken_lines = 1
-            return native_sessions[1:]
+            return native_records[1:]
 
         claude = Mock(collect=Mock(side_effect=collect_claude))
         codex = Mock(collect=Mock(side_effect=collect_codex))
@@ -151,7 +151,8 @@ class PlacementTests(OfflineTest):
         with patch("sumbi.install.placement.ADAPTERS", registry):
             sessions, window, coverage = read_starts(home, now=NOW)
 
-        self.assertEqual(sessions, native_sessions)
+        self.assertEqual([(s.agent, s.raw_id) for s in sessions],
+                         [("claude-code", "a"), ("codex", "b")])
         self.assertEqual(window, Window(NOW - timedelta(days=14), NOW))
         self.assertEqual(coverage, {
             "claude-code": Coverage(files_scanned=1, lines_read=2).as_dict(),
@@ -159,8 +160,8 @@ class PlacementTests(OfflineTest):
         })
         for adapter in (claude, codex):
             adapter.collect.assert_called_once()
-            self.assertEqual(adapter.collect.call_args.args[:2], (home, window))
-            self.assertIsInstance(adapter.collect.call_args.args[2], Coverage)
+            self.assertEqual(adapter.collect.call_args.args[0], home)
+            self.assertIsInstance(adapter.collect.call_args.args[1], Coverage)
         generic.collect.assert_not_called()
 
     def test_inherited_parent_time_does_not_replace_child_cwd_launch(self):
