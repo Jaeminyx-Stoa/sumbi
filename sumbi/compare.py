@@ -8,6 +8,7 @@ from sumbi.catalog import load_judgment_policy
 from sumbi.compare_stats import bootstrap, newcombe, sample_size
 from sumbi.deliver import STATES, deliver, wilson
 from sumbi.ledger import read_ledger
+from sumbi.interventions import exposure_gap, exposure_side, gap_summary, in_exposure_gap
 from sumbi.model import TOKEN_KINDS, Window, timestamp
 from sumbi.privacy import pseudonym, pseudonym_key, read_salt
 from sumbi.registration import read_registration
@@ -39,6 +40,11 @@ def mix_report(counts):
     maximum = max(counts.values(), default=0)
     return {"values": {k: fraction(v, total) for k, v in sorted(counts.items())},
             "dominant": sorted(k for k, v in counts.items() if v == maximum)}
+
+
+def agent_only_in_one_arm(arms):
+    agents = {arm: {r["agent"] for r in rows} for arm, rows in arms.items()}
+    return sorted(agents["before"] ^ agents["after"])
 
 
 def verdict(*, coverage_reasons, preregistered, blocking_flags, arms, registered_size,
@@ -80,8 +86,10 @@ def verdict(*, coverage_reasons, preregistered, blocking_flags, arms, registered
 
 
 def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
-            agents=None, rules=None, idle_minutes=5, salt=None, seed=1729, resamples=5000):
+            agents=None, rules=None, idle_minutes=5, salt=None, seed=1729, resamples=5000,
+            interventions_path=None, intervention_id=None):
     registration = read_registration(registration_path)
+    gap = exposure_gap(registration, interventions_path, intervention_id)
     if registration.outcome_source != "github":
         raise ValueError("GitHub comparison requires github outcome source in registration")
     policy = load_judgment_policy()
@@ -121,8 +129,9 @@ def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
                     for field in ("first_at", "last_at"):
                         when = timestamp(s[field])
                         if when is not None:
-                            exposure.add("before" if when < registration.applied_at else "after")
-                reason = ("unlinked" if not exposure or identity in weak_ids else
+                            exposure.add(exposure_side(when, registration.applied_at, gap))
+                reason = ("exposure_gap" if in_exposure_gap(dispatches[identity], gap) else
+                          "unlinked" if not exposure or identity in weak_ids else
                           "exposure_mixed" if exposure != {arm} else None)
                 if reason:
                     excluded[arm].append({"id": pseudonym("deliverable", identity), "reason": reason})
@@ -142,6 +151,9 @@ def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
         mixes = {}
         arm_sessions = {arm: [metadata[sid] for sid in sorted({s for r in rows for s in sessions[r["id"]]})]
                         for arm, rows in arms.items()}
+        shifted_agents = agent_only_in_one_arm(arm_sessions)
+        if shifted_agents:
+            flag("agent_mix_shift", True, {"agents": shifted_agents})
         for kind in ("model", "effort", "cli_version"):
             unobservable, partial, asymmetric = [], [], []
             for agent in sorted({s["agent"] for rows in arm_sessions.values() for s in rows}):
@@ -152,7 +164,7 @@ def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
                     continue
                 if any(any(values) and not all(values) for values in reported.values()):
                     partial.append(agent)
-                if any(reported["before"]) != any(reported["after"]):
+                if all(reported.values()) and any(reported["before"]) != any(reported["after"]):
                     asymmetric.append(agent)
             for suffix, agents_affected, blocking in (("unobservable", unobservable, False),
                     ("metadata_partial", partial, True), ("metadata_asymmetric", asymmetric, True)):
@@ -253,6 +265,7 @@ def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
                 "non_inferiority_margin_pp": registration.margin_pp, "follow_up_days": registration.follow_up_days,
                 "windows": {arm: {"since": w.since.isoformat(), "until": w.until.isoformat(), "bounds": "[since,until)"}
                             for arm, w in windows.items()}},
+            **({"exposure_gap": gap} if gap is not None else {}),
             "thresholds": {"excluded_or_unlinked_share": EXCLUDED_SHARE, "unattributed_spend_share": UNATTRIBUTED_SHARE,
                            "mix_total_variation": MIX_DISTANCE, "volume_relative_difference": 0.50},
             "sample_size": {"registered_per_arm": registration.sample_size_per_arm,
@@ -292,6 +305,8 @@ def text_summary(report):
         return "not reported" if v is None else f"[{v[0]:.6g}, {v[1]:.6g}]"
     lines = ["sumbi compare", "Verdict proposal: " + report["verdict"]["proposal"],
              "Reasons: " + ", ".join(report["verdict"]["reasons"])]
+    if "exposure_gap" in report:
+        lines.append(gap_summary(report["exposure_gap"]))
     size = report["sample_size"]
     lines.append(f"Sample per arm: registered {size['registered_per_arm']}; needed {value(size['needed_per_arm'])}; "
                  f"actual before {size['actual']['before']}, after {size['actual']['after']}")

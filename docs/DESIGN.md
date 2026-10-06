@@ -116,7 +116,8 @@ Seeds a sensible first harness in the current repository, starting from what is 
    `AGENTS.md` fallback. A versioned agent-neutral discovery table drives
    observed-session-start placement warnings and recommended entry paths.
    Top-level and worker session counts are visible; workers without their own
-   start-header evidence cannot vote in placement recommendations. Ignored,
+   header or direct first-observed cwd evidence cannot vote in placement
+   recommendations. Ignored,
    missing and unsafe cwd paths are withheld.
    Other local worktrees of the inspected repository count too when hardened
    local git queries establish the same common directory. Their scope is

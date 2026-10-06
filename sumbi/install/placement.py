@@ -81,6 +81,7 @@ def observed_starts(root: Path, report: dict, sessions, window: Window | None = 
     root = root.resolve()
     base = normalize_path(str(root.resolve()))
     counts, coverage, roles, agent_roles, seen = Counter(), Counter(), Counter(), Counter(), set()
+    provenance = Counter()
     repositories = report["versioning"]["nested_repositories"]["paths"]
     ignored = _IgnoreChecks(root, repositories)
     git_identity = _git_identity(root)
@@ -148,27 +149,32 @@ def observed_starts(root: Path, report: dict, sessions, window: Window | None = 
             continue
         roles[role] += 1
         agent_roles[session.agent, role] += 1
-        if role == "worker" and (getattr(session, "start_evidence", None) != "session-header"
+        evidence = getattr(session, "start_evidence", None)
+        if role == "worker" and (evidence not in {"session-header", "first-observed-cwd"}
                 or not getattr(session, "start_cwd", None)):
             coverage["worker_start_unknown"] += 1
             continue
+        evidence = evidence or "first-observed-cwd"
+        provenance[evidence] += 1
         scope = None if same_worktree else next((p for p in sorted(repositories, key=len, reverse=True)
                       if path == normalize_path(str(root / p))
                       or path.startswith(normalize_path(str(root / p)) + "/")), None)
         if scope:
             relative = scope + relative[len(scope):]
         kind = "same-repository-worktree" if same_worktree else "workspace-root" if relative == "." else "nested-repository" if scope else "subfolder"
-        counts[session.agent, relative, kind, scope, role] += 1
+        counts[session.agent, relative, kind, scope, role, evidence] += 1
     paths = {}
-    for (agent, path, kind, repository, role), count in sorted(counts.items()):
+    for (agent, path, kind, repository, role, evidence), count in sorted(counts.items()):
         row = paths.setdefault((agent, path, kind, repository), {"agent": agent, "path": path, "kind": kind,
-            "repository": repository, "count": 0, "roles": {"top-level": 0, "worker": 0}})
+            "repository": repository, "count": 0, "roles": {"top-level": 0, "worker": 0}, "start_evidence": {}})
         if kind == "same-repository-worktree":
             row["scope"] = kind
         row["count"] += count
         row["roles"][role] += count
+        row["start_evidence"][evidence] = row["start_evidence"].get(evidence, 0) + count
     return {"status": "observed" if roles else "no-starts-found", "sessions": sum(roles.values()),
             "placement_sessions": sum(counts.values()),
+            "start_evidence": dict(sorted(provenance.items())),
             "roles": {role: roles[role] for role in ("top-level", "worker")},
             "agents": [{"agent": agent, "roles": {role: agent_roles[agent, role]
                 for role in ("top-level", "worker")},
