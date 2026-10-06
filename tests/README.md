@@ -7,6 +7,25 @@ synthetic inputs and recorded GitHub responses; they never need network access.
 python -m unittest discover -s tests
 ```
 
+## Normalized event seams
+
+`test_event_adapters.py` checks immutable translation observations without a
+measurement window, session factory, attribution, or outcome decisions.
+`test_session_builder.py` folds synthetic normalized events directly and pins
+streaming snapshot selection, cumulative counter resets and corrections,
+deduplication, tool/request pairing, execution context, dispatch conflicts and
+metadata completeness. Existing native and open-format accounting and local
+verification tests retain their assertions through the shared builder's
+collection seam.
+
+Adapters yield ordered immutable `Record` envelopes containing the v1 event
+types from `sumbi.events.schema`. A native record can contain several
+observations sharing one deduplication identity and ordering position. Open
+event IDs are resolved globally before folding so conflicting records cannot
+contribute favorable evidence. Optional snapshot and pairing fields describe
+observations that native logs expose; vendor record dictionaries never reach
+the builder. The eight open JSONL types and their wire contract remain unchanged.
+
 ## Temporary roots and Git isolation
 
 Every test that creates repositories or invokes Git uses
