@@ -255,7 +255,7 @@ class InventoryTests(OfflineTest):
         (root / "docs/design.md").write_text(rule, encoding="utf-8")
         (root / "AGENTS.md").write_text("See [design](docs/design.md).\n", encoding="utf-8")
         report = inventory(root)
-        self.assertEqual(report["conventions"]["plan_approval"], [])
+        self.assertEqual(report["conventions"]["plan_approval"], {"status": "absent", "evidence": []})
         self.assertIn("missing-plan-approval", {gap["id"] for gap in find_gaps(report)})
 
     def test_loaded_rules_skills_and_imports_supply_directive_evidence(self):
@@ -271,7 +271,7 @@ class InventoryTests(OfflineTest):
                 if path.startswith("docs/"):
                     (root / "CLAUDE.md").write_text("@docs/imported.md\n", encoding="utf-8")
                 report = inventory(root)
-                self.assertEqual(report["conventions"]["plan_approval"], [path])
+                self.assertEqual(report["conventions"]["plan_approval"], {"status": "present", "evidence": [{"path": path, "kind": "directive"}]})
                 self.assertNotIn("missing-plan-approval", {g["id"] for g in find_gaps(report)})
 
     def test_instruction_mentions_examples_metadata_and_denials_are_not_rules(self):
@@ -286,4 +286,9 @@ class InventoryTests(OfflineTest):
         skill.parent.mkdir(parents=True)
         skill.write_text("---\nname: planning\ndescription: Write a plan before approval.\n---\n"
                          "Planning is a catalog topic.\n", encoding="utf-8")
-        self.assert_gaps(inventory(root), BASE_GAPS)
+        report = inventory(root)
+        self.assert_gaps(report, BASE_GAPS - {"missing-plan-approval", "missing-worktree-rule"})
+        for key in ("plan_approval", "parallel_worktree"):
+            paths = ([".agents/skills/planning/SKILL.md"] if key == "plan_approval" else []) + ["AGENTS.md"]
+            self.assertEqual(report["conventions"][key], {"status": "unknown", "evidence": [
+                {"path": path, "kind": "mentioned"} for path in paths]})

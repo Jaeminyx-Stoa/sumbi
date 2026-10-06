@@ -63,6 +63,19 @@ def excluded_by(relative: str, patterns: tuple[str, ...]) -> str | None:
     return next((p for p in patterns if any(matches(a.as_posix(), p) for a in ancestors)), None)
 
 
+def local_git(root: Path, *arguments: str, data: bytes | None = None):
+    """Run only a bounded local git query with repository programs disabled."""
+    try:
+        return subprocess.run(
+            ["git", "-C", str(root), "-c", "core.fsmonitor=false",
+             "-c", "core.untrackedCache=false", *arguments], input=data,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env={**os.environ, "LC_ALL": "C"}, timeout=30, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
 class GitIgnore:
     """Ask local git for standard ignore rules; never execute project code."""
 
@@ -89,16 +102,10 @@ class GitIgnore:
             self.available = False
 
     def _run(self, *arguments: str, data: bytes | None = None):
-        try:
-            return subprocess.run(
-                ["git", "-C", str(self.root), "-c", "core.fsmonitor=false",
-                 "-c", "core.untrackedCache=false", *arguments], input=data,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                env={**os.environ, "LC_ALL": "C"}, timeout=30, check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired):
+        result = local_git(self.root, *arguments, data=data)
+        if result is None:
             self.available = False
-            return None
+        return result
 
     def excludes(self, relative: str) -> bool:
         """Match discovered ignored roots without visiting their contents."""

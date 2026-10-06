@@ -11,7 +11,7 @@ installer-specific log parser: the registry supplies normalized sessions.
 | Agent | Default entry and discovery | Primary documentation |
 |---|---|---|
 | Codex | Global guidance and one entry per directory from project root through cwd; without a root, cwd only. Overrides precede AGENTS.md. | [Codex discovery](https://developers.openai.com/codex/guides/agents-md) |
-| Claude Code | CLAUDE.md ancestors at launch, imports expanded, nested files on demand. AGENTS fallback is conditional. | [Claude memory](https://code.claude.com/docs/en/memory) |
+| Claude Code | CLAUDE.md ancestors at launch, imports expanded, nested files on demand. Rules with non-empty paths front matter activate on matching file reads; other rules are always loaded. AGENTS fallback is conditional. | [Claude memory](https://code.claude.com/docs/en/memory) |
 | Gemini CLI | Global GEMINI.md, configured workspaces and parents, then trusted context on demand. | [Gemini context](https://geminicli.com/docs/cli/gemini-md/) |
 | Copilot | Repository-wide .github/copilot-instructions.md; additional instruction features vary by product. | [Copilot instructions](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions) |
 | Cursor | .cursor/rules/*.mdc; alwaysApply must be true for every chat. Other types are conditional. | [Cursor rules](https://cursor.com/docs/rules) |
@@ -23,6 +23,18 @@ Some sessions before v2.1.281 cannot use it. Settings, exclusions and subagent
 instruction policies can change receipt. An explicit CLAUDE.md import remains
 compatible. The installer reports AGENTS fallback as unknown because session
 settings and ancestors outside the inspected root are unavailable.
+
+Revision 2 of the version 1 load-rule table records Claude rule activation:
+`.claude/rules/*.md` with non-empty `paths:` in YAML front matter is conditional.
+Missing or empty `paths:` is always loaded. The inventory supports scalar,
+flow-list and block forms without a YAML dependency. Conditional rules appear
+in `cost.conditional_instructions.claude`, separately from always-loaded root
+and largest-scope estimates, and cannot alone trigger `instruction-budget`.
+These estimates use `script-aware-v1`: `ceil(other_characters / 4)` plus one
+token per Hangul, Han, Hiragana or Katakana character. This is an upper-leaning
+heuristic, not a tokenizer or a guaranteed upper bound; the output names the
+rule. Unique files count once within each estimate and sibling scopes are not
+summed. Cost does not prove actual instruction receipt.
 
 Placement assumes each agent's default project discovery and filename settings.
 Codex project-root overrides, fallback filenames and byte limits can change the
@@ -73,6 +85,30 @@ weighting. Unknown worker starts never decide the majority.
 Ties do not warn. Recommended entry paths are ranked by the missed start counts
 they address. A non-git workspace root can therefore need root guidance for one
 agent and separate nested-repository guidance for another.
+
+A start outside the inspected workspace can still belong to the same
+repository: local git must report a different worktree root and the same
+resolved git common directory. Identity queries disable `core.fsmonitor` and
+`core.untrackedCache`, just like ignore queries; no folder-name inference or
+network query is used. These starts have `kind` and `scope`
+`same-repository-worktree`, with only the relative path inside that worktree.
+They contribute to repository placement counts and never to
+`outside_workspace`. Ignore rules are checked in the starting worktree;
+exclusions, directory/link safety and worker provenance still apply. Failed git
+identity queries cannot establish membership. Worktree names and absolute paths
+stay out of reports. Placement maps these starts to the inspected repository's
+relative instruction layout; it does not verify other checkouts' file contents
+or copy an installation into them. Checkout differences and ancestors outside
+each worktree can change actual receipt.
+
+Convention coverage is independent of launch discovery: loaded guidance
+candidates and owner declarations produce `present`, `absent` or `unknown`.
+The vendored English/Korean lexicon is extendable per language. Predominantly
+uncovered scripts produce `convention-language-unsupported` with script labels,
+and undetected conventions produce no gaps. Existing paths declared under
+`[conventions]` in `.sumbi/config.toml` supply `declared` evidence; missing paths
+warn without supplying presence. See the [install guide](../sumbi/install/README.md)
+for declaration keys and safeguards.
 
 The install API exposes `read_starts`, `observed_starts`, and
 `annotate_placement` for callers supplying normalized sessions or an explicit

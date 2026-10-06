@@ -5,21 +5,18 @@ from __future__ import annotations
 import ast
 import configparser
 import json
-import math
 import os
 from pathlib import Path, PurePosixPath
 import re
 import textwrap
 import tomllib
 
+from .conventions import detect as detect_conventions
+from .text import ESTIMATE_RULE, estimate_tokens
 from .errors import InstallError
 from .exclusions import GitIgnore, excluded_by, load_excludes
 
 MAX_BYTES = 1_048_576
-ESTIMATE_RULE = (
-    "ceil(characters / 4), normalized line endings; unique instructions and local imports "
-    "at root and largest inherited scope; all rule files included as an upper bound"
-)
 
 
 def checked_relative(relative: str) -> PurePosixPath:
@@ -124,7 +121,7 @@ def _paths(root: Path, patterns: tuple[str, ...]) -> tuple[list[str], list[dict]
     }, {"root_versioned": git.versioned, "nested_repositories": _entry(nested)}, ignored
 
 
-def _without_code(text: str) -> str:
+def _without_code(text: str, *, inline: bool = True) -> str:
     """Remove fenced blocks and matching backtick spans before import parsing."""
     lines = []
     fence = None
@@ -141,6 +138,8 @@ def _without_code(text: str) -> str:
         else:
             lines.append(line)
     text = "".join(lines)
+    if not inline:
+        return text
     runs = list(re.finditer(r"`+", text))
     output, start, index = [], 0, 0
     while index < len(runs):
@@ -160,6 +159,42 @@ def _without_code(text: str) -> str:
 
 def _entry(paths: list[str]) -> dict:
     return {"count": len(paths), "paths": sorted(paths)}
+
+
+def conditional_paths(text: str) -> bool:
+    """Recognize non-empty paths in a bounded YAML front-matter subset.
+
+    Scalar, flow-list and indented block forms are supported. No YAML objects
+    are constructed and no path expressions or tags are executed.
+    """
+    frontmatter = re.match(r"\A---[ \t]*\n(.*?)\n---[ \t]*(?:\n|$)", text, re.S)
+    if not frontmatter:
+        return False
+    lines = frontmatter[1].splitlines()
+    empty = {"", "[]", "{}", "null", "Null", "NULL", "~", "''", '""'}
+    for index, line in enumerate(lines):
+        match = re.match(r"^(?:paths|'paths'|\"paths\"):[ \t]*(.*)$", line)
+        if not match:
+            continue
+        # Comments start at whitespace; a '#' inside a quoted glob is content.
+        value = re.split(r"\s+#", match[1], maxsplit=1)[0].strip()
+        if value.startswith("#"):
+            value = ""
+        if value.startswith("[") and value.endswith("]") and not value[1:-1].strip(" \t,\"'"):
+            continue
+        if value in empty and value:
+            continue
+        if value not in empty and value not in {"|", ">", "|-", ">-", "|+", ">+"}:
+            return True
+        for following in lines[index + 1:]:
+            if not following.strip() or following.lstrip().startswith("#"):
+                continue
+            if not following.startswith((" ", "\t", "-")):
+                break
+            item = re.split(r"\s+#", following.strip().removeprefix("-").strip(), maxsplit=1)[0].strip()
+            if item not in empty:
+                return True
+    return False
 
 
 def inventory(repository: Path | str = ".", budget: int = 2000, *,
@@ -203,7 +238,7 @@ def inventory(repository: Path | str = ".", budget: int = 2000, *,
     instructions = {
         "agents": [p for p in paths if PurePosixPath(p).name == "AGENTS.md"],
         "claude": [p for p in paths if PurePosixPath(p).name == "CLAUDE.md"],
-        "claude_rules": [p for p in paths if p.startswith(".claude/rules/")],
+        "claude_rules": [p for p in paths if p.startswith(".claude/rules/") and p.endswith(".md")],
         "gemini": [p for p in paths if PurePosixPath(p).name == "GEMINI.md"],
         "copilot": [p for p in paths if p == ".github/copilot-instructions.md"],
         "cursor_rules": [p for p in paths if p.startswith(".cursor/rules/")],
@@ -273,7 +308,7 @@ def inventory(repository: Path | str = ".", budget: int = 2000, *,
                 elif len(description) >= 2 and description[0] == description[-1] and description[0] in "\"'":
                     description = description[1:-1]
         descriptions.append({"path": path, "characters": len(description),
-                             "estimated_tokens": math.ceil(len(description) / 4)})
+                             "estimated_tokens": estimate_tokens(description)})
 
     config_paths = [p for p in (".claude/settings.json", ".codex/config.toml", ".codex/hooks.json", ".mcp.json") if p in paths]
     configs, prompt_hooks = [], []
@@ -417,32 +452,16 @@ def inventory(repository: Path | str = ".", budget: int = 2000, *,
         | {item["path"] for item in imports if item["status"] == "resolved"}
         | {p for group in capabilities.values() for p in group["paths"]}
     )
-    conventions = {key: [] for key in ("review_gate", "handoff", "friction_line", "parallel_worktree", "plan_approval")}
-    patterns = {
-        "review_gate": r"(?:\b(?:risk\w*|security|money|payment|auth\w*)\b[^.\n]{0,120}\b(?:require|must|need|before|gate)\b[^.\n]{0,120}\breview\b|\b(?:require|must|need|gate)\b[^.\n]{0,120}\breview\b[^.\n]{0,120}\b(?:risk\w*|security|money|payment|auth\w*)\b|reviewer from a different model family reviews)",
-        "handoff": r"(?:\b(?:leave|write|create|keep|update|record|use|require|must)\b[^.\n]{0,100}\bhandoff\b|\bhandoff (?:document|record|template|convention)\b[^.\n]{0,100}\b(?:must|should|record|include|contain)\b)",
-        "friction_line": r"\b(?:end|include|write|record|report|use|must)\b[^\n]{0,120}\b(?:harness )?friction:\s*",
-        "parallel_worktree": r"(?:\bparallel\b[^.\n]{0,100}\b(?:use|require|must|need)\b[^.\n]{0,100}\bworktrees?\b|\b(?:use|require|must|assign)\b[^.\n]{0,100}\bparallel\b[^.\n]{0,100}\bworktrees?\b)",
-        "plan_approval": r"(?:\b(?:write|record|create|critique|review|need|needs|must|approve|require)\b[^\n]{0,100}\bplan\b[^\n]{0,160}\b(?:approval|approve|before implementation)\b|\bplan\b[^\n]{0,80}\b(?:needs|must|requires)\b[^\n]{0,100}\b(?:approval|approve|before implementation)\b)",
-    }
-    for path in convention_paths:
-        # Evidence must be a directive, not a roadmap, an example or a denial.
-        guidance = re.sub(r"\A---\s*\n.*?\n---(?:\s*\n|$)", "", content(path), flags=re.S)
-        guidance = re.sub(r"(?m)^\s*(`{3,}|~{3,})[^\n]*\n.*?^\s*\1\s*$", "", guidance, flags=re.S)
-        text = "\n".join(line for line in guidance.splitlines() if not re.search(
-            r"\b(?:roadmap|planned|ideas?|examples?|might|could|consider)\b|\b(?:not|never)\s+(?:require|use|write|need)",
-            line, re.I))
-        for key, pattern in patterns.items():
-            if re.search(pattern, text, re.I):
-                conventions[key].append(path)
+    conventions, lexicon_version = detect_conventions(root, convention_paths, content, warnings)
+    conditional_rules = [p for p in instructions["claude_rules"] if conditional_paths(content(p))]
     agent_sources = {"codex": instructions["agents"], "claude": instructions["claude"],
                      "gemini": instructions["gemini"], "copilot": [], "cursor": []}
-    global_sources = {"codex": [], "claude": instructions["claude_rules"], "gemini": [],
+    global_sources = {"codex": [], "claude": [p for p in instructions["claude_rules"] if p not in conditional_rules], "gemini": [],
                       "copilot": instructions["copilot"], "cursor": instructions["cursor_rules"]}
     costs = {}
     for agent, main_sources in agent_sources.items():
         scopes = sorted({PurePosixPath(p).parent for p in main_sources} | {PurePosixPath(".")}, key=str)
-        largest_sources, largest_characters, root_characters = [], 0, 0
+        largest_sources, largest_text, root_text, largest_tokens = [], "", "", 0
         for scope in scopes:
             ancestors = {scope, *scope.parents}
             sources = {p for p in main_sources if PurePosixPath(p).parent in ancestors} | set(global_sources[agent])
@@ -454,15 +473,18 @@ def inventory(repository: Path | str = ".", budget: int = 2000, *,
                         if item["source"] == source and item["status"] == "resolved" and item["path"] not in sources:
                             sources.add(item["path"])
                             pending.append(item["path"])
+                sources.difference_update(conditional_rules)
             sources = sorted(sources)
-            characters = sum(len(content(path)) for path in sources)
+            text = "".join(content(path) for path in sources)
+            tokens = estimate_tokens(text)
             if scope == PurePosixPath("."):
-                root_characters = characters
-            if characters > largest_characters or not largest_sources:
-                largest_characters, largest_sources = characters, sources
-        costs[agent] = {"paths": largest_sources, "characters": largest_characters,
-                        "estimated_tokens": math.ceil(largest_characters / 4),
-                        "root_estimated_tokens": math.ceil(root_characters / 4)}
+                root_text = text
+            if tokens > largest_tokens or not largest_sources:
+                largest_text, largest_sources = text, sources
+                largest_tokens = tokens
+        costs[agent] = {"paths": largest_sources, "characters": len(largest_text),
+                        "estimated_tokens": largest_tokens,
+                        "root_estimated_tokens": estimate_tokens(root_text)}
     return {
         "exclusions": exclusions,
         "versioning": versioning,
@@ -475,7 +497,11 @@ def inventory(repository: Path | str = ".", budget: int = 2000, *,
                         "type_check": _entry(sorted(set(typing))), "test_sources": test_sources,
                         "required_checks": "unknown (offline)", "rulesets": "unknown (offline)"},
         "cost": {"estimate_rule": ESTIMATE_RULE, "budget": budget,
-                 "instructions": costs, "skill_descriptions": descriptions,
+                 "instructions": costs, "conditional_instructions": {"claude": {
+                     "paths": conditional_rules, "characters": sum(len(content(p)) for p in conditional_rules),
+                     "estimated_tokens": estimate_tokens("".join(content(p) for p in conditional_rules))}},
+                 "skill_descriptions": descriptions,
                  "every_prompt_hooks": prompt_hooks},
-        "conventions": conventions, "convention_search_paths": convention_paths, "warnings": warnings,
+        "conventions": conventions, "convention_lexicon_version": lexicon_version,
+        "convention_search_paths": convention_paths, "warnings": warnings,
     }

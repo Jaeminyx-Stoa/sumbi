@@ -12,7 +12,7 @@ from sumbi.model import Coverage, Window, normalize_path
 from .errors import InstallError
 from .gaps import has_import
 from .inventory import read_bytes, safe_path
-from .exclusions import GitIgnore, excluded_by
+from .exclusions import GitIgnore, excluded_by, local_git
 
 
 class _IgnoreChecks:
@@ -64,6 +64,18 @@ def read_starts(home: Path, *, now: datetime | None = None) -> tuple[list, Windo
     return sessions, window, coverage
 
 
+def _git_identity(directory: Path) -> tuple[Path, Path] | None:
+    """Return worktree root/common directory from git, never a folder-name guess."""
+    result = local_git(directory, "rev-parse", "--path-format=absolute",
+                       "--show-toplevel", "--git-common-dir")
+    if result is None or result.returncode:
+        return None
+    values = os.fsdecode(result.stdout).splitlines()
+    if len(values) != 2 or any(not Path(value).is_absolute() for value in values):
+        return None
+    return Path(values[0]).resolve(), Path(values[1]).resolve()
+
+
 def observed_starts(root: Path, report: dict, sessions, window: Window | None = None) -> dict:
     """Count session starts, with worker attribution and uncertain child coverage."""
     root = root.resolve()
@@ -72,6 +84,8 @@ def observed_starts(root: Path, report: dict, sessions, window: Window | None = 
     provenance = Counter()
     repositories = report["versioning"]["nested_repositories"]["paths"]
     ignored = _IgnoreChecks(root, repositories)
+    git_identity = _git_identity(root)
+    worktree_checks, identities = {}, {}
     patterns = tuple(e["pattern"] for e in report["exclusions"]["patterns"])
     for session in sessions:
         identity = session.agent, session.raw_id
@@ -99,11 +113,22 @@ def observed_starts(root: Path, report: dict, sessions, window: Window | None = 
             cwd = next(iter(candidates))
             coverage["first_observed_cwd"] += 1
         path = normalize_path(cwd)
+        same_worktree = False
+        start_root, start_ignored = root, ignored
         if path != base and not path.startswith(base + "/"):
-            coverage["outside_workspace"] += 1
-            continue
+            if path not in identities:
+                identities[path] = _git_identity(Path(cwd)) if git_identity else None
+            candidate = identities[path]
+            if candidate is None or candidate[1] != git_identity[1] or candidate[0] == git_identity[0]:
+                coverage["outside_workspace"] += 1
+                continue
+            same_worktree = True
+            start_root = candidate[0]
+            if start_root not in worktree_checks:
+                worktree_checks[start_root] = _IgnoreChecks(start_root, [])
+            start_ignored = worktree_checks[start_root]
         try:
-            relative = Path(os.path.normpath(cwd)).relative_to(root).as_posix()
+            relative = Path(os.path.normpath(cwd)).relative_to(start_root).as_posix()
         except ValueError:
             coverage["unsafe_cwd"] += 1
             continue
@@ -111,11 +136,11 @@ def observed_starts(root: Path, report: dict, sessions, window: Window | None = 
             coverage["excluded_cwd"] += 1
             continue
         try:
-            directory = root if relative == "." else safe_path(root, relative)
+            directory = start_root if relative == "." else safe_path(start_root, relative)
             if not directory.is_dir():
                 coverage["missing_or_non_directory_cwd"] += 1
                 continue
-            excluded = ignored.check(relative)
+            excluded = start_ignored.check(relative)
         except (InstallError, OSError):
             coverage["unsafe_cwd"] += 1
             continue
@@ -131,17 +156,19 @@ def observed_starts(root: Path, report: dict, sessions, window: Window | None = 
             continue
         evidence = evidence or "first-observed-cwd"
         provenance[evidence] += 1
-        scope = next((p for p in sorted(repositories, key=len, reverse=True)
+        scope = None if same_worktree else next((p for p in sorted(repositories, key=len, reverse=True)
                       if path == normalize_path(str(root / p))
                       or path.startswith(normalize_path(str(root / p)) + "/")), None)
         if scope:
             relative = scope + relative[len(scope):]
-        kind = "workspace-root" if relative == "." else "nested-repository" if scope else "subfolder"
+        kind = "same-repository-worktree" if same_worktree else "workspace-root" if relative == "." else "nested-repository" if scope else "subfolder"
         counts[session.agent, relative, kind, scope, role, evidence] += 1
     paths = {}
     for (agent, path, kind, repository, role, evidence), count in sorted(counts.items()):
-        row = paths.setdefault((agent, path), {"agent": agent, "path": path, "kind": kind,
+        row = paths.setdefault((agent, path, kind, repository), {"agent": agent, "path": path, "kind": kind,
             "repository": repository, "count": 0, "roles": {"top-level": 0, "worker": 0}, "start_evidence": {}})
+        if kind == "same-repository-worktree":
+            row["scope"] = kind
         row["count"] += count
         row["roles"][role] += count
         row["start_evidence"][evidence] = row["start_evidence"].get(evidence, 0) + count
@@ -255,6 +282,7 @@ def annotate_placement(plan, sessions, window: Window | None = None, coverage: d
     if any(starts["coverage"].get(k) for k in ("worker_start_unknown", "gitignore_unknown_cwd")):
         plan.report["warnings"].append({"kind": "start-coverage-incomplete"})
     plan.report["load_rules_version"] = rules["version"]
+    plan.report["load_rules_revision"] = rules["revision"]
     by_agent = {r["agent"]: r for r in rules["agents"]}
     contents = {c.path: c.after for c in plan.changes}
     # Imports introduced by this plan also participate in launch guidance.
