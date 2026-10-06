@@ -72,7 +72,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                 start_cwds[raw_id] = when
                 session.start_cwd = event["cwd"]
                 session.start_evidence = "first-observed-cwd"
-            session.is_worker = child
+            session.is_worker = child or event.get("isSidechain") is True
             order = (len(session.seen), len(session.seen))
             session.cwd(event.get("cwd"), when)
             if event.get("version"):

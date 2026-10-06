@@ -97,6 +97,8 @@ class DecisionOrderTests(unittest.TestCase):
         self.assertEqual(self.decision(**bad, coverage_reasons=["broken"])[1][0], "incomplete_coverage")
         self.assertEqual(self.decision(**bad, preregistered=False)[1], ["not_preregistered"])
         self.assertEqual(self.decision(**bad, blocking_flags=["model_mix_shift"])[1], ["not_comparable", "model_mix_shift"])
+        self.assertEqual(self.decision(**bad, blocking_flags=["verifier_never_passed"]),
+                         ("withhold", ["not_comparable", "verifier_never_passed"]))
         self.assertEqual(self.decision(**bad, registered_size=2)[1], ["insufficient_sample"])
         self.assertEqual(self.decision(**bad, arms={"before": [{"state": "immature"}], "after": []})[1], ["immature_or_in_progress"])
 
@@ -493,6 +495,31 @@ class CompareRoundTests(unittest.TestCase):
         self.assert_proposal(report, "withhold", "effort_metadata_asymmetric")
         flag = next(f for f in report["flags"] if f["name"] == "effort_metadata_asymmetric")
         self.assertEqual(flag["evidence"]["agents"], ["codex"])
+
+    def test_agent_only_in_one_arm_does_not_claim_metadata_asymmetry(self):
+        target = self.root / "home/.claude/projects/fixture"
+        target.mkdir(parents=True)
+        shutil.copyfile(self.root / "claude/A01.jsonl", target / "A01.jsonl")
+        (self.root / "home/.codex/sessions/rollout-A01.jsonl").unlink()
+        report = self.run_round(agents=["claude-code", "codex"])
+        flag = next(f for f in report["flags"] if f["name"] == "agent_mix_shift")
+        self.assertEqual(flag, {"name": "agent_mix_shift", "blocking": True, "evidence": {"agents": ["claude-code"]}})
+        self.assert_proposal(report, "withhold", "agent_mix_shift")
+        self.assertFalse(any(f["name"].endswith("metadata_asymmetric") for f in report["flags"]))
+
+    def test_intervention_apply_gap_later_earlier_and_absent(self):
+        path = self.root / "interventions.jsonl"
+        for actual, arm in (("2030-01-08T00:10:00Z", "after"), ("2030-01-01T00:00:00Z", "before")):
+            with self.subTest(actual=actual):
+                path.write_text(json.dumps({"practice_id": "round-01", "utc_time": actual}) + "\n", encoding="utf-8")
+                report = self.run_round(interventions_path=path)
+                self.assertEqual(report["exclusions"][arm]["counts"], {"exposure_gap": 20})
+                self.assertEqual(report["arms"][arm]["n"], 0)
+                self.assertGreater(report["exposure_gap"]["seconds"], 0)
+                self.assertIn("Exposure gap:", text_summary(report))
+        report = self.run_round()
+        self.assertNotIn("exposure_gap", report)
+        self.assertEqual(report["arms"]["after"]["n"], 20)
 
     def test_other_project_heavy_spend_is_context_only(self):
         source = self.root / "home/.codex/sessions/rollout-B01.jsonl"

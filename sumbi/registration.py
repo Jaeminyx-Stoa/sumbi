@@ -1,11 +1,13 @@
 """Strict, local pre-registration schema; diagnostics never echo input."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import math
+import os
 from pathlib import Path
 import re
+import tempfile
 
 from sumbi.ledger import LABEL, utc
 from sumbi.model import Window
@@ -94,3 +96,45 @@ def _unique(pairs):
             raise ValueError
         result[key] = value
     return result
+
+
+def write_registration(path: Path, *, intervention_id, outcome_source, margin_pp,
+                       sample_size_per_arm, follow_up_days, window_days, applied_at, practice_ids):
+    """Publish a validated catalog pre-registration exclusively, never replace."""
+    from sumbi.catalog import load_catalog
+    catalog = {p["id"]: p for p in load_catalog()}
+    if (not practice_ids or len(set(practice_ids)) != len(practice_ids)
+            or any(p not in catalog for p in practice_ids)):
+        raise ValueError("Predictions require unique bundled catalog practice IDs")
+    if type(window_days) not in (int, float) or not math.isfinite(window_days) or window_days <= 0:
+        raise ValueError("Window days must be positive and finite")
+    try:
+        planned = utc(applied_at, "Registration")
+        duration = timedelta(days=window_days)
+        raw = {"intervention_id": intervention_id, "outcome_source": outcome_source,
+               "registered_at": datetime.now(timezone.utc).isoformat(), "applied_at": planned.isoformat(),
+               "non_inferiority_margin_pp": margin_pp, "sample_size_per_arm": sample_size_per_arm,
+               "follow_up_days": follow_up_days,
+               "before": {"since": (planned - duration).isoformat(), "until": planned.isoformat()},
+               "after": {"since": planned.isoformat(), "until": (planned + duration).isoformat()},
+               "predictions": [catalog[p]["prediction"] for p in practice_ids]}
+        data = json.dumps(raw, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
+    except (ValueError, TypeError, OverflowError):
+        raise ValueError("Registration flags must match the documented comparison JSON schema") from None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n", dir=path.parent,
+                                         prefix=".sumbi-register-", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(data)
+        temporary.chmod(0o600)
+        registration = read_registration(temporary)
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            raise ValueError("Registration already exists; it will not be overwritten") from None
+        return registration
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)

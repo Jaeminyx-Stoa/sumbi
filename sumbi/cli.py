@@ -74,9 +74,20 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="sumbi")
     root.add_argument("--version", action="version", version="sumbi " + __version__)
     commands = root.add_subparsers(dest="command", required=True)
+    command = commands.add_parser("register", help="Create a validated catalog pre-registration; never overwrite")
+    command.add_argument("--json", type=Path, required=True, metavar="OUT", help="New local registration JSON file")
+    command.add_argument("--intervention-id", required=True, help="Public-safe intervention ID")
+    command.add_argument("--outcome-source", required=True, choices=("github", "local-verify"))
+    command.add_argument("--margin-pp", "--non-inferiority-margin-pp", dest="margin_pp", type=float, required=True,
+                         help="Acceptable success-rate drop in absolute percentage points (0 < margin < 100)")
+    command.add_argument("--sample-size-per-arm", type=int, required=True, help="Positive registered sample per arm")
+    command.add_argument("--follow-up-days", type=idle, required=True, help="Positive outcome follow-up days")
+    command.add_argument("--window-days", type=idle, required=True, help="Equal adjacent dispatch windows around planned application")
+    command.add_argument("--applied-at", type=utc, required=True, help="Planned UTC application time; registered_at is now")
+    command.add_argument("--practice", action="append", required=True, metavar="ID", help="Catalog prediction practice ID; repeatable")
     configure_install(commands.add_parser("install", help="Inventory and seed repository practices offline"))
     configure_collection(commands.add_parser("collect", help="Measure local session logs without transcripts"))
-    command = commands.add_parser("deliver", help="Join a dispatch ledger with recorded or live GitHub outcomes")
+    command = commands.add_parser("deliver", help="Measure GitHub deliverables or local worker verification")
     configure_collection(command, deliver=True)
     configure_outcome_source(command)
     command.add_argument("--cache", type=Path, metavar="DIR", help="Private GitHub response cache outside repositories")
@@ -88,13 +99,17 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--cache", type=Path, metavar="DIR")
     command.add_argument("--record", type=Path, metavar="DIR")
     command.add_argument("--registration", type=Path, required=True)
+    command.add_argument("--interventions", type=Path, metavar="FILE",
+                         help="Optional install intervention JSONL; exclude and count actual apply-time exposure gaps")
+    command.add_argument("--intervention-id", help="Apply record ID (defaults to registration ID; must match it)")
     command.add_argument("--seed", type=int, default=1729)
     command.add_argument("--resamples", type=int, default=5000)
     return root
 
 
 def configure_outcome_source(command):
-    command.add_argument("--outcome-source", choices=("github", "local-verify"))
+    command.add_argument("--outcome-source", choices=("github", "local-verify"),
+                         help="Local verification reports verifier_never_passed with exit-code counts; compare blocks before non-inferiority")
     command.add_argument("--ledger", type=Path)
     command.add_argument("--outcomes", metavar="github|DIR")
     command.add_argument("--repository", type=Path, help="Repository scope for local verification units")
@@ -125,6 +140,21 @@ def main(argv: list[str] | None = None) -> int:
     args = root.parse_args(argv)
     if args.command == "install":
         return run_install(args)
+    if args.command == "register":
+        try:
+            from sumbi.registration import write_registration
+            write_registration(args.json, intervention_id=args.intervention_id, outcome_source=args.outcome_source,
+                               margin_pp=args.margin_pp, sample_size_per_arm=args.sample_size_per_arm,
+                               follow_up_days=args.follow_up_days, window_days=args.window_days,
+                               applied_at=args.applied_at.isoformat(), practice_ids=args.practice)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        except OSError:
+            print("Registration write failed; existing files were not replaced.", file=sys.stderr)
+            return 1
+        print("Pre-registration written; registered_at is now; predictions copied from catalog.")
+        return 0
     try:
         if args.command == "compare":
             from sumbi.registration import read_registration
@@ -147,6 +177,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.salt_file is not None and args.salt_file.resolve() in resolved:
         root.error("Output destinations must not overwrite the pseudonym salt file")
     sources = log_roots(args.home)
+    if args.command == "compare":
+        if args.intervention_id is not None and args.interventions is None:
+            root.error("--intervention-id requires --interventions")
+        if args.interventions is not None and args.interventions.resolve() in resolved:
+            root.error("Compare output must not overwrite interventions")
     if any(p.is_relative_to(source.resolve()) for p in resolved for source in sources):
         root.error("Output destinations must be outside session-log directories")
     if args.command in ("deliver", "compare"):
@@ -171,7 +206,8 @@ def main(argv: list[str] | None = None) -> int:
                 if args.command == "compare":
                     from sumbi.local_compare import compare_local, text_summary as local_summary
                     report = compare_local(args.home, args.repository, args.registration,
-                                           **options, seed=args.seed, resamples=args.resamples)
+                                           **options, seed=args.seed, resamples=args.resamples,
+                                           interventions_path=args.interventions, intervention_id=args.intervention_id)
                 else:
                     report = deliver_local(args.home, window, args.repository, **options)
                 data = json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
@@ -213,6 +249,8 @@ def main(argv: list[str] | None = None) -> int:
                 protected = [args.ledger.resolve(), *resolved]
                 if args.command == "compare":
                     protected.append(args.registration.resolve())
+                    if args.interventions:
+                        protected.append(args.interventions.resolve())
                 if args.salt_file:
                     protected.append(args.salt_file.resolve())
                 if any(p.is_relative_to(store) for p in protected for store in stores) or any(
@@ -226,7 +264,8 @@ def main(argv: list[str] | None = None) -> int:
                 from sumbi.compare import compare, text_summary as deliver_summary
                 report = compare(args.home, args.ledger, outcomes, args.registration,
                                  agents=agents, rules=rules, idle_minutes=args.idle_minutes,
-                                 salt=salt, seed=args.seed, resamples=args.resamples)
+                                 salt=salt, seed=args.seed, resamples=args.resamples,
+                                 interventions_path=args.interventions, intervention_id=args.intervention_id)
             else:
                 report = deliver(args.home, window, args.ledger, outcomes,
                                  agents=agents, rules=rules, idle_minutes=args.idle_minutes,

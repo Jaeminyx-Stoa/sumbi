@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import stat
 import tempfile
+import re
 
 from sumbi.catalog import VERSION, load_judgment_policy
 from .baseline import baseline
@@ -67,7 +68,10 @@ def _protect_local_artifacts(root: Path) -> None:
     _write(root, relative, before, data + LOCAL_IGNORES, mode)
 
 
-def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = None) -> dict:
+def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = None, intervention_id=None) -> dict:
+    from sumbi.ledger import LABEL
+    if intervention_id is not None and (not isinstance(intervention_id, str) or not re.fullmatch(LABEL, intervention_id)):
+        raise InstallError("Intervention ID must be a bounded public-safe label.")
     if not plan.changes:
         return {"applied": [], "baseline": {"status": "not requested (empty plan)"}}
     root = plan.root
@@ -116,6 +120,7 @@ def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = Non
         backup = safe_path(root, backup_relative)
         backup.mkdir(parents=True, mode=0o700, exist_ok=False)
         records = [{"practice_id": p["id"], "catalog_version": VERSION,
+                    **({"intervention_id": intervention_id} if intervention_id is not None else {}),
                     "content_hash": p["content_hash"], "files": p["files"],
                     "prediction": p["prediction"], "judgment": p["judgment"],
                     "provenance": p["provenance"], "utc_time": utc,

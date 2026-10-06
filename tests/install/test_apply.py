@@ -18,6 +18,18 @@ apply_module = importlib.import_module("sumbi.install.apply")
 
 
 class ApplyTests(OfflineTest):
+    def test_explicit_intervention_id_groups_practices_and_rejects_private_text(self):
+        root = self.copy_fixture("empty")
+        plan = build_plan(root, select=["handoff", "test-and-verify"])
+        with self.assertRaisesRegex(InstallError, "bounded"):
+            apply_plan(plan, intervention_id="synthetic private text")
+        self.assertFalse((root / ".sumbi/interventions.jsonl").exists())
+        apply_plan(plan, intervention_id="round-01")
+        rows = [json.loads(line) for line in (root / ".sumbi/interventions.jsonl").read_text().splitlines()]
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(all(r["intervention_id"] == "round-01" for r in rows))
+        self.assertEqual(len({r["utc_time"] for r in rows}), 1)
+
     def test_each_fixture_is_idempotent_and_backed_up(self):
         for name in ("empty", "claude-only", "codex-only", "both", "configured"):
             with self.subTest(fixture=name):

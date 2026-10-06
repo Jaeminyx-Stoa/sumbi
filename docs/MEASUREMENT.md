@@ -619,6 +619,26 @@ never caches that transient failure as an unreadable policy.
 
 ### Registration JSON schema
 
+Create a pre-registration from explicit planning flags and bundled catalog
+predictions before applying the change:
+
+```sh
+sumbi register --json registration.json --intervention-id round-01 \
+  --outcome-source local-verify --margin-pp 5 --sample-size-per-arm 12 \
+  --follow-up-days 7 --window-days 14 --applied-at 2030-01-15T00:00:00Z \
+  --practice handoff --practice test-and-verify
+```
+
+`--practice` is repeatable and requires unique catalog practice IDs. The command
+copies their predictions, sets `registered_at` to the current UTC time, and makes
+equal adjacent `[since, until)` windows around the planned `applied_at`.
+`--margin-pp` (also `--non-inferiority-margin-pp`) uses absolute percentage points.
+All planning flags are required. The existing registration reader validates the
+staged JSON before exclusive publication; an existing file is never overwritten.
+Invalid flags publish no registration. Past planned times remain valid input
+and produce a visibly late registration when compared. The command cannot
+authenticate a timestamp or prevent later manual editing.
+
 The top-level object has exactly the required fields below, plus optional
 `confounders` and `outcome_source`. Duplicate keys and unknown fields are rejected. Numbers must be
 finite JSON numbers, not booleans. All times are UTC ISO strings ending in `Z`
@@ -687,6 +707,29 @@ timestamps are checked, including context and nonbillable records; a shared or
 resumed session spanning application is conservatively mixed. This does not
 assert event-specific harness versions that the logs cannot establish.
 
+Both outcome sources accept optional `--interventions .sumbi/interventions.jsonl`.
+The registered intervention ID selects the install record; optional
+`--intervention-id` must match that registration ID. Apply with
+`sumbi install --apply --intervention-id round-01` to attach a shared ID to all
+practices in one installation. For older records without `intervention_id`, the
+reader matches `practice_id`. Matching practice records must have exactly one
+distinct valid UTC `utc_time`; missing, malformed or ambiguous apply evidence
+fails the run rather than guessing. Revert audit rows are not apply evidence.
+Use a fresh ID for each installation being compared.
+
+The recorded `utc_time` is the install write transaction's time after its
+pre-apply baseline, rather than the planned registration time. The report shows
+`exposure_gap`: actual write time, earlier/later/equal direction, half-open bounds
+and gap length in seconds. When actual write is later, dispatches in
+`[applied_at, actual_write)` are excluded with reason `exposure_gap`. When earlier,
+before-arm dispatches in `[actual_write, applied_at)` receive the same exclusion.
+The lower bound belongs to the gap; its upper bound does not. Each exclusion is
+counted in its originating arm and contributes to the mixed-exposure share gate.
+Session endpoints in that interval are also mixed; outside it, exposure uses the
+actual boundary. The install record describes a transaction, not per-file receipt
+or proof that an agent loaded instructions. Without `--interventions`, the
+registered boundary and existing exposure behavior are unchanged.
+
 Mixed deliverables are excluded from both arms and counted by originating arm.
 Unlinked deliverables are also excluded. A row with only weak project/time
 evidence, or any weak allocation alongside stronger links, counts as unlinked;
@@ -719,13 +762,17 @@ observations). They are not weighted by tokens. Models, efforts and CLI versions
 use collect's bounded labels/pseudonyms. Session metadata includes the agent.
 Observability is assessed per agent and dimension over the retained sessions:
 
+- An agent present in only one arm blocks comparison with `agent_mix_shift`,
+  listing the affected agents even when the share change is small. Absence of an
+  agent is not metadata asymmetry.
+
 - If no session of an agent in either arm reports a dimension, an informational
   `<kind>_unobservable` flag lists that agent. Its sessions are left out of that
   dimension's mix. Changes in an unobservable dimension can only be caught by
   registered confounder events, which block comparison.
 - If some sessions of an agent report the dimension and others in the same arm
   do not, `<kind>_metadata_partial` blocks comparison and lists the agents.
-- If an agent reports the dimension in one arm only,
+- If an agent is present in both arms but reports the dimension in one arm only,
   `<kind>_metadata_asymmetric` blocks comparison and lists the agents.
 
 The mix-shift rule applies to the remaining reported session values. Tied
@@ -799,6 +846,11 @@ zero ratio. Unreported cost stays null. A ratio is `improved` only if its point
 estimate is <= 0.90 and its upper bound < 1.00; `worse` only if its lower bound
 > 1.00; otherwise `uncertain`. Only **total tokens** and time drive the verdict;
 per-kind ratios are descriptive.
+
+An undefined point ratio is classified as `uncertain` too, including zero
+successes, missing cost, or a zero before-cost denominator. The decision table
+treats undefined cost as uncertain: it cannot prove improvement or an offset to
+a worse cost in the other dimension.
 
 ### Decision order and public output
 
@@ -897,6 +949,21 @@ result omits a task ID or resembles a successful foreground envelope.
 Text inside stdout never supplies an exit code. Commands, stdout and edit payloads
 are never included in public JSON or text summaries.
 
+`deliver` and `compare` report verifier health separately from worker success.
+At least one matched completed execution with a known integer exit code and no
+exit zero in the measurement window emits `verifier_never_passed`. JSON includes
+completed and passed counts and counts by exit code; the signal appears on the
+first lines of the text summary. It describes a never-passing verification gate,
+including launch or prerequisite failures, and does not prove that tests ran.
+Scoped parent sessions and no-change workers contribute to this health signal.
+Unknown exit codes remain coverage gaps and do not count as known completions.
+Completions outside the dispatch measurement window, including later lifetime
+follow-up passes, cannot suppress it. Comparison uses the union of its two
+registered windows, excluding any intervening hiatus. The signal is a blocking
+comparability flag with reason `verifier_never_passed`, after coverage and before
+success non-inferiority. This prevents success-based proposals from interpreting
+a never-passing gate as an intervention effect. Commands are never emitted.
+
 Recognition accepts a single executed repository-relative script, including
 `./scripts/check.sh`, `bash`/`sh`, `-l`/`--login`, quoted `-c`/`-lc` scripts,
 environment assignment prefixes, PowerShell's `&` and quoted shell executable,
@@ -942,6 +1009,14 @@ Claude's earliest timestamp and earliest cwd-bearing event are preserved
 separately; an earlier metadata event without cwd does not erase that cwd.
 Local-only start provenance distinguishes session headers from first-observed
 cwd evidence. Excluded-scope counts include only sessions observed in the scan.
+
+Install placement accepts a Claude worker's own first-observed cwd from its
+subagent stream, where records can repeat `cwd`, `isSidechain`, `agentId` and
+`sessionId`. This remains `first-observed-cwd`, distinct from Codex's
+`session-header`; placement JSON and text expose counts of each provenance kind,
+globally and per path. Repeated records still count as one session. A child's
+missing cwd is never repaired by borrowing its parent's cwd. Parent-inferred or
+missing worker provenance remains unknown and supplies no placement vote.
 
 Each unit reports a bounded start-scope label. Starts at the configured root or
 its physical subdirectories belong to this workspace; subdirectory workers can

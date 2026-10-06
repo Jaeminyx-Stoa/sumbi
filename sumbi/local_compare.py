@@ -5,18 +5,21 @@ from pathlib import Path
 
 from sumbi.catalog import load_judgment_policy
 from sumbi.compare import (DECISION_ORDER, EXCLUDED_SHARE, MIX_DISTANCE, fraction,
-                           mix_distance, mix_report, verdict)
+                           agent_only_in_one_arm, mix_distance, mix_report, verdict)
 from sumbi.compare_stats import bootstrap, newcombe, sample_size
 from sumbi.deliver import wilson
-from sumbi.local_outcomes import METRICS, STATES, deliver_local
+from sumbi.local_outcomes import METRICS, STATES, deliver_local, verifier_summary
+from sumbi.interventions import exposure_gap, exposure_side, gap_summary, in_exposure_gap
 from sumbi.model import Window, timestamp
 from sumbi.privacy import pseudonym, pseudonym_key, read_salt
 from sumbi.registration import read_registration
 
 
 def compare_local(home: Path, repository: Path, registration_path: Path, *, agents=None,
-                  verify=None, scan_until=None, active_minutes=5, salt=None, seed=1729, resamples=5000):
+                  verify=None, scan_until=None, active_minutes=5, salt=None, seed=1729, resamples=5000,
+                  interventions_path=None, intervention_id=None):
     registration = read_registration(registration_path)
+    gap = exposure_gap(registration, interventions_path, intervention_id)
     if registration.outcome_source != "local-verify":
         raise ValueError("Registration and both arms must use local-verify outcome source")
     if load_judgment_policy()["decision_order"] != DECISION_ORDER:
@@ -25,7 +28,8 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
     with pseudonym_key(key):
         period = Window(registration.before.since, registration.after.until)
         measured = deliver_local(home, period, repository, agents=agents, verify=verify,
-                                 scan_until=scan_until, active_minutes=active_minutes, salt=key)
+                                 scan_until=scan_until, active_minutes=active_minutes, salt=key,
+                                 verification_windows=(registration.before, registration.after))
         windows = {"before": registration.before, "after": registration.after}
         candidates = {arm: [r for r in measured["units"] if w.contains(timestamp(r["dispatched_at"]))]
                       for arm, w in windows.items()}
@@ -33,6 +37,8 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
         flags, mixes = [], {}
         def flag(name, blocking, evidence):
             flags.append({"name": name, "blocking": blocking, "evidence": evidence})
+        for signal in measured["signals"]:
+            flag(signal["name"], True, signal["evidence"])
         scope_mismatches = {arm: dict(Counter(r["start_scope"] for r in rows
                             if r["start_scope"] == "same_origin_other_checkout")) for arm, rows in candidates.items()}
         if any(scope_mismatches.values()):
@@ -41,8 +47,9 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
             arms[arm], excluded = [], []
             for row in rows:
                 last = timestamp(row["last_at"])
-                reason = (row["state"] if row["state"] in ("no_change", "in_progress") else
-                          "exposure_mixed" if arm == "before" and last and last >= registration.applied_at else None)
+                reason = ("exposure_gap" if in_exposure_gap(timestamp(row["dispatched_at"]), gap) else
+                          row["state"] if row["state"] in ("no_change", "in_progress") else
+                          "exposure_mixed" if last and exposure_side(last, registration.applied_at, gap) != arm else None)
                 if reason:
                     excluded.append({"id": row["id"], "reason": reason})
                 else:
@@ -55,6 +62,9 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
                                "counts": dict(Counter(r["reason"] for r in excluded)), "units": excluded}
             if share["value"] is not None and share["value"] > EXCLUDED_SHARE:
                 flag(arm + "_excluded_or_mixed", True, share)
+        shifted_agents = agent_only_in_one_arm(arms)
+        if shifted_agents:
+            flag("agent_mix_shift", True, {"agents": shifted_agents})
         for kind in ("agent", "model", "effort", "cli_version"):
             unobservable, partial, asymmetric = [], [], []
             if kind != "agent":
@@ -66,7 +76,7 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
                             r.get("metadata_incomplete", {}).get(kind) for rows in arms.values()
                             for r in rows if r["agent"] == agent):
                         partial.append(agent)
-                    if any(reported["before"]) != any(reported["after"]):
+                    if all(reported.values()) and any(reported["before"]) != any(reported["after"]):
                         asymmetric.append(agent)
                 for suffix, affected, blocking in (("unobservable", unobservable, False),
                          ("metadata_partial", partial, True), ("metadata_asymmetric", asymmetric, True)):
@@ -80,7 +90,10 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
                            summaries["before"]["dominant"] != summaries["after"]["dominant"])
             mixes[kind] = {**summaries, "total_variation_distance": distance, "dominant_changed": changed}
             if changed or distance is not None and distance > MIX_DISTANCE:
-                flag(kind + "_mix_shift", True, mixes[kind])
+                if kind == "agent" and shifted_agents:
+                    next(f for f in flags if f["name"] == "agent_mix_shift")["evidence"].update(mixes[kind])
+                else:
+                    flag(kind + "_mix_shift", True, mixes[kind])
         sizes = [len(r) for r in arms.values()]
         if max(sizes) > 1.5 * min(sizes):
             flag("volume_shift", False, fraction(max(sizes) - min(sizes), min(sizes)))
@@ -135,6 +148,8 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
             arms=arms, registered_size=registration.sample_size_per_arm, success=success,
             margin_pp=registration.margin_pp, ratios=ratios)
         return {"schema_version": "local-compare-1.0", "outcome_source": "local-verify",
+            "verification": measured["verification"], "signals": measured["signals"],
+            **({"exposure_gap": gap} if gap is not None else {}),
             "registration": {"outcome_source": registration.outcome_source,
                 "intervention_id": pseudonym("intervention", registration.intervention_id),
                 "applied_at": registration.applied_at.isoformat(), "registered_at": registration.registered_at.isoformat(),
@@ -159,8 +174,13 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
 
 
 def text_summary(report):
-    lines = ["sumbi compare local verification", "Outcome source: local-verify", "Verdict proposal: " +
-             report["verdict"]["proposal"], "Reasons: " + ", ".join(report["verdict"]["reasons"])]
+    lines = ["sumbi compare local verification"]
+    if report.get("signals"):
+        lines.append(verifier_summary(report["verification"]))
+    lines.extend(["Outcome source: local-verify", "Verdict proposal: " +
+                  report["verdict"]["proposal"], "Reasons: " + ", ".join(report["verdict"]["reasons"])])
+    if "exposure_gap" in report:
+        lines.append(gap_summary(report["exposure_gap"]))
     lines.append("Cost proposal scope: retained worker sessions only")
     lines.append(f"Excluded dispatch overhead: {report['dispatch_overhead']['sessions']} sessions; observed tokens {report['dispatch_overhead']['observed_total']}")
     size = report["sample_size"]
