@@ -1,5 +1,7 @@
 """Fixed worker-session units and local verification outcome measurements."""
 
+from sumbi.sessions.session import Session
+
 from collections import Counter
 from datetime import timedelta
 from pathlib import Path
@@ -12,6 +14,8 @@ from sumbi.core.paths import execution_cwd
 from sumbi.core.privacy import current_key, pseudonym_key, read_salt
 from sumbi.events.registry import ADAPTERS, DEFAULT_AGENTS
 from sumbi.outcomes.local_verify.recognizer import declared_commands, recognize
+from sumbi.core.stats import wilson
+from sumbi.core.stats import estimate
 
 STATES = ("success", "failed", "unverified", "in_progress", "no_change")
 METRICS = (*TOKEN_KINDS, "total", "time")
@@ -108,7 +112,7 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
         arm_counts = {arm: Counter() for arm in verification_windows or {}}
         for agent in agents if agents is not None else DEFAULT_AGENTS:
             measured = Coverage()
-            sessions = ADAPTERS[agent].collect(home, scan, measured)
+            sessions = ADAPTERS[agent].collect(home, scan, measured, session_factory=Session)
             adapters[agent] = {**measured.as_dict(), "sessions_read": len(sessions)}
             for session in sessions:
                 if not session.start_at or not session.start_cwd:
@@ -160,8 +164,6 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                     **({"metadata_incomplete": dict(session.metadata_incomplete)} if session.agent == "sumbi-events" else {})})
         units.sort(key=lambda row: row["id"])
         retained = [r for r in units if r["state"] not in ("in_progress", "no_change")]
-        from sumbi.outcomes.github.deliver import wilson
-        from sumbi.judge.stats import estimate
         verification = verification_report(verification_counts)
         if verification_windows:
             verification["arms"] = {arm: verification_report(counts) for arm, counts in arm_counts.items()}

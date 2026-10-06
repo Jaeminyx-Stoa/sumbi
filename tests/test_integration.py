@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 from sumbi import __version__
 from sumbi.cli import main
-from sumbi.install.baseline import baseline
+from sumbi.install.baseline import record_baseline as baseline
 from sumbi.install import apply_plan, build_plan
 from sumbi.install.errors import InstallError
 from sumbi.measure.attribution import RepositoryAttributor

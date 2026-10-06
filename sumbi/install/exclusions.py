@@ -8,6 +8,7 @@ import subprocess
 import tomllib
 
 from .errors import InstallError
+from .files import read_bytes
 
 DEFAULT_EXCLUDES = tuple(f"**/{name}" for name in (
     ".git", ".sumbi", "node_modules", "vendor", ".venv", "venv", "dist",
@@ -29,7 +30,6 @@ def _validate(patterns: object) -> tuple[str, ...]:
 
 def load_excludes(root: Path, extra: list[str] | tuple[str, ...] = ()) -> tuple[str, ...]:
     # This single configuration file is read explicitly before pruning .sumbi.
-    from .inventory import read_bytes
 
     raw = read_bytes(root, ".sumbi/config.toml")
     configured = ()

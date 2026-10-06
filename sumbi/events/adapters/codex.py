@@ -2,14 +2,16 @@
 
 from pathlib import Path
 import re
+from typing import Callable, TypeVar
 
 from sumbi.events.tool_paths import tool_evidence
 from sumbi.events.references import branch, branch_query, tool_refs
 from sumbi.core.records import Coverage, records
-from sumbi.sessions.session import Session
 from sumbi.core.time import Window
 from sumbi.core.values import epoch, integer, label, mapping, timestamp
 from sumbi.core.paths import execution_cwd
+
+SessionT = TypeVar("SessionT")
 
 KNOWN = {"session_meta", "turn_context", "event_msg", "response_item", "compacted",
          "token_usage_record", "inter_agent_communication_metadata", "world_state"}
@@ -64,9 +66,9 @@ def _cwd_at_start(history, started_at, own_start):
 
 
 def collect(home: Path, window: Window, coverage: Coverage, *, local_review: bool = False,
-            collect_links: bool = False) -> list[Session]:
+            collect_links: bool = False, session_factory: Callable[..., SessionT]) -> list[SessionT]:
     root = home / ".codex" / "sessions"
-    sessions: dict[str, Session] = {}
+    sessions: dict[str, SessionT] = {}
     snapshots: dict[str, list] = {}
     contexts: dict[str, list] = {}
     tool_names = {}
@@ -83,7 +85,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
             inherited_meta = False
             if kind == "session_meta" and not meta_seen:
                 raw_id = str(payload.get("id") or payload.get("session_id") or path.stem)
-                session = sessions.setdefault(raw_id, Session("codex", raw_id))
+                session = sessions.setdefault(raw_id, session_factory("codex", raw_id))
                 meta_seen = True
                 if payload.get("cli_version"):
                     session.versions.add(label(payload["cli_version"], "version"))
@@ -96,7 +98,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                 session.versions.add(label(payload["cli_version"], "version"))
             if session is None:
                 # Without meta, keep coverage and a pseudonymous, unlinked session.
-                session = sessions.setdefault(path.stem, Session("codex", path.stem))
+                session = sessions.setdefault(path.stem, session_factory("codex", path.stem))
             if not session.accept(event, coverage):
                 continue
             when = timestamp(event.get("timestamp"))

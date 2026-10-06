@@ -8,6 +8,7 @@ import tomllib
 
 from .errors import InstallError
 from .text import scripts
+from .files import _without_code, read_bytes, safe_path
 
 
 def load_lexicon() -> dict:
@@ -15,7 +16,6 @@ def load_lexicon() -> dict:
 
 
 def detect(root: Path, paths: list[str], content, warnings: list[dict]) -> tuple[dict, int]:
-    from .inventory import _without_code, read_bytes, safe_path
 
     lexicon = load_lexicon()
     conventions = {key: {"status": "absent", "evidence": []} for key in lexicon["conventions"]}

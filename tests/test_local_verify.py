@@ -15,6 +15,7 @@ from sumbi.cli import main
 from sumbi.judge.compare_local import compare_local
 from sumbi.outcomes.local_verify.workers import deliver_local
 from sumbi.core.records import Coverage
+from sumbi.sessions.session import Session
 from sumbi.core.time import Window
 from sumbi.core.paths import execution_cwd
 from sumbi.core.values import timestamp
@@ -255,14 +256,14 @@ class UnitTests(unittest.TestCase):
                         "timestamp": "2030-01-01T01:59:00Z", "uuid": identity + "metadata"}
             records.insert(0, metadata) if first else records.append(metadata)
             self.save(self.home / ".claude/projects/fixture/parent/subagents" / ("agent-" + identity + ".jsonl"), records)
-        sessions = collect_claude(self.home, self.window, Coverage())
+        sessions = collect_claude(self.home, self.window, Coverage(), session_factory=Session)
         self.assertEqual(len(sessions), 2)
         for session in sessions:
             self.assertEqual(session.start_at, timestamp("2030-01-01T01:59:00Z"))
             self.assertEqual(session.start_cwd, str(self.repo))
             self.assertEqual(session.start_evidence, "first-observed-cwd")
         self.write_codex("header")
-        session = collect_codex(self.home, self.window, Coverage())[0]
+        session = collect_codex(self.home, self.window, Coverage(), session_factory=Session)[0]
         self.assertEqual(session.start_evidence, "session-header")
         self.assertEqual(self.report()["states"]["success"], 3)
         self.assertNotIn("start_evidence", json.dumps(self.report()))
@@ -402,7 +403,7 @@ class UnitTests(unittest.TestCase):
             if explicit is not None:
                 completion["payload"]["item"]["cwd"] = explicit
             self.save(self.codex / ("rollout-" + identity + ".jsonl"), records)
-            session = next(s for s in collect_codex(self.home, self.window, Coverage()) if s.raw_id == identity)
+            session = next(s for s in collect_codex(self.home, self.window, Coverage(), session_factory=Session) if s.raw_id == identity)
             self.assertEqual(session.commands["check-1"].cwd, explicit if explicit is not None else before)
         self.assertEqual(self.report()["states"]["success"], 2)
         self.assertEqual(self.report()["states"]["unverified"], 2)
@@ -453,7 +454,7 @@ class UnitTests(unittest.TestCase):
                 if completed_cwd:
                     records[index + 1]["payload"]["item"]["cwd"] = str(self.repo)
                 self.save(self.codex / ("rollout-" + identity + ".jsonl"), records)
-                session = next(s for s in collect_codex(self.home, self.window, Coverage()) if s.raw_id == identity)
+                session = next(s for s in collect_codex(self.home, self.window, Coverage(), session_factory=Session) if s.raw_id == identity)
                 if seconds != 3:
                     self.assertIsNone(session.commands["check-1"].started_at)
                 unit = next(r for r in self.report()["units"] if r["id"] == session.id())

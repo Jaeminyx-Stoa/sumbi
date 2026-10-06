@@ -41,6 +41,11 @@ class BuildTests(unittest.TestCase):
                 for module in ("compare_github", "stats", "registration"):
                     self.assertIn("sumbi/judge/" + module + ".py", archive.namelist())
                 self.assertEqual(len(json.loads(archive.read("sumbi/catalog/practices.json"))["practices"]), 8)
+                self.assertIn("sumbi/catalog/conventions.v1.json", archive.namelist())
+                self.assertIn("sumbi/install/load_rules.v1.json", archive.namelist())
+                sources = {p.relative_to(sumbi_build.ROOT).as_posix()
+                           for p in sumbi_build.source_files("sumbi", (".py", ".json", ".md"))}
+                self.assertEqual({name for name in archive.namelist() if name.startswith("sumbi/")}, sources)
                 self.assertIn("2026-10-05", archive.read("sumbi/catalog/CREDITS.md").decode())
                 self.assertFalse(any(name.startswith("tests/") for name in archive.namelist()))
                 records = list(csv.reader(io.StringIO(archive.read(sumbi_build.INFO + "/RECORD").decode())))

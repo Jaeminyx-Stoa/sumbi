@@ -16,6 +16,7 @@ from sumbi.cli.collect import run as run_collect
 from sumbi.cli.deliver import run as run_deliver, configure_parser as configure_deliver
 from sumbi.cli.compare import run as run_compare, configure_parser as configure_compare
 from sumbi.cli.register import run as run_register, configure_parser as configure_register
+from sumbi.judge.registration import read_registration
 
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="sumbi")
@@ -38,7 +39,6 @@ def main(argv: list[str] | None = None) -> int:
         return run_register(args)
     try:
         if args.command == "compare":
-            from sumbi.judge.registration import read_registration
             registration = read_registration(args.registration)
             window = Window(registration.before.since, registration.after.until)
         else:

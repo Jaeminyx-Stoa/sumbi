@@ -6,7 +6,8 @@ from pathlib import Path
 
 from sumbi.catalog import load_judgment_policy
 from sumbi.judge.stats import bootstrap, newcombe, sample_size
-from sumbi.outcomes.github.deliver import STATES, deliver, wilson
+from sumbi.outcomes.github.deliver import STATES, deliver
+from sumbi.judge.stats import wilson
 from sumbi.outcomes.github.ledger import read_ledger
 from sumbi.judge.interventions import exposure_gap, exposure_side, gap_summary, in_exposure_gap
 from sumbi.sessions.session import TOKEN_KINDS
@@ -14,6 +15,7 @@ from sumbi.core.time import Window
 from sumbi.core.values import timestamp
 from sumbi.core.privacy import pseudonym, pseudonym_key, read_salt
 from sumbi.judge.registration import read_registration
+from sumbi.judge.stats import estimate
 
 EXCLUDED_SHARE = 0.10
 UNATTRIBUTED_SHARE = 0.05
@@ -294,7 +296,6 @@ def compare(home: Path, ledger_path: Path, outcomes, registration_path: Path, *,
 
 
 def _descriptive(rows, task, metric):
-    from sumbi.judge.stats import estimate
     result = estimate([r for r in rows if (r["task_type"] or "<not_reported>") == task], metric)
     result["interval_method"] = "not_estimated_descriptive"
     return result

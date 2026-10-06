@@ -4,7 +4,7 @@ import math
 import random
 from statistics import NormalDist
 
-from sumbi.outcomes.github.deliver import wilson
+from sumbi.core.stats import estimate, wilson
 
 
 def newcombe(before_successes, before_n, after_successes, after_n):
@@ -42,15 +42,6 @@ def percentile(values, probability):
     lower = math.floor(position)
     upper = math.ceil(position)
     return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
-
-
-def estimate(rows, metric):
-    successes = sum(row["state"] == "success" for row in rows)
-    values = [row["elapsed_seconds"] if metric == "time" else row["tokens"][metric] for row in rows]
-    numerator = sum(values) if values and all(v is not None for v in values) else None
-    return {"numerator": numerator, "denominator": successes,
-            "value": numerator / successes if numerator is not None and successes else None,
-            "interval_95": None, "interval_method": "percentile_bootstrap"}
 
 
 def classify_ratio(value, interval):

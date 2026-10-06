@@ -2,13 +2,15 @@
 
 from pathlib import Path
 import re
+from typing import Callable, TypeVar
 
 from sumbi.events.tool_paths import tool_evidence
 from sumbi.events.references import branch, branch_query, tool_refs
 from sumbi.core.records import Coverage, records
-from sumbi.sessions.session import Session
 from sumbi.core.time import Window
 from sumbi.core.values import integer, label, mapping, timestamp
+
+SessionT = TypeVar("SessionT")
 
 KNOWN = {"assistant", "user", "system", "progress", "attachment", "summary",
          "file-history-snapshot", "file-history-delta", "queue-operation", "pr-link",
@@ -44,9 +46,9 @@ def bash_exit_code(event, block, *, run_in_background=False):
 
 
 def collect(home: Path, window: Window, coverage: Coverage, *, local_review: bool = False,
-            collect_links: bool = False) -> list[Session]:
+            collect_links: bool = False, session_factory: Callable[..., SessionT]) -> list[SessionT]:
     root = home / ".claude" / "projects"
-    sessions: dict[str, Session] = {}
+    sessions: dict[str, SessionT] = {}
     messages: dict[str, dict] = {}
     tool_names = {}
     bash_calls = {}
@@ -64,7 +66,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                 child = child or (path.stem.startswith("agent-") and event.get("isSidechain") is True)
                 parent = str(event.get("sessionId") or parent_hint)
                 raw_id = parent + ":subagent:" + str(event.get("agentId") or agent_hint) if child else parent
-                session = sessions.setdefault(raw_id, Session("claude-code", raw_id, parent if child else None,
+                session = sessions.setdefault(raw_id, session_factory("claude-code", raw_id, parent if child else None,
                                                               is_worker=child))
             raw_id = session.raw_id
             if not session.accept(event, coverage):

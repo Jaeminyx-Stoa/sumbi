@@ -256,9 +256,9 @@ must survive while recovery data exists. This command never stages or commits.
 
 ## Baseline integration
 
-The integration point is `sumbi.collect.baseline(*, repository: pathlib.Path,
+The integration point is `sumbi.install.baseline.record_baseline(*, repository: pathlib.Path,
 home: pathlib.Path | None = None, salt: bytes | None = None)`.
-Dry-run probes for this callable but does not invoke it. Apply invokes it once,
+Dry-run checks this callable but does not invoke it. Apply invokes it once,
 before target writes. The collect implementation must stay read-only and offline
 and own its aggregate baseline artifact. Apply passes `--home DIR` and the local
 pseudonym key selected by `SUMBI_SALT` or `--salt-file FILE`. The collector reads
@@ -270,5 +270,6 @@ and session count to the ledger, never arbitrary collector text. Empty reports
 are valid baselines. See [measurement scope](../../docs/MEASUREMENT.md).
 
 If the entry point is missing, output and interventions retain the compatibility
-status `pending (collect not available)`. An import or execution failure in an
-available collector aborts application. Empty plans never run collection.
+status `pending (collect not available)`. An execution failure in an available
+collector aborts application. Empty plans never run collection. The hook imports
+measurement directly; it no longer discovers a collector through importlib.

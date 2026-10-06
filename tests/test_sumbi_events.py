@@ -43,7 +43,7 @@ class OpenEventAdapterTests(unittest.TestCase):
 
     def read(self):
         coverage = Coverage()
-        return collect(self.home, self.window, coverage), coverage
+        return collect(self.home, self.window, coverage, session_factory=Session), coverage
 
     def worker(self):
         return [self.start(), self.event("file_edit", "edit", 1),

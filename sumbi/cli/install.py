@@ -10,9 +10,9 @@ import sys
 from sumbi.core.privacy import read_salt
 
 from sumbi.install.apply import apply_plan
-from sumbi.install.baseline_hook import baseline
+from sumbi.install.baseline import baseline
 from sumbi.install.errors import InstallError
-from sumbi.install.inventory import safe_path
+from sumbi.install.files import safe_path
 from sumbi.install.exclusions import GitIgnore
 from sumbi.install.planner import build_plan
 from sumbi.install.placement import annotate_placement, read_starts

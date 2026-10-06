@@ -1,5 +1,7 @@
 """Deliverable judgments, event links and token cost per success (offline)."""
 
+from sumbi.sessions.session import Session
+
 from collections import Counter
 from datetime import timedelta
 import fnmatch
@@ -8,6 +10,7 @@ import ntpath
 from pathlib import Path
 import re
 
+from sumbi.core.stats import wilson
 from sumbi.outcomes.github.ledger import Deliverable, read_ledger
 from sumbi.measure.attribution import Attributor
 from sumbi.core.records import Coverage
@@ -21,19 +24,6 @@ from sumbi.events.registry import ADAPTERS, DEFAULT_AGENTS
 STATES = ("success", "failed", "in_progress", "immature")
 CHECKS_BASES = ("historical", "current_policy", "all_visible", "unknown")
 LINKS = ("deliverable_id", "tool_reference", "project_time_weak", "ambiguous", "unallocated", "unassigned", "other")
-
-
-def wilson(successes, total):
-    if type(total) is not int or type(successes) is not int or not 0 <= successes <= total:
-        raise ValueError("Wilson counts must be integers with 0 <= successes <= total")
-    if total == 0:
-        return {"numerator": 0, "denominator": 0, "rate": None, "wilson_95": None}
-    z = 1.959963984540054
-    p, z2 = successes / total, z * z
-    center = (p + z2 / (2 * total)) / (1 + z2 / total)
-    radius = z * math.sqrt(p * (1 - p) / total + z2 / (4 * total * total)) / (1 + z2 / total)
-    return {"numerator": successes, "denominator": total, "rate": p,
-            "wilson_95": [max(0.0, center - radius), min(1.0, center + radius)]}
 
 
 def judge(deliverable: Deliverable, outcomes: Outcomes, days=7):
@@ -257,7 +247,7 @@ def deliver(home: Path, window: Window, ledger_path: Path, outcomes: Outcomes, *
         coverage, links, project_spend = {}, {}, {}
         for agent in agents if agents is not None else DEFAULT_AGENTS:
             measured = Coverage()
-            found = ADAPTERS[agent].collect(home, scan, measured, collect_links=True)
+            found = ADAPTERS[agent].collect(home, scan, measured, collect_links=True, session_factory=Session)
             coverage[agent] = {**measured.as_dict(), "sessions_read": len(found),
                                "sessions_in_period": sum(s.in_window(window) for s in found),
                                "sessions_in_lifetime_scan": sum(s.in_window(scan) for s in found)}

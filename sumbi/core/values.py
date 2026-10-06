@@ -6,6 +6,9 @@ import re
 from sumbi.core.privacy import pseudonym
 
 
+TOKEN_KINDS = ("new_input", "cache_write", "cache_read", "output", "reasoning_output")
+
+
 def label(value: object, category: str = "label") -> str:
     """Allow bounded machine labels; fingerprint unsupported free-text shapes."""
     if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_<][A-Za-z0-9_.:<>-]{0,95}", value):

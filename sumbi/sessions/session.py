@@ -8,12 +8,9 @@ import hashlib
 import json
 from sumbi.core.records import Coverage
 from sumbi.core.time import Window
-from sumbi.core.values import timestamp
+from sumbi.core.values import TOKEN_KINDS, timestamp
 from sumbi.core.privacy import pseudonym
-from sumbi.measure.attribution import Attributor
-
-
-TOKEN_KINDS = ("new_input", "cache_write", "cache_read", "output", "reasoning_output")
+from sumbi.events.tool_paths import resolve_path
 
 
 EVIDENCE_TYPES = ("cwd", "tool_path", "previous_event", "unassigned")
@@ -125,7 +122,6 @@ class Session:
             self.attribution_events.append((when, order, "usage", (values, cwd, paths)))
 
     def event_allocations(self, window, attributor, idle_minutes):
-        from sumbi.events.tool_paths import resolve_path
 
         context_cwd = None
         command_cwd = None
@@ -255,7 +251,7 @@ class Session:
             paths.update(value for when, value in self.cwd_events if when is None)
         return paths
 
-    def as_dict(self, window: Window, attributor: Attributor, idle_minutes: float):
+    def as_dict(self, window: Window, attributor, idle_minutes: float):
         times = sorted(self.times)
         span = window.overlap(times[0], times[-1]) if times else 0.0
         thresholds = sorted({2.0, 5.0, 10.0, idle_minutes})

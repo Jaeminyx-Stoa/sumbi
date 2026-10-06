@@ -11,6 +11,8 @@ import tempfile
 
 from sumbi.outcomes.github.ledger import LABEL, utc
 from sumbi.core.time import Window
+from sumbi.core.json import unique_object
+from sumbi.catalog import load_catalog
 
 
 @dataclass(frozen=True)
@@ -34,7 +36,7 @@ class Registration:
 
 def read_registration(path: Path) -> Registration:
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique)
+        raw = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
         fields = {"intervention_id", "applied_at", "registered_at", "predictions",
                   "non_inferiority_margin_pp", "sample_size_per_arm", "follow_up_days", "before", "after"}
         if not isinstance(raw, dict) or not fields <= set(raw) or set(raw) - fields - {"confounders", "outcome_source"}:
@@ -89,19 +91,9 @@ def read_registration(path: Path) -> Registration:
         raise ValueError("Registration must match the documented comparison JSON schema") from None
 
 
-def _unique(pairs):
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError
-        result[key] = value
-    return result
-
-
 def write_registration(path: Path, *, intervention_id, outcome_source, margin_pp,
                        sample_size_per_arm, follow_up_days, window_days, applied_at, practice_ids):
     """Publish a validated catalog pre-registration exclusively, never replace."""
-    from sumbi.catalog import load_catalog
     catalog = {p["id"]: p for p in load_catalog()}
     if (not practice_ids or len(set(practice_ids)) != len(practice_ids)
             or any(p not in catalog for p in practice_ids)):

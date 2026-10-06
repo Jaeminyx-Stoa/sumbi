@@ -8,9 +8,18 @@ from sumbi.core.privacy import read_salt
 
 
 from sumbi.cli.common import atomic_write, configure_collection, configure_outcome_source, idle
+from sumbi.outcomes.local_verify.workers import deliver_local, text_summary as local_deliver_summary
+from sumbi.judge.compare_local import compare_local, text_summary as compare_local_summary
+from sumbi.outcomes.github.deliver import deliver, text_summary as github_deliver_summary
+from sumbi.outcomes.github.recorded import FixtureOutcomes
+from sumbi.outcomes.github import live as github_outcomes
+from sumbi.outcomes.github.ledger import read_ledger
+from sumbi.judge.compare_github import compare, text_summary as compare_summary
 
 
 def run(args, root, window, agents, rules, resolved, sources, registration=None):
+    local_summary = local_deliver_summary
+    deliver_summary = github_deliver_summary
     source = args.outcome_source or (registration.outcome_source if args.command == "compare" else "github")
     if args.command == "compare" and registration.outcome_source != source:
         root.error("Registration and both arms must use the same outcome source")
@@ -25,12 +34,11 @@ def run(args, root, window, agents, rules, resolved, sources, registration=None)
         if any(p.resolve() in resolved for p in protected):
             root.error("Local output must not overwrite config or registration")
         try:
-            from sumbi.outcomes.local_verify.workers import deliver_local, text_summary as local_summary
             salt = read_salt(args.salt_file)
             options = dict(agents=agents, verify=args.verify, scan_until=args.scan_until,
                            active_minutes=args.active_minutes, salt=salt)
             if args.command == "compare":
-                from sumbi.judge.compare_local import compare_local, text_summary as local_summary
+                local_summary = compare_local_summary
                 report = compare_local(args.home, args.repository, args.registration,
                                        **options, seed=args.seed, resamples=args.resamples,
                                        interventions_path=args.interventions, intervention_id=args.intervention_id)
@@ -61,17 +69,13 @@ def run(args, root, window, agents, rules, resolved, sources, registration=None)
         root.error("Deliver output must not overwrite ledger or outcome fixtures")
     if args.command == "compare" and args.registration.resolve() in resolved:
         root.error("Compare output must not overwrite registration")
-    from sumbi.outcomes.github.deliver import deliver, text_summary as deliver_summary
-    from sumbi.outcomes.github.recorded import FixtureOutcomes
     try:
         salt = read_salt(args.salt_file)
         if live:
-            from sumbi.outcomes.github.live import GitHubOutcomes, outside_repository
-            from sumbi.outcomes.github.ledger import read_ledger
             cache = args.cache if args.cache is not None else Path.home() / ".cache/sumbi/outcomes"
-            stores = [outside_repository(p) for p in (cache, args.record) if p is not None]
+            stores = [github_outcomes.outside_repository(p) for p in (cache, args.record) if p is not None]
             for destination in resolved:
-                outside_repository(destination)
+                github_outcomes.outside_repository(destination)
             protected = [args.ledger.resolve(), *resolved]
             if args.command == "compare":
                 protected.append(args.registration.resolve())
@@ -83,11 +87,11 @@ def run(args, root, window, agents, rules, resolved, sources, registration=None)
                     store.is_relative_to(source.resolve()) or source.resolve().is_relative_to(store)
                     for store in stores for source in sources):
                 raise ValueError("GitHub cache and record must not overlap inputs or output")
-            outcomes = GitHubOutcomes(read_ledger(args.ledger), cache=cache, record=args.record)
+            outcomes = github_outcomes.GitHubOutcomes(read_ledger(args.ledger), cache=cache, record=args.record)
         else:
             outcomes = FixtureOutcomes(outcome_dir)
         if args.command == "compare":
-            from sumbi.judge.compare_github import compare, text_summary as deliver_summary
+            deliver_summary = compare_summary
             report = compare(args.home, args.ledger, outcomes, args.registration,
                              agents=agents, rules=rules, idle_minutes=args.idle_minutes,
                              salt=salt, seed=args.seed, resamples=args.resamples,

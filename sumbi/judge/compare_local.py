@@ -7,7 +7,7 @@ from sumbi.catalog import load_judgment_policy
 from sumbi.judge.compare_github import (DECISION_ORDER, EXCLUDED_SHARE, MIX_DISTANCE, fraction,
                            agent_only_in_one_arm, mix_distance, mix_report, verdict)
 from sumbi.judge.stats import bootstrap, newcombe, sample_size
-from sumbi.outcomes.github.deliver import wilson
+from sumbi.judge.stats import wilson
 from sumbi.outcomes.local_verify.workers import METRICS, STATES, deliver_local, verifier_signals, verifier_summary
 from sumbi.judge.interventions import exposure_gap, exposure_side, gap_summary, in_exposure_gap
 from sumbi.core.time import Window

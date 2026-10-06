@@ -9,9 +9,9 @@ from pathlib import Path
 import re
 import stat
 
-from .apply import _checked, _write
+from .files import _checked, _write
 from .errors import InstallError
-from .inventory import checked_relative, read_bytes, safe_path
+from .files import checked_relative, read_bytes, safe_path
 from .planner import digest
 
 BACKUP_ID = re.compile(r"[0-9]{8}T[0-9]{6}\.[0-9]{6}Z")

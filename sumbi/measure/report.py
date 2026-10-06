@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from sumbi.sessions.session import Session
+
 from pathlib import Path
 
 from sumbi import SCHEMA_VERSION
@@ -11,9 +13,6 @@ from sumbi.sessions.session import COUNT_KINDS, EVIDENCE_TYPES, TOKEN_KINDS
 from sumbi.core.records import Coverage
 from sumbi.core.time import Window
 from sumbi.core.privacy import current_key, pseudonym_key, read_salt
-
-
-
 
 
 def totals(sessions: list[dict], idle_minutes: float = 5) -> dict:
@@ -66,7 +65,7 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
     reviews = []
     for agent in agents if agents is not None else DEFAULT_AGENTS:
         measured = Coverage()
-        found = ADAPTERS[agent].collect(home, window, measured, local_review=local_review)
+        found = ADAPTERS[agent].collect(home, window, measured, local_review=local_review, session_factory=Session)
         included = [s for s in found if s.in_window(window)]
         coverage[agent] = {**measured.as_dict(), "sessions_read": len(found), "sessions_in_window": len(included)}
         selected_count = 0

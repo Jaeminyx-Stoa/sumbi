@@ -3,13 +3,16 @@
 from pathlib import Path
 import json
 import re
+from typing import Callable, TypeVar
 
 from sumbi.core.records import Coverage, records
-from sumbi.sessions.session import Session, TOKEN_KINDS
+from sumbi.core.values import TOKEN_KINDS
 from sumbi.core.time import Window
 from sumbi.core.paths import execution_cwd
 from sumbi.core.values import integer, timestamp
 from sumbi.core.privacy import pseudonym
+
+SessionT = TypeVar("SessionT")
 
 KINDS = {"session_start", "session_end", "context",
          "token_usage", "tool_start", "tool_end", "command_execution", "file_edit"}
@@ -26,7 +29,7 @@ def local_cwd(value):
 
 
 def collect(home: Path, window: Window, coverage: Coverage, *, local_review=False,
-            collect_links=False) -> list[Session]:
+            collect_links=False, session_factory: Callable[..., SessionT]) -> list[SessionT]:
     """Read all streams before applying evidence; conflicts cannot win by order."""
     sessions, unique, conflicting = {}, {}, set()
     invalid, token_invalid = set(), set()
@@ -34,7 +37,7 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review=Fals
         for event in records(path, coverage, ignore_blank=True):
             raw_id = event.get("session_id")
             if identity(raw_id):
-                sessions.setdefault(raw_id, Session("sumbi-events", raw_id))
+                sessions.setdefault(raw_id, session_factory("sumbi-events", raw_id))
             event_id = event.get("event_id")
             if not identity(event_id):
                 coverage.unknown("invalid_event_record")

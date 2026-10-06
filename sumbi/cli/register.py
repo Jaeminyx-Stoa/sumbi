@@ -3,10 +3,10 @@
 import sys
 from pathlib import Path
 from sumbi.cli.common import idle, utc
+from sumbi.judge.registration import write_registration
 
 def run(args):
     try:
-        from sumbi.judge.registration import write_registration
         write_registration(args.json, intervention_id=args.intervention_id, outcome_source=args.outcome_source,
                            margin_pp=args.margin_pp, sample_size_per_arm=args.sample_size_per_arm,
                            follow_up_days=args.follow_up_days, window_days=args.window_days,

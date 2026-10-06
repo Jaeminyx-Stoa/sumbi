@@ -16,6 +16,7 @@ import urllib.request
 
 from sumbi.outcomes.github.ledger import PR, utc
 from sumbi.outcomes.github.recorded import FixtureOutcomes, SHA
+from dataclasses import replace
 
 API = "https://api.github.com"
 MAX_BYTES = 16 * 1024 * 1024
@@ -326,7 +327,6 @@ class GitHubOutcomes(FixtureOutcomes):
             except (KeyError, TypeError, AttributeError):
                 raise ValueError("GitHub check response was malformed") from None
             entry["observed_checks_at_merge"] = value
-            from dataclasses import replace
             pr = replace(pr, observed_checks=value, checks=checks, checks_basis=basis, checks_reason=reason)
             self.pulls[identity] = pr
             self._record_repo(identity.rsplit("#", 1)[0])

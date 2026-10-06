@@ -132,12 +132,14 @@ class PlacementTests(OfflineTest):
         home = Path.home()
         native_sessions = [Session("claude-code", "a"), Session("codex", "b")]
 
-        def collect_claude(home, window, measured):
+        def collect_claude(home, window, measured, *, session_factory):
+            self.assertIs(session_factory, Session)
             measured.files_scanned = 1
             measured.lines_read = 2
             return native_sessions[:1]
 
-        def collect_codex(home, window, measured):
+        def collect_codex(home, window, measured, *, session_factory):
+            self.assertIs(session_factory, Session)
             measured.files_scanned = 3
             measured.broken_lines = 1
             return native_sessions[1:]
@@ -146,7 +148,7 @@ class PlacementTests(OfflineTest):
         codex = Mock(collect=Mock(side_effect=collect_codex))
         generic = Mock(collect=Mock(side_effect=AssertionError("Opt-in adapter invoked")))
         registry = {"sumbi-events": generic, "codex": codex, "claude-code": claude}
-        with patch("sumbi.events.registry.ADAPTERS", registry):
+        with patch("sumbi.install.placement.ADAPTERS", registry):
             sessions, window, coverage = read_starts(home, now=NOW)
 
         self.assertEqual(sessions, native_sessions)
