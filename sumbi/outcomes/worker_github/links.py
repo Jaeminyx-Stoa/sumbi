@@ -125,6 +125,8 @@ def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps
         for identity in identities:
             if identity.rsplit("#", 1)[0] not in repos:
                 continue
+            if identity.rsplit("#", 1)[0] in getattr(outcomes, "unreadable", ()):
+                continue
             pr = outcomes.pull(identity)
             if kind == "pr_created" and scope and identity.rsplit("#", 1)[0] not in scope:
                 gaps["link_conflicts"] += 1

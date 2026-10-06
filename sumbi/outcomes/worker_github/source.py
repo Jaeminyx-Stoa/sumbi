@@ -36,7 +36,8 @@ class WorkerGitHubSource:
                 (start, last) if last else (start,), (row,), row["tokens"],
                 row["tokens_complete"], row["elapsed_seconds"], None, row, row["id"],
                 unlinked=row["weak_link"] and row["state"] != "no_change",
-                excluded_state="no_change" if row["state"] == "no_change" else None,
+                excluded_state=("repository_unreadable" if row["reason"] == "repository_unreadable"
+                    else "no_change" if row["state"] == "no_change" else None),
                 checks_basis=tuple(row["checks_basis"]), start_scope=row["start_scope"],
                 retained_unlinked=row["state"] == "no_pr"))
         return units, report
@@ -73,6 +74,8 @@ class WorkerGitHubSource:
         if coverage["missing_prs"]:
             reasons.append("missing_pr_evidence")
         for o in coverage["repositories"]:
+            if o.get("reason") == "repository_unreadable":
+                continue
             if (not o["pulls_complete"] or not o["commits_complete"]
                 or timestamp(o["coverage_start"]) > windows["before"].since
                 or timestamp(o["observed_at"]) < windows["after"].until):

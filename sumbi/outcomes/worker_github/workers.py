@@ -146,18 +146,28 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
                     "tokens": tokens, "tokens_complete": complete, "observed_total": observed})
                 continue
             if session.id() in fixed:
-                units.append(worker_row(session, scan, links, outcomes, follow_up_days,
+                unreadable_only = bool(evidence_repos & outcomes.unreadable) and not (
+                    evidence_repos - outcomes.unreadable) and not any(
+                    evidence != "cwd_branch" for evidence, _, _ in links.values())
+                if unreadable_only:
+                    excluded["repository_unreadable"] += 1
+                    links = {}
+                row = worker_row(session, scan, links, outcomes, follow_up_days,
                     "start_origin" if origin_repo else "own_reference", gaps,
-                    authored=bool(evidence_repos)))
+                    authored=bool(evidence_repos))
+                if unreadable_only:
+                    row.update(state="in_progress", reason="repository_unreadable")
+                units.append(row)
         return worker_report(window, scan, repos, units, overhead, excluded, adapters,
-            observations, follow_up_days, gaps)
+            observations, follow_up_days, gaps, outcomes.unreadable)
 
 
 def worker_report(window, scan, repos, units, overhead, excluded, adapters, observations, days,
-    gaps):
+    gaps, unreadable=()):
     units.sort(key=lambda row: row["id"])
     overhead.sort(key=lambda row: row["id"])
-    retained = [r for r in units if r["state"] != "no_change" and not r["weak_link"]]
+    retained = [r for r in units if r["state"] != "no_change" and not r["weak_link"]
+        and r["reason"] != "repository_unreadable"]
     return {"schema_version": "worker-github-deliver-1.0", "outcome_source": "worker-github",
         "unit": "worker_session", "dispatch_window": {"since": window.since.isoformat(),
             "until": window.until.isoformat(), "bounds": "[since,until)"},
@@ -176,6 +186,7 @@ def worker_report(window, scan, repos, units, overhead, excluded, adapters, obse
             for r in units if r not in retained)},
         "coverage": {"adapters": adapters, "excluded_scope": dict(sorted(excluded.items())),
             "repositories": [{"id": pseudonym("repository", repo),
+                **({"reason": "repository_unreadable"} if repo in unreadable else {}),
                 "coverage_start": o.start.isoformat() if o else None,
                 "observed_at": o.until.isoformat() if o else None,
                 "pulls_complete": o.pulls_complete if o else False,

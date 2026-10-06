@@ -5,6 +5,7 @@ from datetime import timedelta
 
 from sumbi.core.time import Window
 from sumbi.outcomes.github.ledger import Deliverable
+from sumbi.outcomes.github.live import RepositoryUnreadable
 from sumbi.outcomes.worker_github.links import authorship
 
 
@@ -14,23 +15,37 @@ class ScopedOutcomes:
     def __init__(self, provider, window, repos):
         self.provider, self.window = provider, window
         self.sources = {}
+        self.unreadable = set()
         self.ensure(repos)
 
-    def ensure(self, repos):
-        missing = sorted(set(repos) - self.sources.keys())
+    def ensure(self, repos, *, discovered=False):
+        missing = sorted(set(repos) - self.sources.keys() - self.unreadable)
         if not missing:
             return
-        source = self.provider([Deliverable("repository", self.window.since, (r,), (), ())
-            for r in missing]) if callable(self.provider) else self.provider
-        self.sources.update((r, source) for r in missing)
+        for repo in missing:
+            try:
+                source = self.provider([Deliverable("repository", self.window.since,
+                    (repo,), (), ())]) if callable(self.provider) else self.provider
+            except RepositoryUnreadable:
+                if not discovered:
+                    raise
+                self.unreadable.add(repo)
+                continue
+            self.sources[repo] = source
 
     def pull(self, identity):
+        if identity.rsplit("#", 1)[0] in self.unreadable:
+            return None
         return self.sources[identity.rsplit("#", 1)[0]].pull(identity)
 
     def observation(self, repo):
+        if repo in self.unreadable:
+            return None
         return self.sources[repo].observation(repo)
 
     def branch_pulls(self, repo, branch):
+        if repo in self.unreadable:
+            return ()
         return self.sources[repo].branch_pulls(repo, branch)
 
     def disturbances(self, pull, days):
@@ -75,7 +90,7 @@ def capture(initial, window, repos, owners, outcomes, fixed, collect_sessions):
     while True:
         measured.update(owned_repositories(found, scan, owners, fixed))
         repos = tuple(sorted(measured))
-        outcomes.ensure(repos)
+        outcomes.ensure(repos, discovered=True)
         observations = [outcomes.observation(r) for r in repos]
         extended = Window(window.since, max([scan.until, *[o.until for o in observations if o]]))
         found, adapters = collect_sessions(extended)

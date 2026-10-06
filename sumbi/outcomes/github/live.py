@@ -25,6 +25,10 @@ CACHE_SECONDS = 300
 PLAN_UNAVAILABLE = "Upgrade to GitHub Pro or make this repository public to enable this feature."
 
 
+class RepositoryUnreadable(ValueError):
+    """A non-rate-limit access failure; callers may exclude discovered scope."""
+
+
 def outside_repository(path: Path):
     """Resolve symlinks and reject any destination in a Git working tree."""
     target = path.resolve()
@@ -241,7 +245,9 @@ class GitHubOutcomes(FixtureOutcomes):
                             "response": [] if plan_unavailable else None}
                         _write(destination, payload)
                         break
-                    raise ValueError("GitHub request failed (HTTP " + str(code)
+                    failure = (RepositoryUnreadable
+                        if code in (403, 404) and not limited else ValueError)
+                    raise failure("GitHub request failed (HTTP " + str(code)
                         + "); check access or retry later") from None
                 except (urllib.error.URLError, OSError, UnicodeError, json.JSONDecodeError,
                     KeyError, TypeError, AttributeError):

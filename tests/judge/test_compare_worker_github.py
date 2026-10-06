@@ -9,6 +9,7 @@ from support import IsolatedTemporaryDirectory
 from worker_github_fixtures import REPO, build_round, save
 from sumbi.judge.compare_worker_github import compare_workers, text_summary
 from sumbi.outcomes.github.recorded import FixtureOutcomes
+from sumbi.outcomes.github.live import RepositoryUnreadable
 
 
 class WorkerCompareTests(unittest.TestCase):
@@ -61,6 +62,30 @@ class WorkerCompareTests(unittest.TestCase):
         self.assertEqual(report["arms"]["before"]["success_rate"]["numerator"], 10)
         self.assertEqual(report["arms"]["before"]["cost"]["total"]["numerator"], 1200)
         self.assertEqual(report["exclusions"]["before"]["share"]["numerator"], 0)
+
+    def test_unreadable_owner_workers_count_toward_risky_exclusion_share(self):
+        denied = "example/second"
+        def unreadable(rows):
+            return [json.loads(json.dumps(row).replace(REPO, denied)) for row in rows]
+        for number in (101, 102):
+            self.edit_stream(number, unreadable)
+        recorded = FixtureOutcomes(self.directory)
+        def provider(dispatches):
+            if dispatches[0].repos == (denied,):
+                raise RepositoryUnreadable("GitHub request failed (HTTP 404)")
+            return recorded
+        report = compare_workers(self.home, [], provider, self.registration,
+            repo_owners=["example"], salt=b"synthetic-key", resamples=100)
+        self.assertEqual(report["exclusions"]["before"]["counts"], {"repository_unreadable": 2})
+        self.assertEqual(report["exclusions"]["before"]["risky_share"],
+            {"numerator": 2, "denominator": 12, "value": 2 / 12,
+                "interval_95": None, "interval_method": "not_applicable_census"})
+        self.assertEqual(report["arms"]["before"]["n"], 10)
+        self.assertEqual(report["arms"]["after"]["n"], 12)
+        self.assertEqual(report["coverage"]["incomplete_reasons"], [])
+        self.assertIn("before_excluded_or_unlinked", report["verdict"]["reasons"])
+        self.assertEqual(report["verdict"]["proposal"], "withhold")
+        self.assertNotIn(denied, json.dumps(report))
 
     def test_weak_branch_links_are_excluded_and_block_share(self):
         def weak(rows):

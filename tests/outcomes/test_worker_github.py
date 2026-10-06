@@ -2,13 +2,15 @@
 
 from datetime import timedelta
 import base64
+import io
 import json
 from pathlib import Path
 import subprocess
 import unittest
+import urllib.error
 from unittest.mock import Mock, patch
 
-from support import IsolatedTemporaryDirectory
+from support import IsolatedTemporaryDirectory, isolate_github_destinations
 from worker_github_fixtures import (REPO, at, codex_worker, claude_worker, execution, pull,
     push_output, recording, repository, save, stream)
 from sumbi.core.records import Coverage
@@ -16,6 +18,7 @@ from sumbi.core.time import Window
 from sumbi.events.adapters import claude_code, codex
 from sumbi.events.references import tool_refs
 from sumbi.outcomes.github.recorded import FixtureOutcomes
+from sumbi.outcomes.github.live import GitHubOutcomes, RepositoryUnreadable
 from sumbi.outcomes.worker_github.workers import deliver_workers, text_summary
 from sumbi.outcomes.local_verify.workers import deliver_local
 from sumbi.sessions.builder import collect
@@ -719,6 +722,74 @@ class WorkerGitHubTests(unittest.TestCase):
         self.assertEqual(report["units"], [])
         provider.assert_not_called()
 
+    def test_owner_unreadable_repository_is_counted_and_readable_links_survive(self):
+        denied = "example/second"
+        codex_worker(self.home, "readable", self.repo, 1)
+        codex_worker(self.home, "unreadable", self.repo, edit=False,
+            command="gh pr create", output=f"https://github.com/{denied}/pull/1")
+        codex_worker(self.home, "mixed", self.repo, edit=False, command="git push",
+            output=push_output("worker-1", denied) + push_output("worker-1"))
+        rows = codex_worker(self.home, "mixed-commit", self.repo, edit=False,
+            command="git commit -m 'Synthetic change'", output="[worker-1 abc1234] Synthetic change")
+        rows.extend(execution("git push", push_output("worker-1", denied), self.repo,
+            identity="second-push", start=12, end=13))
+        stream(self.home / ".codex/sessions/rollout-mixed-commit.jsonl", rows)
+        recorded = self.outcomes([pull(1)])
+        isolate_github_destinations(self)
+        for code in (404, 403):
+            with self.subTest(code=code):
+                calls = []
+                def provider(dispatches):
+                    repo = dispatches[0].repos[0]
+                    calls.append(repo)
+                    if repo == denied:
+                        return GitHubOutcomes(dispatches, cache=self.root / "cache", head_refs=True)
+                    return recorded
+                def response(request, **kwargs):
+                    raise urllib.error.HTTPError(request.full_url, code, "Synthetic denied", {},
+                        io.BytesIO(b'{"message":"Not accessible"}'))
+                with patch("sumbi.outcomes.github.live.github_token", return_value="synthetic-token"), \
+                    patch("urllib.request.OpenerDirector.open", side_effect=response), \
+                    patch("sumbi.outcomes.github.live.time.sleep") as sleep:
+                    report = deliver_workers(self.home, self.window, [], provider,
+                        repo_owners=["example"], salt=b"synthetic-key")
+                sleep.assert_not_called()
+                self.assertEqual(calls.count(denied), 1)
+                self.assertEqual(report["states"]["success"], 3)
+                self.assertEqual(report["success_rate"]["denominator"], 3)
+                self.assertEqual(report["coverage"]["excluded_scope"]["repository_unreadable"], 1)
+                self.assertEqual(sum(r.get("reason") == "repository_unreadable"
+                    for r in report["coverage"]["repositories"]), 1)
+                excluded = next(r for r in report["units"] if r["reason"] == "repository_unreadable")
+                self.assertEqual(excluded["links"], [])
+                self.assertEqual(report["coverage"]["missing_prs"], 0)
+                self.assertEqual(report["excluded_worker_spend"]["observed_total"], 100)
+                for private in (REPO, denied, "worker-1", "Not accessible"):
+                    self.assertNotIn(private, json.dumps(report))
+                with patch("sumbi.outcomes.github.live.github_token", return_value="synthetic-token"), \
+                    patch("urllib.request.OpenerDirector.open", side_effect=response):
+                    with self.assertRaisesRegex(RepositoryUnreadable, f"HTTP {code}"):
+                        deliver_workers(self.home, self.window, [denied], provider,
+                            repo_owners=["example"])
+
+    def test_owner_rate_limit_and_transient_failures_still_abort(self):
+        codex_worker(self.home, "worker", self.repo, 1)
+        isolate_github_destinations(self)
+        for code in (403, 429, 503):
+            with self.subTest(code=code):
+                def response(request, **kwargs):
+                    raise urllib.error.HTTPError(request.full_url, code, "Synthetic failure",
+                        {"Retry-After": "0", "X-RateLimit-Remaining": "0"},
+                        io.BytesIO(b'{"message":"rate limit exceeded"}'))
+                with patch("sumbi.outcomes.github.live.github_token", return_value="synthetic-token"), \
+                    patch("urllib.request.OpenerDirector.open", side_effect=response) as opened, \
+                    patch("sumbi.outcomes.github.live.time.sleep"):
+                    with self.assertRaisesRegex(ValueError, f"HTTP {code}") as raised:
+                        deliver_workers(self.home, self.window, [], lambda ds:
+                            GitHubOutcomes(ds, cache=self.root / "cache"), repo_owners=["example"])
+                self.assertNotIsInstance(raised.exception, RepositoryUnreadable)
+                self.assertEqual(opened.call_count, 4 if code in (403, 429) else 1)
+
     def test_owner_repositories_discovered_in_extended_lifetime_are_fetched_once(self):
         codex_worker(self.home, "worker", self.repo, 1, edit=False)
         path = self.home / ".codex/sessions/rollout-worker.jsonl"
@@ -736,7 +807,7 @@ class WorkerGitHubTests(unittest.TestCase):
             calls.append(tuple(r for d in dispatches for r in d.repos))
             return recorded
         report = deliver_workers(self.home, self.window, [], live, repo_owners=["example"])
-        self.assertEqual(calls, [(REPO, "example/second")])
+        self.assertEqual(calls, [(REPO,), ("example/second",)])
         self.assertEqual(len(report["units"][0]["links"]), 2)
         self.assertEqual(report["states"]["success"], 1)
 
