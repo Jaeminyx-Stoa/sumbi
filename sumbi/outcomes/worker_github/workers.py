@@ -133,11 +133,10 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
             if lifetime is None:
                 continue
             refs = references(session, lifetime)
+            evidence_repos = set()
             links = link_prs(session, lifetime, refs, repos, origin_repo, outcomes,
-                attributor, gaps if session.id() in fixed else Counter())
-            explicit = any(k == "pr" and v.rsplit("#", 1)[0] in repos
-                or k == "repository" and v in repos for k, v in refs)
-            if not origin_repo and not links and not explicit:
+                attributor, gaps if session.id() in fixed else Counter(), evidence_repos)
+            if not origin_repo and not evidence_repos:
                 excluded["repository_unconfirmed"] += 1
                 continue
             if not dispatched(session):

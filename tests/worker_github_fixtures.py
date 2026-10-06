@@ -8,6 +8,10 @@ import subprocess
 REPO = "example/sample"
 
 
+def push_output(branch, repo=REPO):
+    return f"To https://github.com/{repo}.git\n   abc1234..def5678 HEAD -> {branch}\n"
+
+
 def save(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8", newline="\n")
@@ -57,6 +61,8 @@ def codex_worker(home, identity, cwd, number=None, *, day=1, cost=100, kind="exe
                 "input": "synthetic edit"}})
     if command is None and number is not None:
         command = "git push -u origin worker-" + str(number)
+        if output is None:
+            output = push_output("worker-" + str(number))
     if command is not None:
         rows.append({"type": "response_item", "timestamp": at(day, 3).isoformat(), "payload": {
             "type": "function_call", "call_id": "shell", "name": "exec_command",
@@ -99,8 +105,10 @@ def claude_worker(home, identity, cwd, number, *, day=1, cost=100, seconds=100):
                         "name": "Bash", "input": {"command": f"git push origin worker-{number}"}}]}},
         {"type": "user", "sessionId": "main", "agentId": identity, "cwd": str(cwd),
             "timestamp": at(day, seconds).isoformat(), "toolUseResult": {
-                "stdout": "", "stderr": "", "interrupted": False}, "message": {"content": [
-                    {"type": "tool_result", "tool_use_id": "push", "content": "",
+                "stdout": "", "stderr": push_output(f"worker-{number}"), "interrupted": False},
+            "message": {"content": [
+                    {"type": "tool_result", "tool_use_id": "push",
+                        "content": push_output(f"worker-{number}"),
                         "is_error": False}]}}]
     stream(home / ".claude/projects/group/main/subagents" / ("agent-" + identity + ".jsonl"), rows)
 

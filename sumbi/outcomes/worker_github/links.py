@@ -48,7 +48,11 @@ def authorship(session, scan, gaps):
             results.setdefault(identity, []).append((at, refs))
     for identity, execution in session.commands.items():
         action = actions(execution.command)
-        if not scan.contains(execution.at) or not action:
+        if not scan.contains(execution.at):
+            continue
+        output = {ref for at, refs in results.get(identity, [])
+            if execution.started_at and execution.started_at <= at <= execution.at for ref in refs}
+        if not action and not any(k == "push_result" for k, _ in output):
             continue
         if execution.exit_code != 0:
             gaps["failed_authorship_commands" if execution.exit_code is not None
@@ -58,25 +62,19 @@ def authorship(session, scan, gaps):
             or execution.at < execution.started_at):
             gaps["link_conflicts"] += 1
             continue
-        output = {ref for at, refs in results.get(identity, [])
-            if execution.started_at <= at <= execution.at for ref in refs}
         if (len({v for k, v in output if k == "pr_created"}) > 1
             or len({v for k, v in output if k == "branch_committed"}) > 1):
             gaps["link_conflicts"] += 1
             continue
         for kind, value in output:
             if (kind == "pr_created" and ("create", None) in action
-                or kind == "branch_pushed" and ("push", None) in action
+                or kind == "push_result"
                 or kind == "branch_committed" and ("commit", None) in action):
                 yield kind, value, execution, output
-        targets = {v for k, v in output if k == "branch_pushed"}
-        if not targets:
-            for kind, value in action:
-                if kind == "push" and value:
-                    yield "branch_pushed", value, execution, output
 
 
-def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps):
+def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps,
+    evidence_repos=None):
     """Only completed authorship links; mentions and conflicts remain coverage."""
     links = {}
     for kind, value in refs:
@@ -85,21 +83,24 @@ def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps
             if pr and pr.created_at < session.start_at:
                 gaps["pre_dispatch_pr_mentions"] += 1
     for kind, value, execution, output in authorship(session, scan, gaps):
-        cwd, command_repos, valid = command_scope(execution.command, execution.cwd)
-        if not valid:
-            gaps["link_conflicts"] += 1
-            continue
-        cwd_repo = start_repo_cwd(cwd, attributor, repos)
-        named = {v for k, v in output if k == "repository"} | command_repos
-        scope = (cwd_repo,)
-        if named:
-            if len(named) != 1 or scope[0] and scope[0] not in named:
+        if kind == "push_result":
+            repository, value = value
+            scope = (repository,)
+        elif kind == "pr_created":
+            scope = (value.rsplit("#", 1)[0],)
+        else:
+            cwd, command_repos, valid = command_scope(execution.command, execution.cwd)
+            if not valid:
                 gaps["link_conflicts"] += 1
                 continue
-            scope = tuple(named)
-        elif not scope[0]:
-            scope = ()
-        evidence = {"pr_created": "pr_created", "branch_pushed": "pushed_branch",
+            cwd_repo = start_repo_cwd(cwd, attributor, repos)
+            if command_repos and cwd_repo and cwd_repo not in command_repos:
+                gaps["link_conflicts"] += 1
+                continue
+            scope = tuple(command_repos) if command_repos else (cwd_repo,) if cwd_repo else ()
+        if evidence_repos is not None and kind in ("push_result", "pr_created"):
+            evidence_repos.update(r for r in scope if r in repos)
+        evidence = {"pr_created": "pr_created", "push_result": "pushed_branch",
             "branch_committed": "committed_branch"}[kind]
         identities = ([value] if kind == "pr_created" else
             [p for r in scope if r in repos for p in outcomes.branch_pulls(r, value)])

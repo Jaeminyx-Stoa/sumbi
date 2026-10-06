@@ -935,11 +935,14 @@ These additional labels do not change existing collection or local-verification
 outputs. Interactive and unrecognized top-level sessions are dispatcher overhead.
 
 A unit enters remote scope when its start cwd's locally queried git origin
-matches a measured repository, or its own explicit PR/branch evidence identifies
-one. A sibling worktree or clone with the same origin is in scope; no physical
-checkout-root equivalence is required for remote PR acceptance. An unavailable
-cwd can still be scoped by an explicit measured PR. Unconfirmed repositories
-and missing starts are counted separately; missing starts block comparison.
+matches a measured repository, or its own successful push or PR-creation result
+names one. Result evidence establishes scope even when the local cwd belongs to
+another repository. A sibling worktree or clone with the same origin is in scope;
+no physical checkout-root equivalence is required for remote PR acceptance. An unavailable
+cwd can still be scoped by a successful measured push or PR creation, including
+a push whose branch has no recorded PR yet. Plain references and command intent
+cannot establish scope. Unconfirmed repositories and missing starts are counted
+separately; missing starts block comparison.
 No parent's cwd, references, costs or outcome are inherited by a child.
 
 Links require own-session authorship from normalized command executions that
@@ -949,14 +952,25 @@ Every linked PR retains its strongest own-session evidence:
 
 | Evidence label | Strength and meaning |
 | --- | --- |
-| `pr_created` | Strongest: a successful `gh pr create` result or API create response naming the PR. |
-| `pushed_branch` | Strong: a successful push's literal origin target or anchored result naming the destination branch. |
+| `pr_created` | Strongest: a successful command containing `gh pr create` prints a PR URL, or a recognized API create response names the PR. |
+| `pushed_branch` | Strong: a successful command's git push result block names the remote repository and changed destination branch. |
 | `committed_branch` | Strong: a successful commit result naming its branch. |
 | `cwd_branch` | Weak: structured cwd/context branch or a literal current-branch query only. |
 
-Branches match exact PR `head.ref` values in measured repositories using the
-execution cwd's origin or an explicit destination. Successful pushes or commits
-can advance a PR created before dispatch; such links have role `continued`.
+Push results pair each `To <remote URL>` block with every changed ref line in
+that block. New branches, updates and forced updates can link; rejected,
+remote-rejected, deleted, tag and up-to-date lines cannot. Push intent or a zero
+exit without a changed ref result cannot link. SSH, WSL and PowerShell wrappers,
+including encoded scripts, need no shell evaluation: the readable result names
+the repository and destination branch. PR creation recognizes `gh pr create`
+anywhere in the command text, including quoted wrapper scripts, then requires
+a printed PR URL on its own output line. Nonzero, unknown or missing exit codes
+cannot supply authorship. Output truncation can hide result evidence and leave
+work unlinked. Command output stays local-only and is never published.
+
+Branches match exact PR `head.ref` values in measured repositories using each
+push result's remote, or the execution cwd's origin for commit results. Successful
+pushes or commits can advance a PR created before dispatch; such links have role `continued`.
 New PRs have role `constituent`. Actions after PR closure and conflicting
 creation, repository or execution evidence are excluded and counted as coverage
 gaps. Older PR mentions are counted separately. Per-unit judgment conflicts

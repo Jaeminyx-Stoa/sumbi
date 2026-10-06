@@ -4,7 +4,7 @@ import json
 import re
 import shlex
 
-from sumbi.core.paths import execution_cwd
+from sumbi.core.paths import execution_cwd, normalize_origin
 from sumbi.events.references import BRANCH, PR_URL, worker_branches
 from sumbi.events.tool_paths import resolve_path
 
@@ -40,6 +40,11 @@ def commands(value):
 def actions(command):
     """Actions are intentions until a normalized execution exits zero."""
     found = set()
+    text = command if isinstance(command, str) else "\n".join(command) if (
+        isinstance(command, list) and all(isinstance(v, str) for v in command)) else ""
+    # Creation results identify the repository even inside unevaluated wrappers.
+    if re.search(r"(?<![\w./-])gh\s+pr\s+create\b", text):
+        found.add(("create", None))
     for words in commands(command):
         if words[:2] == ["git", "-C"]:
             words = ["git", *words[3:]]
@@ -108,8 +113,11 @@ def result_refs(value):
     if isinstance(value, dict):
         url = value.get("html_url", value.get("url"))
     elif isinstance(value, str):
-        url = value.strip()
-        refs.update(worker_branches(value, output=True))
+        url = None
+        refs.update(push_results(value))
+        for line in value.splitlines():
+            if match := PR_URL.fullmatch(line.strip()):
+                refs.add(("pr_created", match[1].lower() + "#" + match[2]))
         match = re.search(r"(?m)^\[(" + BRANCH + r") (?:\(root-commit\) )?[0-9a-f]{7,40}\] ",
             value)
         if match:
@@ -118,4 +126,27 @@ def result_refs(value):
         return refs
     if isinstance(url, str) and (match := PR_URL.fullmatch(url)):
         refs.add(("pr_created", match[1].lower() + "#" + match[2]))
+    return refs
+
+
+def push_results(value):
+    """Pair each changed branch with its own remote block, independent of shell."""
+    refs, repository = set(), None
+    for line in value.splitlines():
+        if line.startswith("To "):
+            origin = normalize_origin(line[3:])
+            match = re.fullmatch(r"github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)",
+                origin or "", re.I)
+            repository = match[1].lower() if match else None
+            continue
+        if not repository:
+            continue
+        match = re.fullmatch(r"\s*(?:\*\s+\[new branch\]|\+?\s*[0-9a-f]{4,40}"
+            r"\.{2,3}[0-9a-f]{4,40})\s+(" + BRANCH + r")\s+->\s+(" + BRANCH
+            + r")(?:\s+\([^\r\n]*\))?\s*", line)
+        if match:
+            destination = match[2]
+            if destination.startswith("refs/") and not destination.startswith("refs/heads/"):
+                continue
+            refs.add(("push_result", (repository, destination.removeprefix("refs/heads/"))))
     return refs

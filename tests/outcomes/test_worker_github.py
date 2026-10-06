@@ -1,6 +1,7 @@
 """Synthetic worker dispatch, own-session links, PR states and privacy boundaries."""
 
 from datetime import timedelta
+import base64
 import json
 from pathlib import Path
 import subprocess
@@ -9,7 +10,7 @@ from unittest.mock import patch
 
 from support import IsolatedTemporaryDirectory
 from worker_github_fixtures import (REPO, at, codex_worker, claude_worker, execution, pull,
-    recording, repository, save, stream)
+    push_output, recording, repository, save, stream)
 from sumbi.core.records import Coverage
 from sumbi.core.time import Window
 from sumbi.events.adapters import codex
@@ -87,8 +88,10 @@ class WorkerGitHubTests(unittest.TestCase):
         cases = [
             ("url-output", 2, "gh pr create --head worker-2",
                 "https://github.com/example/sample/pull/2", None, "pr_created", "strong"),
-            ("push-input", 3, "git push -u origin worker-3", None, None, "pushed_branch", "strong"),
-            ("push-output", 4, "git push origin HEAD", " * [new branch] HEAD -> worker-4\n", None,
+            ("push-input", 3, "git push -u origin worker-3", push_output("worker-3"), None,
+                "pushed_branch", "strong"),
+            ("push-output", 4, "git push origin HEAD", "To https://github.com/example/sample.git\n"
+                " * [new branch] HEAD -> worker-4\n", None,
                 "pushed_branch", "strong"),
             ("committed", 5, "git commit -m 'Synthetic change'", "[worker-5 abc1234] Synthetic change\n",
                 None, "committed_branch", "strong"),
@@ -107,7 +110,8 @@ class WorkerGitHubTests(unittest.TestCase):
             self.assertNotIn(value, public)
 
     def test_pr_opened_by_main_uses_worker_branch_without_borrowing_main_evidence(self):
-        codex_worker(self.home, "worker", self.repo, command="git push origin worker-1")
+        codex_worker(self.home, "worker", self.repo, command="git push origin worker-1",
+            output=push_output("worker-1"))
         codex_worker(self.home, "unlinked", self.repo)
         codex_worker(self.home, "main", self.repo, kind="vscode",
             command="gh pr create --head worker-1", output="https://github.com/example/sample/pull/1")
@@ -170,12 +174,12 @@ class WorkerGitHubTests(unittest.TestCase):
         self.assertEqual(report["units"][0]["start_scope"], "own_reference")
         self.assertEqual(report["states"]["success"], 1)
 
-    def test_explicit_repo_scopes_no_pr_without_a_checkout_origin(self):
+    def test_create_intent_cannot_scope_without_a_checkout_origin(self):
         codex_worker(self.home, "worker", self.root / "missing",
             command="gh pr create --repo example/sample --head uncreated-worker")
         report = self.report([])
-        self.assertEqual(report["units"][0]["start_scope"], "own_reference")
-        self.assertEqual(report["states"]["no_pr"], 1)
+        self.assertEqual(report["units"], [])
+        self.assertEqual(report["coverage"]["excluded_scope"]["repository_unconfirmed"], 1)
 
     def test_anchored_push_result_names_a_strong_branch(self):
         codex_worker(self.home, "worker", self.repo, command="git push origin HEAD",
@@ -372,7 +376,8 @@ class WorkerGitHubTests(unittest.TestCase):
     def test_git_c_operand_uses_execution_repository(self):
         missing = self.root / "missing"
         codex_worker(self.home, "worker", missing,
-            command=["git", "-C", str(self.repo), "push", "origin", "worker-1"])
+            command=["git", "-C", str(self.repo), "push", "origin", "worker-1"],
+            output=push_output("worker-1"))
         report = self.report([pull(1)])
         self.assertEqual(report["states"]["success"], 1)
         self.assertEqual(report["units"][0]["start_scope"], "own_reference")
@@ -401,7 +406,8 @@ class WorkerGitHubTests(unittest.TestCase):
         self.assertEqual(report["units"][0]["links"], [])
 
     def test_malformed_execution_cwd_is_a_gap_not_a_global_abort(self):
-        rows = codex_worker(self.home, "worker", self.repo, 1)
+        rows = codex_worker(self.home, "worker", self.repo,
+            command="git commit -m 'Synthetic fix'", output="[worker-1 abc1234] Synthetic fix\n")
         launch = next(r for r in rows if r.get("payload", {}).get("type") == "exec_command_begin")
         launch["payload"]["cwd"] = {"unsupported": "Synthetic value"}
         stream(self.home / ".codex/sessions/rollout-worker.jsonl", rows)
@@ -409,6 +415,175 @@ class WorkerGitHubTests(unittest.TestCase):
         self.assertEqual(report["states"]["no_pr"], 1)
         self.assertEqual(report["units"][0]["links"], [])
         self.assertEqual(report["coverage"]["evidence_gaps"]["link_conflicts"], 1)
+
+    def test_remote_push_wrappers_link_from_output(self):
+        script = "cd /srv/sample\ngit push origin HEAD:worker-1\n"
+        encoded = base64.b64encode(script.encode()).decode()
+        commands = [
+            "ssh build.example.test 'cd /srv/sample && git push origin HEAD:worker-1'",
+            "wsl.exe -d Ubuntu-24.04 -- ssh build.example.test 'git push origin HEAD:worker-1'",
+            "$script = @'\n" + script + "'@\n"
+                "$encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($script))\n"
+                "wsl.exe -- sh -c 'echo " + encoded + " | base64 -d | ssh build.example.test bash'",
+            ["wsl.exe", "--", "ssh", "build.example.test", script]]
+        for command in commands:
+            with self.subTest(command=command):
+                codex_worker(self.home, "remote", self.repo, command=command,
+                    output=push_output("worker-1"))
+                report = self.report([pull(1)])
+                self.assertEqual(report["states"]["success"], 1)
+                self.assertEqual(report["units"][0]["links"][0]["evidence"], "pushed_branch")
+
+    def test_remote_create_printed_url_scopes_other_checkout(self):
+        other = self.root / "coordination"
+        repository(other)
+        subprocess.run(["git", "-C", str(other), "remote", "set-url", "origin",
+            "https://github.com/example/coordination.git"], capture_output=True, check=True)
+        codex_worker(self.home, "remote", other,
+            command="ssh build.example.test 'cd /srv/sample && gh pr create --head worker-1'",
+            output="Creating pull request for worker-1 into main in example/sample\n\n"
+                "https://github.com/example/sample/pull/1\n")
+        report = self.report([pull(1)])
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(report["units"][0]["start_scope"], "own_reference")
+        self.assertEqual(report["units"][0]["links"][0]["evidence"], "pr_created")
+
+    def test_push_names_scope_even_with_other_measured_cwd(self):
+        other = self.root / "coordination"
+        repository(other)
+        subprocess.run(["git", "-C", str(other), "remote", "set-url", "origin",
+            "https://github.com/example/coordination.git"], capture_output=True, check=True)
+        codex_worker(self.home, "remote", other,
+            command="ssh build.example.test 'git push origin HEAD:worker-1'",
+            output=push_output("worker-1"))
+        outcomes = self.outcomes([pull(1)])
+        save(self.root / "outcomes/coordination.json", {
+            **recording([pull(1)]), "repository": "example/coordination"})
+        report = deliver_workers(self.home, self.window, [REPO, "example/coordination"],
+            FixtureOutcomes(self.root / "outcomes"), salt=b"synthetic-key")
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(report["units"][0]["start_scope"], "start_origin")
+        expected = deliver_workers(self.home, self.window, [REPO], outcomes, salt=b"synthetic-key")
+        self.assertEqual(report["units"][0]["links"], expected["units"][0]["links"])
+        self.assertEqual(expected["units"][0]["start_scope"], "own_reference")
+
+    def test_remote_push_without_a_matching_pr_still_scopes_unit(self):
+        codex_worker(self.home, "remote", self.root / "unavailable",
+            command="ssh build.example.test 'git push origin HEAD:worker-1'",
+            output=push_output("worker-1"))
+        report = self.report([])
+        self.assertEqual(report["units"][0]["start_scope"], "own_reference")
+        self.assertEqual(report["states"]["no_pr"], 1)
+
+    def test_remote_push_can_continue_older_pr(self):
+        older = pull(1)
+        older["response"]["created_at"] = "2029-12-31T00:00:00Z"
+        codex_worker(self.home, "remote", self.root / "unavailable",
+            command="ssh build.example.test 'git push origin HEAD:worker-1'",
+            output=push_output("worker-1"))
+        report = self.report([older])
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(report["units"][0]["links"][0]["role"], "continued")
+
+    def test_rejected_up_to_date_deleted_and_tag_results_are_not_authorship(self):
+        for line in (" ! [rejected] HEAD -> worker-1 (non-fast-forward)",
+            " ! [remote rejected] HEAD -> worker-1 (pre-receive hook declined)",
+            "Everything up-to-date", " = [up to date] HEAD -> worker-1",
+            " - [deleted] (none) -> worker-1", " * [new tag] worker-1 -> worker-1",
+            "   abc1234..def5678 refs/tags/source -> refs/tags/worker-1"):
+            with self.subTest(line=line):
+                codex_worker(self.home, "remote", self.repo, command="git push origin worker-1",
+                    output="To https://github.com/example/sample.git\n" + line + "\n")
+                report = self.report([pull(1)])
+                self.assertEqual(report["states"]["no_pr"], 1)
+                self.assertEqual(report["units"][0]["links"], [])
+
+    def test_push_results_require_successful_completed_execution(self):
+        for code in (1, None):
+            with self.subTest(exit_code=code):
+                codex_worker(self.home, "remote", self.repo, exit_code=code,
+                    command="ssh build.example.test 'git push origin HEAD:worker-1'",
+                    output=push_output("worker-1"))
+                report = self.report([pull(1)])
+                self.assertEqual(report["units"][0]["links"], [])
+                self.assertEqual(report["states"]["no_pr"], 1)
+        rows = codex_worker(self.home, "remote", self.repo,
+            command="ssh build.example.test 'git push origin HEAD:worker-1'",
+            output=push_output("worker-1"))
+        next(r for r in rows if r.get("payload", {}).get("type") == "exec_command_end"
+            )["payload"].pop("exit_code")
+        stream(self.home / ".codex/sessions/rollout-remote.jsonl", rows)
+        self.assertEqual(self.report([pull(1)])["units"][0]["links"], [])
+
+    def test_push_result_remote_blocks_do_not_cross_link(self):
+        codex_worker(self.home, "remote", self.repo,
+            command="ssh build.example.test 'git push origin --all'",
+            output=push_output("worker-1") + push_output("worker-2", "other/sample")
+                + "To https://example.test/sample.git\n   abc1234..def5678 HEAD -> worker-3\n")
+        report = self.report([pull(1), pull(2), pull(3)])
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(len(report["units"][0]["links"]), 1)
+
+    def test_outside_push_result_cannot_scope_unit(self):
+        codex_worker(self.home, "remote", self.root / "unavailable",
+            command="ssh build.example.test 'git push origin worker-1'",
+            output=push_output("worker-1", "other/sample"))
+        report = self.report([pull(1)])
+        self.assertEqual(report["units"], [])
+        self.assertEqual(report["coverage"]["excluded_scope"]["repository_unconfirmed"], 1)
+
+    def test_all_changed_destination_refs_link_with_exact_heads(self):
+        codex_worker(self.home, "remote", self.repo, command="ssh build.example.test 'git push'",
+            output="To git@github.com:example/sample.git\n"
+                " * [new branch] source -> worker-1\n"
+                "   abc1234..def5678 source -> worker-2\n"
+                " + abc1234...def5678 HEAD -> refs/heads/worker-3 (forced update)\n"
+                " ! [rejected] source -> worker-4 (non-fast-forward)\n")
+        report = self.report([pull(1), pull(2), pull(3), pull(4), pull(5, head="source")])
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(len(report["units"][0]["links"]), 3)
+
+    def test_opaque_push_output_and_plain_url_mentions_cannot_link_or_scope(self):
+        for command, output in (("git push origin worker-1", "Synthetic completion"),
+            ("ssh build.example.test 'cat brief.md'", "https://github.com/example/sample/pull/1")):
+            with self.subTest(command=command):
+                codex_worker(self.home, "remote", self.root / "unavailable",
+                    command=command, output=output)
+                report = self.report([pull(1)])
+                self.assertEqual(report["units"], [])
+
+    def test_claude_remote_push_and_create_use_paired_results(self):
+        for command, output, evidence in (("ssh build.example.test 'git push'",
+            push_output("worker-1"), "pushed_branch"),
+            ("ssh build.example.test 'gh pr create'",
+                "Creating pull request\nhttps://github.com/example/sample/pull/1\n", "pr_created")):
+            with self.subTest(evidence=evidence):
+                claude_worker(self.home, "remote", self.root / "unavailable", 1, seconds=11)
+                path = self.home / ".claude/projects/group/main/subagents/agent-remote.jsonl"
+                rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+                rows[-2]["message"]["content"][0]["input"]["command"] = command
+                rows[-1]["toolUseResult"].update(stdout=output, stderr="")
+                rows[-1]["message"]["content"][0]["content"] = output
+                stream(path, rows)
+                report = self.report([pull(1)])
+                self.assertEqual(report["states"]["success"], 1)
+                self.assertEqual(report["units"][0]["links"][0]["evidence"], evidence)
+                public = json.dumps(report)
+                for private in ("build.example.test", "worker-1", "example/sample", "git push",
+                    "Creating pull request", str(self.root)):
+                    self.assertNotIn(private, public)
+
+    def test_codex_completed_item_remote_push_result_links(self):
+        rows = codex_worker(self.home, "remote", self.root / "unavailable")
+        rows.append({"type": "event_msg", "timestamp": at(1, 11).isoformat(), "payload": {
+            "type": "item_completed", "started_at_ms": int(at(1, 3).timestamp() * 1000),
+            "item": {"id": "push", "type": "CommandExecution",
+                "command": ["ssh", "build.example.test", "git push"], "exit_code": 0,
+                "aggregated_output": push_output("worker-1")}}})
+        stream(self.home / ".codex/sessions/rollout-remote.jsonl", rows)
+        report = self.report([pull(1)])
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(report["units"][0]["links"][0]["evidence"], "pushed_branch")
 
 
 if __name__ == "__main__":
