@@ -55,6 +55,7 @@ class Session:
     start_at: datetime | None = None
     start_cwd: str | None = None
     start_evidence: str | None = None
+    dispatch_kind: str = "unknown"
     is_worker: bool = False
     commands: dict[str, CommandExecution] = field(default_factory=dict)
     edits: dict[str, datetime] = field(default_factory=dict)

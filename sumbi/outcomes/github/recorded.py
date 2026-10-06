@@ -8,6 +8,7 @@ import re
 from typing import Protocol
 
 from sumbi.outcomes.github.ledger import REPO, utc
+from sumbi.events.references import branch
 
 SHA = r"[0-9a-fA-F]{40}"
 FIX = re.compile(
@@ -38,6 +39,7 @@ class PullRequest:
     observed_checks: str = "unknown"
     checks_basis: str = "unknown"
     checks_reason: str = "checks_policy_unreadable"
+    head_ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -53,6 +55,7 @@ class Outcomes(Protocol):
 
     def pull(self, identity: str) -> PullRequest | None: ...
     def observation(self, repo: str) -> Observation | None: ...
+    def branch_pulls(self, repo: str, head_ref: str) -> list[str]: ...
     def disturbances(self, pull: PullRequest, days: float) -> tuple[list[PullRequest],
         list[datetime]]: ...
 
@@ -112,6 +115,9 @@ class FixtureOutcomes:
             merged = utc(pr["merged_at"],
                 "Outcomes PR merged_at") if pr["merged_at"] is not None else None
             head, merge = pr["head"]["sha"], pr["merge_commit_sha"]
+            head_ref = pr["head"].get("ref")
+            if head_ref is not None and branch(head_ref) is None:
+                raise ValueError("Outcomes: invalid PR head ref")
             if (not isinstance(head, str) or not re.fullmatch(SHA, head)
                 or (merge is not None
                     and (not isinstance(merge, str) or not re.fullmatch(SHA, merge)))
@@ -138,9 +144,17 @@ class FixtureOutcomes:
             self.pulls[identity] = PullRequest(identity, pr["state"], created, closed, merged,
                 head.lower(), merge.lower() if merge else None,
                 checks, pr["title"], pr["body"] or "", observed,
-                basis, reason)
+                basis, reason, head_ref)
+        self._load_commits(repo, raw["commits"], start, end)
+
+    def branch_pulls(self, repo, head_ref):
+        """Enumerate exact heads without exposing branch text in public reports."""
+        return sorted(p.id for p in self.pulls.values()
+            if p.id.rsplit("#", 1)[0] == repo and p.head_ref == head_ref)
+
+    def _load_commits(self, repo, rows, start, end):
         commits = []
-        for commit in raw["commits"]:
+        for commit in rows:
             if not re.fullmatch(SHA,
                 commit["sha"]) or not isinstance(commit["commit"]["message"], str):
                 raise ValueError("Outcomes: invalid commit evidence")

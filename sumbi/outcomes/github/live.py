@@ -82,7 +82,8 @@ class GitHubOutcomes(FixtureOutcomes):
     Recordings include normalized fixtures and filtered REST pages for offline tests.
     """
 
-    def __init__(self, ledger, *, cache=None, record=None):
+    def __init__(self, ledger, *, cache=None, record=None, head_refs=False):
+        self.head_refs = head_refs
         self.cache = outside_repository(cache if cache is not None
             else Path.home() / ".cache/sumbi/outcomes")
         self.record = outside_repository(record) if record is not None else None
@@ -126,7 +127,7 @@ class GitHubOutcomes(FixtureOutcomes):
         return value
 
     @staticmethod
-    def _filter(path, raw):
+    def _filter(path, raw, *, head_refs=False):
         """Allow-list only data used by this adapter, dropping all author fields."""
         endpoint = path.split("?", 1)[0]
 
@@ -135,6 +136,8 @@ class GitHubOutcomes(FixtureOutcomes):
                 "merge_commit_sha", "title", "body")
             result = {k: pr[k] for k in fields}
             result["head"] = {"sha": pr["head"]["sha"]}
+            if head_refs:
+                result["head"]["ref"] = pr["head"]["ref"]
             result["base"] = {"ref": pr["base"]["ref"]}
             return result
 
@@ -190,7 +193,7 @@ class GitHubOutcomes(FixtureOutcomes):
                         if len(data) > MAX_BYTES:
                             raise ValueError("GitHub response exceeds the size limit")
                         raw = json.loads(data)
-                    filtered = self._redact(self._filter(path, raw))
+                    filtered = self._redact(self._filter(path, raw, head_refs=self.head_refs))
                     for obj in filtered if isinstance(filtered, list) else [filtered]:
                         if isinstance(obj, dict):
                             values = [obj.get("title"), obj.get("body"),
@@ -432,7 +435,8 @@ class GitHubOutcomes(FixtureOutcomes):
         return payload["response"]
 
     def _cached_response(self, path):
-        key = hashlib.sha256(path.encode("utf-8")).hexdigest()
+        cache_key = ("worker-head-refs-v1:" if self.head_refs else "") + path
+        key = hashlib.sha256(cache_key.encode("utf-8")).hexdigest()
         destination = self.cache / (key + ".json")
         payload = None
         try:

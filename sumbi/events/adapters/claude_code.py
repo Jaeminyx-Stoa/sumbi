@@ -77,7 +77,8 @@ def _translate(event, when, parent, child):
     kind = event.get("type")
     cwd = event.get("cwd") if isinstance(event.get("cwd"), str) else None
     yield SessionStart(cwd, parent if child else None, "worker" if child else "orchestrator",
-        "claude-code", provenance="first-observed-cwd")
+        "claude-code", provenance="first-observed-cwd",
+        dispatch_kind="subagent" if child else "interactive")
     if event.get("version"):
         yield Metadata(cli_version=freeze(event["version"]), supplied=("cli_version",))
     message = mapping(event.get("message"))

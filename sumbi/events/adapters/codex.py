@@ -175,9 +175,12 @@ def _translate(event, payload, when, inherited):
     if kind == "session_meta" and not inherited:
         subagent = mapping(mapping(payload.get("source")).get("subagent"))
         parent = mapping(subagent.get("thread_spawn")).get("parent_thread_id")
+        dispatch = ("subagent" if subagent else "noninteractive_exec"
+            if payload.get("source") == "exec" and payload.get("originator") == "codex_exec"
+            else "interactive" if payload.get("source") in ("vscode", "cli") else "unknown")
         yield SessionStart(payload.get("cwd") if isinstance(payload.get("cwd"), str) else None,
             parent if isinstance(parent, str) else None, "worker" if subagent else "orchestrator",
-            agent="codex", provenance="session-header")
+            agent="codex", provenance="session-header", dispatch_kind=dispatch)
     if kind not in KNOWN:
         yield Diagnostic(freeze(kind))
     if kind in ("session_meta", "turn_context") and not inherited:

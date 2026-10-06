@@ -1,0 +1,50 @@
+sumbi compare
+Verdict proposal: adopt
+Reasons: non_inferior_with_cost_improvement
+Outcome source: worker-github
+Cost proposal scope: retained worker sessions only
+Excluded dispatch overhead: 2 sessions; observed tokens 200
+Sample per arm: registered 12; needed 0; actual before 12, after 12
+before success: 12/12; Wilson 95% [0.757506, 1]
+before merged-attempt checks bases: historical 12
+before new_input per success: 1080/12 = 90; bootstrap 95% [90, 90]
+before cache_write per success: not reported/12 = not reported; bootstrap 95% not reported
+before cache_read per success: 0/12 = 0; bootstrap 95% [0, 0]
+before output per success: 120/12 = 10; bootstrap 95% [10, 10]
+before reasoning_output per success: not reported/12 = not reported; bootstrap 95% not reported
+before total per success: 1200/12 = 100; bootstrap 95% [100, 100]
+before time per success: 1200/12 = 100; bootstrap 95% [100, 100]
+after success: 12/12; Wilson 95% [0.757506, 1]
+after merged-attempt checks bases: historical 12
+after new_input per success: 480/12 = 40; bootstrap 95% [40, 40]
+after cache_write per success: not reported/12 = not reported; bootstrap 95% not reported
+after cache_read per success: 0/12 = 0; bootstrap 95% [0, 0]
+after output per success: 120/12 = 10; bootstrap 95% [10, 10]
+after reasoning_output per success: not reported/12 = not reported; bootstrap 95% not reported
+after total per success: 600/12 = 50; bootstrap 95% [50, 50]
+after time per success: 600/12 = 50; bootstrap 95% [50, 50]
+After - before success: 0; Newcombe 95% [-0.242494, 0.242494]; non_inferior; margin 30 percentage points
+new_input after/before: 40/90 = 0.444444; bootstrap 95% [0.444444, 0.444444]; improved
+cache_write after/before: not reported/not reported = not reported; bootstrap 95% not reported; uncertain
+cache_read after/before: 0/0 = not reported; bootstrap 95% not reported; uncertain
+output after/before: 10/10 = 1; bootstrap 95% [1, 1]; uncertain
+reasoning_output after/before: not reported/not reported = not reported; bootstrap 95% not reported; uncertain
+total after/before: 50/100 = 0.5; bootstrap 95% [0.5, 0.5]; improved
+time after/before: 50/100 = 0.5; bootstrap 95% [0.5, 0.5]; improved
+Bootstrap: seed 1729; resamples 100
+before excluded or unlinked: 0/12; 
+after excluded or unlinked: 0/12; 
+Flag effort_unobservable: informational
+Flag dispatch_overhead_excluded: informational
+agent mix total variation: 0
+  before: claude-code 4/12 = 0.333333; codex 8/12 = 0.666667
+  after: claude-code 4/12 = 0.333333; codex 8/12 = 0.666667
+model mix total variation: 0
+  before: synthetic-claude 4/12 = 0.333333; synthetic-codex 8/12 = 0.666667
+  after: synthetic-claude 4/12 = 0.333333; synthetic-codex 8/12 = 0.666667
+effort mix total variation: 0
+  before: high 8/8 = 1
+  after: high 8/8 = 1
+cli_version mix total variation: 0
+  before: 1.0 12/12 = 1
+  after: 1.0 12/12 = 1

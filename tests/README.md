@@ -15,6 +15,10 @@ flows; outcome tests cover the GitHub and local-verification sources. Shared
 synthetic inputs remain in `fixtures/`, and the CLI corpus remains in
 `characterization/`. Build, layer and style checks stay at the test root.
 Package markers let standard `unittest` discovery find every nested test.
+Worker GitHub tests add authored mixed-agent launcher/subagent streams, a real
+synthetic sibling worktree, own-session link strengths and recorded PR outcomes.
+Comparison cases cover adoption, unlinked/weak shares, exposure and checks-basis
+gates. Its new command goldens leave every existing golden byte-identical.
 
 ## Normalized event seams
 

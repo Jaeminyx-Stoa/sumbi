@@ -1,0 +1,1408 @@
+{
+  "schema_version": "worker-github-deliver-1.0",
+  "outcome_source": "worker-github",
+  "unit": "worker_session",
+  "dispatch_window": {
+    "since": "2030-01-01T00:00:00+00:00",
+    "until": "2030-01-15T00:00:00+00:00",
+    "bounds": "[since,until)"
+  },
+  "scan_until": "2030-02-01T00:00:00+00:00",
+  "follow_up_days": 7.0,
+  "pseudonyms": {
+    "salted": true,
+    "algorithm": "hmac-sha256"
+  },
+  "states": {
+    "success": 24,
+    "failed": 0,
+    "immature": 0,
+    "in_progress": 0,
+    "no_pr": 0,
+    "no_change": 0
+  },
+  "units": [
+    {
+      "id": "session_00f3ca73c5731d3458660b03",
+      "agent": "codex",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "noninteractive_exec",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_00f3ca73c5731d3458660b03",
+          "pr_id": "pr_47316d4d06416a019dba30dd",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_b9039a1ba42bf394e64e73cd",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_47316d4d06416a019dba30dd"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_026dd11577b6cf6289ef6a8f",
+      "agent": "codex",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_026dd11577b6cf6289ef6a8f",
+          "pr_id": "pr_def68336e401b04b57dfc8e6",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_8988fd24fd0b9f1435fd3265",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_def68336e401b04b57dfc8e6"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_0aae361d58125c1026511d84",
+      "agent": "claude-code",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_0aae361d58125c1026511d84",
+          "pr_id": "pr_0a67c84b8949445985e39d19",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_1e51b52aa215bc748e55b883",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_0a67c84b8949445985e39d19"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-claude"
+      ],
+      "effort": [],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_179cc8f095ed625d5c3bb588",
+      "agent": "codex",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_179cc8f095ed625d5c3bb588",
+          "pr_id": "pr_5fd1b2edf5b601c911e8e1f7",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_fe402cff384d85eb05085b10",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_5fd1b2edf5b601c911e8e1f7"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_1aae1795ef57f31f40cee7a9",
+      "agent": "claude-code",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_1aae1795ef57f31f40cee7a9",
+          "pr_id": "pr_f9d868789c33eb3e78f8cf8e",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_6c768f7be7f82c028e87fd19",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_f9d868789c33eb3e78f8cf8e"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-claude"
+      ],
+      "effort": [],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_1f2cea5bb68fa7c0588a7dc3",
+      "agent": "codex",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "noninteractive_exec",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_1f2cea5bb68fa7c0588a7dc3",
+          "pr_id": "pr_d4e4ca0399b52f605f1209c9",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_01c8b81f92446da68a837c12",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_d4e4ca0399b52f605f1209c9"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_29f8ec494af7089bc644bc67",
+      "agent": "codex",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_29f8ec494af7089bc644bc67",
+          "pr_id": "pr_fff300e25637b6024c8b9caf",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_9706742e93dfdf2bd759b449",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_fff300e25637b6024c8b9caf"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_2ac2d16bef74f5ec17ccd5ab",
+      "agent": "codex",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "noninteractive_exec",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_2ac2d16bef74f5ec17ccd5ab",
+          "pr_id": "pr_117d96a714864cf3cd7bb802",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_e7b673894424ff8167afff97",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_117d96a714864cf3cd7bb802"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_394d1995a7a2360c81bbb9c6",
+      "agent": "claude-code",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_394d1995a7a2360c81bbb9c6",
+          "pr_id": "pr_f52d59edf011a42b01386b5f",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_a164b80da64a771f9cd0c530",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_f52d59edf011a42b01386b5f"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-claude"
+      ],
+      "effort": [],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_42c29e3de6a063729b588302",
+      "agent": "codex",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "noninteractive_exec",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_42c29e3de6a063729b588302",
+          "pr_id": "pr_4499d744f19c9dce4be6b003",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_8dc8235ffb2a01a4c47751be",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_4499d744f19c9dce4be6b003"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_62db1bc9eca43bf026de5305",
+      "agent": "claude-code",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_62db1bc9eca43bf026de5305",
+          "pr_id": "pr_b44a2b0f372347e026942db9",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_e940bbc26f9816af33554402",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_b44a2b0f372347e026942db9"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-claude"
+      ],
+      "effort": [],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_7cc44adc67ef47acc60e386d",
+      "agent": "claude-code",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_7cc44adc67ef47acc60e386d",
+          "pr_id": "pr_ee0fe000dc76c7c6fee7596c",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_b6c1bdaa020d82ed3cfbb8aa",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_ee0fe000dc76c7c6fee7596c"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-claude"
+      ],
+      "effort": [],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_83b2d0ae19f947e56288fb8f",
+      "agent": "codex",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "noninteractive_exec",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_83b2d0ae19f947e56288fb8f",
+          "pr_id": "pr_6fb5a7436a2c056ce4c6928f",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_0eb6094c8386882e4a526866",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_6fb5a7436a2c056ce4c6928f"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_84409117966884840227eaea",
+      "agent": "claude-code",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_84409117966884840227eaea",
+          "pr_id": "pr_c78718cf65d1907adc47b872",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_d83d2d745ab9a6136d11aaa9",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_c78718cf65d1907adc47b872"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-claude"
+      ],
+      "effort": [],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_904aedf3671bd94d28ef1b57",
+      "agent": "codex",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_904aedf3671bd94d28ef1b57",
+          "pr_id": "pr_4c8f3136f38aafc780d4793f",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_9d4ff114cb5b837da35ae049",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_4c8f3136f38aafc780d4793f"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_93b3ce85b1cdb48e0017a1e0",
+      "agent": "codex",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_93b3ce85b1cdb48e0017a1e0",
+          "pr_id": "pr_ed4495e1af567e1342ea7f5e",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_96a697b414d593927d464dbd",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_ed4495e1af567e1342ea7f5e"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_a3cf4cdc3db8100d026f8b9b",
+      "agent": "codex",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_a3cf4cdc3db8100d026f8b9b",
+          "pr_id": "pr_7ef8bb92c5487fceb1d7630a",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_6d93d77d11e5f220e3e9918e",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_7ef8bb92c5487fceb1d7630a"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_a55a2b5454edeadcc88523ed",
+      "agent": "codex",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_a55a2b5454edeadcc88523ed",
+          "pr_id": "pr_ed58c91fd93e95ff8750750f",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_6f535241c564d35dddf16813",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_ed58c91fd93e95ff8750750f"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_b133b40d3ab52ce65f2149b6",
+      "agent": "claude-code",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_b133b40d3ab52ce65f2149b6",
+          "pr_id": "pr_7a88b4de2a2beca2c2fdb7d3",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_fe723a28c9a80749c7d6559f",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_7a88b4de2a2beca2c2fdb7d3"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-claude"
+      ],
+      "effort": [],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_b177dfb8fba0a08c9c3215f7",
+      "agent": "codex",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "noninteractive_exec",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_b177dfb8fba0a08c9c3215f7",
+          "pr_id": "pr_47c6a7e522d7152d802906cf",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_08fd682709b96e8ba80cbd61",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_47c6a7e522d7152d802906cf"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_c17e76b7d0a61c732177b788",
+      "agent": "codex",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "noninteractive_exec",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_c17e76b7d0a61c732177b788",
+          "pr_id": "pr_46835e7bd579eafcb6652645",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_62ea5ffe22100067c8226a1a",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_46835e7bd579eafcb6652645"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_ca06d4e2f34e4da201a4167d",
+      "agent": "claude-code",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_ca06d4e2f34e4da201a4167d",
+          "pr_id": "pr_bde2223e1512529ef0c28979",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_7bbd6f2fb72245f75e62e6fb",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_bde2223e1512529ef0c28979"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-claude"
+      ],
+      "effort": [],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_e41ff416a0c265e7f61ecd75",
+      "agent": "codex",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "dispatch_kind": "subagent",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-01T01:01:40+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_e41ff416a0c265e7f61ecd75",
+          "pr_id": "pr_fef3c347ce112c7b99b2c85f",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_0f56c16f4580c5388038dd53",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_fef3c347ce112c7b99b2c85f"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 90,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 100.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    },
+    {
+      "id": "session_ec811345d9e945246d8878ef",
+      "agent": "codex",
+      "dispatched_at": "2030-01-08T01:00:00+00:00",
+      "dispatch_kind": "noninteractive_exec",
+      "start_scope": "start_origin",
+      "last_at": "2030-01-08T01:00:50+00:00",
+      "state": "success",
+      "reason": "accepted",
+      "task_type": null,
+      "links": [
+        {
+          "session_id": "session_ec811345d9e945246d8878ef",
+          "pr_id": "pr_a1bc4d3ed97f3247ddd80ea3",
+          "repository_id": "repository_43523e188c49217989df5a27",
+          "branch_id": "branch_813c1273f155d2fc68db9950",
+          "evidence": "pushed_branch",
+          "strength": "strong"
+        }
+      ],
+      "weak_link": false,
+      "prs": [
+        "pr_a1bc4d3ed97f3247ddd80ea3"
+      ],
+      "missing_prs": 0,
+      "checks_basis": [
+        "historical"
+      ],
+      "tokens": {
+        "new_input": 40,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": 0,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 50.0,
+      "elapsed_measurement": "observed_worker_span",
+      "model": [
+        "synthetic-codex"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "metadata_incomplete": {},
+      "evidence_incomplete": false
+    }
+  ],
+  "success_rate": {
+    "numerator": 24,
+    "denominator": 24,
+    "rate": 1.0,
+    "wilson_95": [
+      0.8620237953250198,
+      1.0
+    ]
+  },
+  "cost": {
+    "basis": "retained_worker_lifetime_only",
+    "per_success": {
+      "new_input": {
+        "numerator": 1560,
+        "denominator": 24,
+        "value": 65.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "cache_write": {
+        "numerator": null,
+        "denominator": 24,
+        "value": null,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "cache_read": {
+        "numerator": 0,
+        "denominator": 24,
+        "value": 0.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "output": {
+        "numerator": 240,
+        "denominator": 24,
+        "value": 10.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "reasoning_output": {
+        "numerator": null,
+        "denominator": 24,
+        "value": null,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "total": {
+        "numerator": 1800,
+        "denominator": 24,
+        "value": 75.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "time": {
+        "numerator": 1800.0,
+        "denominator": 24,
+        "value": 75.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      }
+    }
+  },
+  "dispatch_overhead": {
+    "sessions": 2,
+    "rows": [
+      {
+        "id": "session_66aabbddbaa648b9272c14d5",
+        "agent": "codex",
+        "tokens": {
+          "new_input": 90,
+          "cache_write": null,
+          "cache_read": 0,
+          "output": 10,
+          "reasoning_output": 0,
+          "total": 100
+        },
+        "tokens_complete": true,
+        "observed_total": 100
+      },
+      {
+        "id": "session_9fde0535e0719793a7dcb579",
+        "agent": "codex",
+        "tokens": {
+          "new_input": 90,
+          "cache_write": null,
+          "cache_read": 0,
+          "output": 10,
+          "reasoning_output": 0,
+          "total": 100
+        },
+        "tokens_complete": true,
+        "observed_total": 100
+      }
+    ],
+    "observed_total": 200
+  },
+  "excluded_worker_spend": {
+    "observed_total": 0
+  },
+  "coverage": {
+    "adapters": {
+      "claude-code": {
+        "files_scanned": 8,
+        "lines_read": 24,
+        "broken_lines": 0,
+        "duplicate_events": 0,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 8
+      },
+      "codex": {
+        "files_scanned": 18,
+        "lines_read": 108,
+        "broken_lines": 0,
+        "duplicate_events": 0,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 18
+      }
+    },
+    "excluded_scope": {},
+    "repositories": [
+      {
+        "id": "repository_43523e188c49217989df5a27",
+        "coverage_start": "2030-01-01T00:00:00+00:00",
+        "observed_at": "2030-02-01T00:00:00+00:00",
+        "pulls_complete": true,
+        "commits_complete": true
+      }
+    ],
+    "missing_prs": 0,
+    "link_evidence_counts": {
+      "pushed_branch": 24
+    }
+  },
+  "limitations": [
+    "worker_costs_exclude_dispatch_overhead",
+    "shell_edits_invisible",
+    "deleted_logs_undetectable",
+    "last_observed_time_is_not_acceptance",
+    "branch_reuse_requires_post_dispatch_pr",
+    "repairs_fail_original_dispatch"
+  ]
+}

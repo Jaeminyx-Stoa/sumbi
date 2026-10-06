@@ -45,7 +45,7 @@ def read_registration(path: Path) -> Registration:
                 "outcome_source"}:
             raise ValueError
         source = raw.get("outcome_source", "github")
-        if source not in ("github", "local-verify"):
+        if source not in ("github", "local-verify", "worker-github"):
             raise ValueError
         def bounded(value):
             return isinstance(value, str) and re.fullmatch(LABEL, value)

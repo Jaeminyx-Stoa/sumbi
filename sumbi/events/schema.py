@@ -60,6 +60,7 @@ class SessionStart:
     provenance: Literal["first-observed-cwd", "session-header",
         "sumbi-events-v1"] = "sumbi-events-v1"
     metadata: Metadata = Metadata()
+    dispatch_kind: Literal["subagent", "noninteractive_exec", "interactive", "unknown"] = "unknown"
 
 
 @dataclass(frozen=True)

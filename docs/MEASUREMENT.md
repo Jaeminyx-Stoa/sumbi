@@ -678,7 +678,7 @@ not authenticate its timestamp or prevent an owner from editing it retrospective
   ID and applied time. It does **not** provide margin, sample size, windows, or
   a full registration. Register these before application; do not treat an
   intervention record written later as independent proof of pre-registration.
-- `outcome_source` is `github` or `local-verify` and applies identically to both
+- `outcome_source` is `github`, `local-verify` or `worker-github` and applies identically to both
   arms. Legacy registrations without it mean `github`; local comparisons require
   it explicitly. The CLI rejects a source override that differs from registration.
 - Margin is strictly between 0 and 100 **absolute percentage points** of success
@@ -899,6 +899,111 @@ labels must be public-safe categories. Acceptance, notes, branches, prompts,
 commands, outcome prose, paths, host names and prediction conditions are absent.
 Use a local salt before sharing. See the authored
 [round calculations and verdict cases](../tests/fixtures/compare/ROUND.md).
+
+## Worker GitHub: fixed dispatches without a ledger
+
+`worker-github` measures dispatched worker sessions against remote PR outcomes.
+It requires no per-deliverable ledger. Scope is an explicit, repeatable list of
+remote repositories, independent of the dispatcher's checkout location:
+
+```sh
+sumbi deliver --outcome-source worker-github --repo example/sample \
+  --outcomes recorded-outcomes --home local-log-home \
+  --since 2030-01-01T00:00:00Z --until 2030-01-15T00:00:00Z \
+  --json out/worker-deliver.json
+sumbi compare --registration worker-registration.json --repo example/sample \
+  --outcomes recorded-outcomes --home local-log-home --json out/worker-compare.json
+```
+
+The registration explicitly names `"outcome_source": "worker-github"` and uses
+the same M2 windows, predictions, margin, sample size, confounders and follow-up
+days. A differing CLI override is rejected. Use `--outcomes github` for the
+existing read-only live adapter with optional `--cache DIR` and `--record DIR`.
+Its authentication, destination protection, checks-basis ladder, pagination,
+observation-time cache semantics and private recording rules still apply.
+`--ledger`, local verification options and project matching rules are rejected;
+`--repo` is the authoritative remote scope. JSON and summary routing follow
+the existing delivery/comparison commands.
+
+Units are fixed from their own start metadata before live outcome collection:
+Claude subagent streams and Codex subagent headers retain the existing worker
+rule; a top-level Codex header additionally qualifies only when both
+`source == "exec"` and `originator == "codex_exec"`. The local `dispatch_kind`
+labels are `subagent`, `noninteractive_exec`, `interactive` and `unknown`.
+Later or inherited headers cannot upgrade an interactive session into a worker.
+These additional labels do not change existing collection or local-verification
+outputs. Interactive and unrecognized top-level sessions are dispatcher overhead.
+
+A unit enters remote scope when its start cwd's locally queried git origin
+matches a measured repository, or its own explicit PR/branch evidence identifies
+one. A sibling worktree or clone with the same origin is in scope; no physical
+checkout-root equivalence is required for remote PR acceptance. An unavailable
+cwd can still be scoped by an explicit measured PR. Unconfirmed repositories
+and missing starts are counted separately; missing starts block comparison.
+No parent's cwd, references, costs or outcome are inherited by a child.
+
+Links use the existing bounded reference extraction from recognized tool inputs
+and outputs, with additional literal worker branch observations. Ordinary
+messages and unknown tools cannot link work. Every linked PR retains its
+strongest own-session evidence:
+
+| Evidence label | Strength and meaning |
+| --- | --- |
+| `pr_url` | Strongest: an exact GitHub PR URL in a recognized tool input or output. |
+| `pushed_branch` | Strong: a literal push target or anchored push result. Input evidence proves the named attempted target, not a successful push. |
+| `created_branch` | Strong: a literal branch creation or explicit `gh pr create --head` operand. |
+| `cwd_branch` | Weak: structured cwd/context branch, branch query, or ordinary branch switch evidence only. |
+
+Branches match exact PR `head.ref` values in measured repositories, restricted
+to the start-origin repository when known. A branch match must refer to a PR
+created at or after dispatch; a reused name cannot import an earlier PR. The
+worker's branch can match a PR opened later by the main session without reading
+the main session's evidence. All matched PRs are constituents; a failed
+constituent cannot be dropped. If any link is only weak, the unit counts as
+unlinked for comparison and is excluded with that reason.
+
+Recorded fixtures may include `response.head.ref`; older fixtures without it
+still support explicit URL links. The live worker capture retains that field
+and uses a separate cache namespace so old cached pages cannot silently omit
+branch evidence. Private recordings preserve refs; public reports contain only
+pseudonymous branch, PR, repository and session IDs, evidence labels and counts.
+They never emit branch text, PR numbers, origins, cwd paths or tool operands.
+
+Worker states use the existing constituent checks and disturbance evidence,
+with dispatch-level failure rules:
+
+- `success`: every constituent merged green and its follow-up capture is mature
+  and complete, with no detected revert or merged fix in the window.
+- `failed`: closed unmerged work, red merge checks, a detected revert, a merged
+  follow-up fix or a fix commit inside the follow-up window. A later repair
+  cannot recover the original worker dispatch into success.
+- `immature`: merged work with an open or incomplete follow-up capture.
+- `in_progress`: an open PR, missing PR/check evidence or pending repair.
+- `no_pr`: known edits without a linked PR, including conservatively incomplete
+  edit evidence. It remains non-success in retained success and cost denominators.
+- `no_change`: no recognized edits, excluded but counted even if PR evidence exists.
+
+Comparisons use the shared M2 engine: actual apply-time exposure gaps, endpoint
+exposure, per-agent metadata observability, agent/model/effort/version mixes,
+sample size, Wilson and Newcombe intervals, whole-worker bootstrap and the
+ordered coverage/comparability/success/cost verdict gates. Checks bases must be
+uniform across every retained merged attempt, including detected follow-ups.
+Missing PRs, incomplete repository capture, parse errors and missing required
+token evidence block coverage. The combined weak/unlinked and exposure-excluded
+share over 10% in either candidate arm blocks comparability. `no_pr` contributes
+to this gate while staying in denominators; overlapping reasons count once.
+The reported `risky_share` includes retained `no_pr` units as well as risky
+exclusions. Exclusions whose reason is `no_change` do not contribute; exposure
+gap exclusions still do. A no-change share shift over 0.2 blocks comparison.
+
+All cost estimates and proposals use retained worker sessions only, including
+failed and no-PR workers' full observed lifetime tokens. Time is dispatch to the
+worker's last observed activity, labeled `observed_worker_span`, rather than
+PR acceptance or human waiting time. Dispatcher overhead and excluded worker
+spend appear separately. An adopt proposal concerns worker costs only.
+Shell edits are invisible, missing/deleted logs are undetectable, branch reuse
+is conservative, and disturbance patterns are bounded evidence rather than
+semantic review. Sources cannot be mixed between arms.
 
 ## Local verification: fixed worker-session outcomes
 

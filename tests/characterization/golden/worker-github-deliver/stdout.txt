@@ -1,0 +1,8 @@
+sumbi worker GitHub
+Outcome source: worker-github
+States: success 24; failed 0; immature 0; in_progress 0; no_pr 0; no_change 0
+Retained success: 24/24; Wilson 95% [0.8620237953250198, 1.0]
+Cost scope: retained worker sessions only
+Dispatch overhead sessions: 2; observed tokens 200
+Worker total per success: 1800/24 = 75.0; descriptive only
+Worker time per success: 1800.0/24 = 75.0; descriptive only

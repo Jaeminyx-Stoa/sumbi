@@ -1592,6 +1592,94 @@
       ],
       "expected_exit": 0,
       "lifecycle": true
+    },
+    {
+      "name": "worker-github-deliver",
+      "command": "deliver",
+      "setup": "worker-github",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "worker-github",
+        "--repo",
+        "example/sample",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--home",
+        "{home}",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-15T00:00:00Z",
+        "--json",
+        "report.json"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "worker-github-compare-adopt",
+      "command": "compare",
+      "setup": "worker-github",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "worker-github",
+        "--repo",
+        "example/sample",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--home",
+        "{home}",
+        "--registration",
+        "{registration}",
+        "--resamples",
+        "100",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "worker-github-compare-withhold",
+      "command": "compare",
+      "setup": "worker-github-withhold",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "worker-github",
+        "--repo",
+        "example/sample",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--home",
+        "{home}",
+        "--registration",
+        "{registration}",
+        "--resamples",
+        "100",
+        "--json",
+        "report.json"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "worker-github-missing-repo",
+      "command": "deliver",
+      "setup": "empty",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "worker-github",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--home",
+        "{home}",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-15T00:00:00Z"
+      ],
+      "expected_exit": 2
     }
   ]
 }

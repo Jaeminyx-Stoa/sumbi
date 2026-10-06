@@ -81,6 +81,21 @@ class TranslationTests(unittest.TestCase):
         self.assertFalse(any(isinstance(event, (e.SessionStart, e.Context)) for event in observations[-1].events))
         self.assertEqual(coverage.inherited_session_meta, 1)
 
+    def test_codex_start_provenance_distinguishes_launcher_and_interactive(self):
+        for identity, source, originator, expected in (
+            ("exec", "exec", "codex_exec", "noninteractive_exec"),
+            ("desktop", "vscode", "desktop", "interactive"),
+            ("unknown", "exec", "desktop", "unknown")):
+            self.save(".codex/sessions/rollout-" + identity + ".jsonl", [{
+                "type": "session_meta", "timestamp": "2030-01-01T00:00:00Z", "payload": {
+                    "id": identity, "cwd": "/fixture/workspace", "source": source,
+                    "originator": originator}}])
+        starts = {record.session_id: event for record in codex.collect(self.home, Coverage())
+            for event in record.events if isinstance(event, e.SessionStart)}
+        self.assertEqual({key: value.dispatch_kind for key, value in starts.items()},
+            {"exec": "noninteractive_exec", "desktop": "interactive", "unknown": "unknown"})
+        self.assertTrue(all(value.role == "orchestrator" for value in starts.values()))
+
     def test_open_usage_uses_the_same_event_type_as_native_usage(self):
         record = {"schema_version": 1, "type": "token_usage", "event_id": "usage", "session_id": "session",
                   "timestamp": "2030-01-01T00:00:01Z", "tokens": {"new_input": 6, "output": 2},

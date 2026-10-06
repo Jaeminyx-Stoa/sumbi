@@ -67,11 +67,13 @@ def atomic_write(path: Path, text: str, *, private: bool = False):
 
 
 def configure_outcome_source(command):
-    command.add_argument("--outcome-source", choices=("github", "local-verify"),
+    command.add_argument("--outcome-source", choices=("github", "local-verify", "worker-github"),
         help="Local verification reports verifier_never_passed with "
         "exit-code counts; compare blocks before non-inferiority")
     command.add_argument("--ledger", type=Path)
     command.add_argument("--outcomes", metavar="github|DIR")
+    command.add_argument("--repo", action="append", metavar="owner/name",
+        help="Measured remote repository for worker GitHub outcomes; repeatable")
     command.add_argument("--repository", type=Path,
         help="Repository scope for local verification units")
     command.add_argument("--verify", action="append",

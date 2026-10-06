@@ -26,7 +26,8 @@ def configure_parser(command):
     command.add_argument("--json", type=Path, required=True, metavar="OUT",
         help="New local registration JSON file")
     command.add_argument("--intervention-id", required=True, help="Public-safe intervention ID")
-    command.add_argument("--outcome-source", required=True, choices=("github", "local-verify"))
+    command.add_argument("--outcome-source", required=True,
+        choices=("github", "local-verify", "worker-github"))
     command.add_argument("--margin-pp", "--non-inferiority-margin-pp", dest="margin_pp",
         type=float, required=True,
         help="Acceptable success-rate drop in absolute percentage points "

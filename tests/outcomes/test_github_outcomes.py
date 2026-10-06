@@ -78,6 +78,21 @@ class GitHubTests(unittest.TestCase):
         self.assertEqual(pr.state, "closed")
         self.assertTrue(adapter.observation(REPO).pulls_complete)
 
+    def test_worker_capture_retains_heads_and_does_not_reuse_legacy_cache(self):
+        for path, response in self.routes.items():
+            if "/pulls" in path:
+                for pr in response if isinstance(response, list) else [response]:
+                    pr["head"]["ref"] = "synthetic-worker-" + str(pr["number"])
+        legacy = self.adapter()
+        self.assertIsNone(legacy.pull(REPO + "#1").head_ref)
+        requests = len(self.calls)
+        worker = self.adapter(head_refs=True, record=self.root / "record")
+        self.assertGreater(len(self.calls), requests)
+        self.assertEqual(worker.pull(REPO + "#1").head_ref, "synthetic-worker-1")
+        self.assertEqual(worker.branch_pulls(REPO, "synthetic-worker-1"), [REPO + "#1"])
+        replay = FixtureOutcomes(self.root / "record")
+        self.assertEqual(replay.branch_pulls(REPO, "synthetic-worker-1"), [REPO + "#1"])
+
     def test_token_precedence_environment(self):
         with patch("shutil.which", side_effect=AssertionError("No CLI lookup needed")):
             self.assertEqual(github_token(), "synthetic-token-canary")
