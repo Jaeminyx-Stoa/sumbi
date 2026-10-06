@@ -6,13 +6,14 @@ from dataclasses import dataclass
 from sumbi.core.values import timestamp
 from sumbi.outcomes.github.source import GitHubSource
 from sumbi.outcomes.units import MIX_DISTANCE, Unit, flag, fraction
-from sumbi.outcomes.worker_github.workers import STATES, deliver_workers
+from sumbi.outcomes.worker_github.workers import STATES, deliver_workers, state_reasons
 
 
 @dataclass
 class WorkerGitHubSource:
     repos: tuple[str, ...]
     outcomes: object
+    repo_owners: tuple[str, ...] = ()
 
     name = "worker-github"
     registration_error = "Registration and both arms must use worker-github outcome source"
@@ -27,7 +28,7 @@ class WorkerGitHubSource:
 
     def measure(self, home, period, registration, windows, *, agents, salt):
         report = deliver_workers(home, period, self.repos, self.outcomes, agents=agents,
-            salt=salt, follow_up_days=registration.follow_up_days)
+            salt=salt, follow_up_days=registration.follow_up_days, repo_owners=self.repo_owners)
         units = []
         for row in report["units"]:
             start, last = timestamp(row["dispatched_at"]), timestamp(row["last_at"])
@@ -88,8 +89,11 @@ class WorkerGitHubSource:
             "bootstrap": {**c["bootstrap"], "unit": "worker_session"},
             "arms": {arm: {"n": len(rows), "success_rate": c["rates"][arm],
                 "cost": c["costs"][arm], "states": dict(Counter(u.state for u in rows)),
+                "state_reasons": state_reasons([u.public for u in rows]),
                 "candidate_states": {s: sum(u.state == s for u in c["candidates"][arm])
-                    for s in STATES}, "checks_basis_counts": bases[arm],
+                    for s in STATES}, "candidate_state_reasons": state_reasons(
+                        [u.public for u in c["candidates"][arm]]),
+                "checks_basis_counts": bases[arm],
                 "units": [u.public for u in rows]} for arm, rows in c["arms"].items()},
             "success_difference": c["success"], "ratios": c["ratios"],
             "exclusions": c["exclusions"], "mixes": c["mixes"], "flags": c["flags"],

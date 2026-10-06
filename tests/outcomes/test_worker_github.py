@@ -6,17 +6,18 @@ import json
 from pathlib import Path
 import subprocess
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from support import IsolatedTemporaryDirectory
 from worker_github_fixtures import (REPO, at, codex_worker, claude_worker, execution, pull,
     push_output, recording, repository, save, stream)
 from sumbi.core.records import Coverage
 from sumbi.core.time import Window
-from sumbi.events.adapters import codex
+from sumbi.events.adapters import claude_code, codex
 from sumbi.events.references import tool_refs
 from sumbi.outcomes.github.recorded import FixtureOutcomes
-from sumbi.outcomes.worker_github.workers import deliver_workers
+from sumbi.outcomes.worker_github.workers import deliver_workers, text_summary
+from sumbi.outcomes.local_verify.workers import deliver_local
 from sumbi.sessions.builder import collect
 
 
@@ -208,12 +209,38 @@ class WorkerGitHubTests(unittest.TestCase):
         report = self.report([previous])
         self.assertEqual(report["states"]["no_pr"], 1)
 
-    def test_no_change_is_excluded_even_with_a_strong_pr_reference(self):
+    def test_remote_authorship_without_local_edits_is_retained(self):
         codex_worker(self.home, "unchanged", self.repo, 1, edit=False)
         report = self.report([pull(1)])
-        self.assertEqual(report["states"]["no_change"], 1)
-        self.assertEqual(report["success_rate"]["denominator"], 0)
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(report["success_rate"]["denominator"], 1)
         self.assertEqual(len(report["units"][0]["links"]), 1)
+
+    def test_remote_create_commit_and_continued_links_prove_changes(self):
+        older = pull(1)
+        older["response"]["created_at"] = "2029-12-31T00:00:00Z"
+        codex_worker(self.home, "push", self.repo, 1, edit=False)
+        codex_worker(self.home, "commit", self.repo, edit=False,
+            command="git commit -m 'Synthetic fix'", output="[worker-1 abc1234] Synthetic fix\n")
+        codex_worker(self.home, "create", self.root / "unavailable", edit=False,
+            command="ssh build.example.test 'gh pr create'",
+            output="https://github.com/example/sample/pull/2")
+        report = self.report([older, pull(2)])
+        self.assertEqual(report["states"]["success"], 3)
+        self.assertEqual(sum(r["links"][0]["role"] == "continued" for r in report["units"]), 2)
+
+    def test_unmatched_remote_push_is_no_pr_without_local_edits(self):
+        codex_worker(self.home, "push", self.root / "unavailable", 1, edit=False)
+        report = self.report([])
+        self.assertEqual(report["states"]["no_pr"], 1)
+        self.assertEqual(report["success_rate"]["denominator"], 1)
+
+    def test_weak_or_no_authorship_without_edits_is_no_change(self):
+        for name, branch in (("weak", "worker-1"), ("none", None)):
+            codex_worker(self.home, name, self.repo, edit=False, context_branch=branch)
+        report = self.report([pull(1)])
+        self.assertEqual(report["states"]["no_change"], 2)
+        self.assertEqual(report["success_rate"]["denominator"], 0)
 
     def test_missing_explicit_pr_is_pending_and_reported_for_coverage(self):
         codex_worker(self.home, "worker", self.repo, command="gh pr create",
@@ -584,6 +611,156 @@ class WorkerGitHubTests(unittest.TestCase):
         report = self.report([pull(1)])
         self.assertEqual(report["states"]["success"], 1)
         self.assertEqual(report["units"][0]["links"][0]["evidence"], "pushed_branch")
+
+    def claude_result(self, command, output, *, error=False, edit=False, envelope=None,
+        background=False):
+        claude_worker(self.home, "remote", self.repo, 1, seconds=11)
+        path = self.home / ".claude/projects/group/main/subagents/agent-remote.jsonl"
+        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        if not edit:
+            rows.pop(1)
+        rows[-2]["message"]["content"][0]["input"].update(command=command,
+            run_in_background=background)
+        rows[-1].pop("toolUseResult")
+        if envelope is not None:
+            rows[-1]["toolUseResult"] = envelope
+        result = rows[-1]["message"]["content"][0]
+        result.update(content=output)
+        result.pop("is_error")
+        if error is not None:
+            result["is_error"] = error
+        stream(path, rows)
+
+    def test_envelope_less_claude_accepted_push_and_creation_are_strong(self):
+        for command, output, evidence in (("ssh build.example.test 'git push'",
+            push_output("worker-1"), "pushed_branch_output"),
+            ("ssh build.example.test 'gh pr create'",
+                "https://github.com/example/sample/pull/1", "pr_created_output")):
+            with self.subTest(evidence=evidence):
+                self.claude_result(command, output)
+                report = self.report([pull(1)])
+                self.assertEqual(report["states"]["success"], 1)
+                link = report["units"][0]["links"][0]
+                self.assertEqual((link["evidence"], link["strength"]), (evidence, "strong"))
+                self.assertNotIn("authorship_exit_unknown", report["coverage"]["evidence_gaps"])
+
+    def test_envelope_less_new_branch_continues_old_pr(self):
+        self.claude_result("ssh build.example.test 'git push'",
+            "To https://github.com/example/sample.git\n * [new branch] HEAD -> worker-1\n")
+        older = pull(1)
+        older["response"]["created_at"] = "2029-12-31T00:00:00Z"
+        report = self.report([older])
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(report["units"][0]["links"][0]["role"], "continued")
+
+    def test_envelope_less_rejected_up_to_date_and_plain_urls_cannot_link(self):
+        for command, output in (("ssh build.example.test 'git push'",
+            "To https://github.com/example/sample.git\n ! [rejected] HEAD -> worker-1\n"),
+            ("git push", "To https://github.com/example/sample.git\n"
+                " ! [remote rejected] HEAD -> worker-1\n"),
+            ("git push", "Everything up-to-date\n"),
+            ("gh pr view 1", "https://github.com/example/sample/pull/1"),
+            ("git commit -m 'Synthetic change'", "[worker-1 abc1234] Synthetic change\n")):
+            with self.subTest(command=command, output=output):
+                self.claude_result(command, output)
+                report = self.report([pull(1)])
+                self.assertEqual(report["states"]["no_change"], 1)
+                self.assertEqual(report["units"][0]["links"], [])
+
+    def test_claude_error_unknown_error_nonzero_and_deferred_cannot_link(self):
+        for options in ({"error": True}, {"error": None}, {"error": "false"},
+            {"envelope": {"exitCode": 1}}, {"background": True},
+            {"envelope": {"interrupted": True}}, {"envelope": {"backgroundTaskId": "task"}}):
+            with self.subTest(options=options):
+                self.claude_result("ssh build.example.test 'git push'", push_output("worker-1"),
+                    **options)
+                report = self.report([pull(1)])
+                self.assertEqual(report["units"][0]["links"], [])
+                self.assertEqual(report["states"]["no_change"], 1)
+
+    def test_envelope_less_authorship_does_not_pass_local_verification(self):
+        self.claude_result("bash scripts/check.sh", push_output("worker-1"), edit=True)
+        report = deliver_local(self.home, self.window, self.repo, verify=["scripts/check.sh"],
+            agents=["claude-code"], salt=b"synthetic-key")
+        self.assertEqual(report["states"]["success"], 0)
+        measured = collect(claude_code, self.home, self.window, Coverage(), worker_links=True)
+        self.assertIsNone(next(iter(measured[0].commands.values())).exit_code)
+
+    def test_owner_scope_measures_two_evidenced_repositories_lazily(self):
+        other = "example/second"
+        for name, repo in (("first", REPO), ("second", other)):
+            codex_worker(self.home, name, self.root / "unavailable", edit=False,
+                command="ssh build.example.test 'git push'", output=push_output("worker-1", repo))
+        codex_worker(self.home, "foreign", self.root / "unavailable", edit=False,
+            command="git push", output=push_output("worker-1", "foreign/sample"))
+        codex_worker(self.home, "mention", self.root / "unavailable", edit=False,
+            command="gh pr view 1", output="https://github.com/example/unmentioned/pull/1")
+        codex_worker(self.home, "weak", self.repo, edit=False, context_branch="worker-1")
+        recorded = self.outcomes([pull(1)])
+        save(self.root / "outcomes/second.json", {**recording([pull(1)]), "repository": other})
+        recorded = FixtureOutcomes(self.root / "outcomes")
+        calls = []
+        def live(dispatches):
+            calls.extend(r for d in dispatches for r in d.repos)
+            return recorded
+        report = deliver_workers(self.home, self.window, [], live, repo_owners=["EXAMPLE"])
+        self.assertEqual(sorted(calls), [REPO, other])
+        self.assertEqual(report["states"]["success"], 2)
+        self.assertEqual(report["states"]["no_change"], 1)
+        self.assertEqual(report["coverage"]["excluded_scope"]["repository_unconfirmed"], 2)
+        self.assertEqual(len(report["coverage"]["repositories"]), 2)
+        for private in ("example/second", "foreign/sample", "build.example.test", "worker-1"):
+            self.assertNotIn(private, json.dumps(report))
+
+    def test_owner_scope_alone_does_not_admit_cwd_or_weak_evidence(self):
+        codex_worker(self.home, "weak", self.repo, context_branch="worker-1")
+        provider = Mock(side_effect=AssertionError("No outcome fetch expected"))
+        report = deliver_workers(self.home, self.window, [], provider, repo_owners=["example"])
+        self.assertEqual(report["units"], [])
+        provider.assert_not_called()
+
+    def test_owner_repositories_discovered_in_extended_lifetime_are_fetched_once(self):
+        codex_worker(self.home, "worker", self.repo, 1, edit=False)
+        path = self.home / ".codex/sessions/rollout-worker.jsonl"
+        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        rows.extend(execution("ssh build.example.test 'git push'",
+            push_output("worker-2", "example/second"), self.repo, day=2,
+            identity="later", end=11))
+        stream(path, rows)
+        recorded = self.outcomes([pull(1)])
+        save(self.root / "outcomes/second.json", {
+            **recording([pull(2, day=2)]), "repository": "example/second"})
+        recorded = FixtureOutcomes(self.root / "outcomes")
+        calls = []
+        def live(dispatches):
+            calls.append(tuple(r for d in dispatches for r in d.repos))
+            return recorded
+        report = deliver_workers(self.home, self.window, [], live, repo_owners=["example"])
+        self.assertEqual(calls, [(REPO, "example/second")])
+        self.assertEqual(len(report["units"][0]["links"]), 2)
+        self.assertEqual(report["states"]["success"], 1)
+
+    def test_owner_first_authorship_after_dispatch_window_still_scopes_worker(self):
+        rows = codex_worker(self.home, "late", self.root / "unavailable", edit=False)
+        rows.extend(execution("ssh build.example.test 'git push'", push_output("worker-1"),
+            self.repo, day=2))
+        stream(self.home / ".codex/sessions/rollout-late.jsonl", rows)
+        report = deliver_workers(self.home, self.window, [], self.outcomes([pull(1, day=2)]),
+            repo_owners=["example"])
+        self.assertEqual(report["states"]["success"], 1)
+
+    def test_delivery_state_reason_breakdown_includes_pending_and_excluded_units(self):
+        for i in (1, 2):
+            codex_worker(self.home, str(i), self.repo, i, edit=False)
+        codex_worker(self.home, "unchanged", self.repo, edit=False)
+        pulls = [pull(i) for i in (1, 2)]
+        for p in pulls:
+            p["checks_at_merge"]["statuses"] = []
+        report = self.report(pulls)
+        self.assertEqual(report["state_reasons"]["in_progress"], {"checks_missing_required": 2})
+        self.assertEqual(report["state_reasons"]["no_change"], {"no_known_edit": 1})
+        self.assertIn("in_progress: checks_missing_required 2", text_summary(report))
+        self.assertIn("no_change: no_known_edit 1", text_summary(report))
 
 
 if __name__ == "__main__":

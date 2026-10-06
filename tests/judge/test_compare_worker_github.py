@@ -96,7 +96,8 @@ class WorkerCompareTests(unittest.TestCase):
             return [r for r in rows if r.get("payload", {}).get("call_id") != "shell"]
         self.edit_stream(101, unlinked)
         def unchanged(rows):
-            return [r for r in rows if r.get("payload", {}).get("name") != "apply_patch"]
+            return [r for r in rows if r.get("payload", {}).get("name") != "apply_patch"
+                and r.get("payload", {}).get("call_id") != "shell"]
         self.edit_stream(102, unchanged)
         raw = json.loads(self.registration.read_text(encoding="utf-8"))
         raw["applied_at"] = "2030-01-07T00:00:00Z"
@@ -134,7 +135,8 @@ class WorkerCompareTests(unittest.TestCase):
 
     def test_no_change_shift_is_visible_and_never_hides_worker_counts(self):
         def unchanged(rows):
-            return [r for r in rows if r.get("payload", {}).get("name") != "apply_patch"]
+            return [r for r in rows if r.get("payload", {}).get("name") != "apply_patch"
+                and r.get("payload", {}).get("call_id") != "shell"]
         for number in (101, 102, 104):
             self.edit_stream(number, unchanged)
         report = self.compare()

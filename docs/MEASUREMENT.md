@@ -903,8 +903,8 @@ Use a local salt before sharing. See the authored
 ## Worker GitHub: fixed dispatches without a ledger
 
 `worker-github` measures dispatched worker sessions against remote PR outcomes.
-It requires no per-deliverable ledger. Scope is an explicit, repeatable list of
-remote repositories, independent of the dispatcher's checkout location:
+It requires no per-deliverable ledger. Scope uses repeatable `--repo owner/name`
+and/or `--repo-owner OWNER` options, independent of the dispatcher's checkout location:
 
 ```sh
 sumbi deliver --outcome-source worker-github --repo example/sample \
@@ -915,6 +915,14 @@ sumbi compare --registration worker-registration.json --repo example/sample \
   --outcomes recorded-outcomes --home local-log-home --json out/worker-compare.json
 ```
 
+`--repo-owner example` measures every repository under that owner named by a
+fixed worker's own strong push or creation evidence. Repeat it for multiple owners;
+matching is case-insensitive. Repositories are captured lazily as evidence appears,
+without listing all repositories under an owner. `--repo` remains an additional
+explicit scope and permits the existing cwd-origin path. Owner scope alone does
+not admit repositories from cwd origins, weak branches or URL mentions. The owner
+option is documented here without changing existing general command help output.
+
 The registration explicitly names `"outcome_source": "worker-github"` and uses
 the same M2 windows, predictions, margin, sample size, confounders and follow-up
 days. A differing CLI override is rejected. Use `--outcomes github` for the
@@ -922,7 +930,7 @@ existing read-only live adapter with optional `--cache DIR` and `--record DIR`.
 Its authentication, destination protection, checks-basis ladder, pagination,
 observation-time cache semantics and private recording rules still apply.
 `--ledger`, local verification options and project matching rules are rejected;
-`--repo` is the authoritative remote scope. JSON and summary routing follow
+`--repo` and `--repo-owner` define the remote scope. JSON and summary routing follow
 the existing delivery/comparison commands.
 
 Units are fixed from their own start metadata before live outcome collection:
@@ -946,7 +954,8 @@ separately; missing starts block comparison.
 No parent's cwd, references, costs or outcome are inherited by a child.
 
 Links require own-session authorship from normalized command executions that
-started and completed inside the worker lifetime and exited zero. PR URLs that
+started and completed inside the worker lifetime and exited zero, with the
+explicit non-error Claude result exception below. PR URLs that
 are read, viewed, quoted or listed in inputs, outputs or briefs cannot link work.
 Every linked PR retains its strongest own-session evidence:
 
@@ -954,6 +963,8 @@ Every linked PR retains its strongest own-session evidence:
 | --- | --- |
 | `pr_created` | Strongest: a successful command containing `gh pr create` prints a PR URL, or a recognized API create response names the PR. |
 | `pushed_branch` | Strong: a successful command's git push result block names the remote repository and changed destination branch. |
+| `pr_created_output` | Strong: an explicitly non-error Claude result without an exit code prints a PR URL for a creation command. |
+| `pushed_branch_output` | Strong: an explicitly non-error Claude result without an exit code contains an accepted push ref line and its remote. |
 | `committed_branch` | Strong: a successful commit result naming its branch. |
 | `cwd_branch` | Weak: structured cwd/context branch or a literal current-branch query only. |
 
@@ -964,8 +975,14 @@ exit without a changed ref result cannot link. SSH, WSL and PowerShell wrappers,
 including encoded scripts, need no shell evaluation: the readable result names
 the repository and destination branch. PR creation recognizes `gh pr create`
 anywhere in the command text, including quoted wrapper scripts, then requires
-a printed PR URL on its own output line. Nonzero, unknown or missing exit codes
-cannot supply authorship. Output truncation can hide result evidence and leave
+a printed PR URL on its own output line. Nonzero exits and error results cannot
+supply authorship. Envelope-less Claude Bash results with `is_error: false`
+can supply only push and creation authorship: push blocks must include an
+accepted changed ref line, and creation still requires the command and printed
+URL. Unknown error state, deferred/background executions and interrupted results
+cannot use this exception. The exit code remains unknown; this exception never
+supplies a successful local-verification outcome or commit authorship.
+Output truncation can hide result evidence and leave
 work unlinked. Command output stays local-only and is never published.
 
 Branches match exact PR `head.ref` values in measured repositories using each
@@ -997,9 +1014,17 @@ with dispatch-level failure rules:
   cannot recover the original worker dispatch into success.
 - `immature`: merged work with an open or incomplete follow-up capture.
 - `in_progress`: an open PR, missing PR/check evidence or pending repair.
-- `no_pr`: known edits without a linked PR, including conservatively incomplete
+- `no_pr`: known edits or strong authorship without a linked PR, including conservatively incomplete
   edit evidence. It remains non-success in retained success and cost denominators.
-- `no_change`: no recognized edits, excluded but counted even if PR evidence exists.
+- `no_change`: neither recognized edits nor strong authorship, excluded but counted.
+  Strong push, creation and continued links prove changes even when remote edits
+  never invoke a local edit tool. Weak cwd-branch evidence alone does not.
+
+Delivery JSON includes `state_reasons`, a reason-count mapping per state; text
+prints rows such as `in_progress: checks_missing_required 2`. Comparison arms
+include retained `state_reasons` and all-candidate `candidate_state_reasons`;
+their text summary prints the candidate breakdown. Reasons are fixed labels,
+and repository IDs remain pseudonymous in both scope modes.
 
 Comparisons use the shared M2 engine: actual apply-time exposure gaps, endpoint
 exposure, per-agent metadata observability, agent/model/effort/version mixes,

@@ -56,6 +56,35 @@ class WorkerCliTests(unittest.TestCase):
         del args[index:index + 2]
         self.assertEqual(self.invoke(args)[0], 0)
 
+    def test_owner_only_and_repeatable_owners_work_for_delivery_and_comparison(self):
+        for command in ("deliver", "compare"):
+            args = self.args(command)
+            index = args.index("--repo")
+            del args[index:index + 2]
+            status, output, errors = self.invoke(args + ["--repo-owner", "EXAMPLE",
+                "--repo-owner", "example", "--repo-owner", "other"])
+            self.assertEqual(status, 0, errors)
+            report = json.loads(output)
+            self.assertEqual(len(report["coverage"]["repositories"]), 1)
+            self.assertNotIn(REPO, output + errors)
+            if command == "compare":
+                self.assertEqual(report["verdict"]["proposal"], "adopt")
+                self.assertEqual(report["arms"]["before"]["state_reasons"],
+                    {"success": {"accepted": 12}, "failed": {}, "immature": {},
+                        "in_progress": {}, "no_pr": {}, "no_change": {}})
+                self.assertIn("before candidate success: accepted 12", errors)
+            else:
+                self.assertIn("state_reasons", report)
+
+    def test_invalid_owner_echoes_no_operands_and_non_worker_source_rejects_it(self):
+        status, output, errors = self.invoke(self.args() + ["--repo-owner", "private/invalid"])
+        self.assertEqual(status, 1)
+        self.assertEqual(output, "")
+        self.assertNotIn("private", errors)
+        args = self.args()
+        args[args.index("worker-github")] = "github"
+        self.assertEqual(self.invoke(args + ["--repo-owner", "example"])[0], 2)
+
     def test_invalid_repo_and_conflicting_options_echo_no_operands(self):
         for extra in (["--repo", "private/path/invalid"], ["--ledger", "private-ledger.csv"],
             ["--repository", "private-checkout"], ["--verify", "private-check.sh"],

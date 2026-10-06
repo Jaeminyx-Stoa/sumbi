@@ -21,6 +21,16 @@
     "no_pr": 0,
     "no_change": 0
   },
+  "state_reasons": {
+    "success": {
+      "accepted": 24
+    },
+    "failed": {},
+    "immature": {},
+    "in_progress": {},
+    "no_pr": {},
+    "no_change": {}
+  },
   "units": [
     {
       "id": "session_00f3ca73c5731d3458660b03",

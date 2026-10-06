@@ -7,12 +7,22 @@ from sumbi.core.privacy import pseudonym
 from sumbi.events.authorship import actions, command_scope
 from sumbi.outcomes.github.ledger import REPO
 
-EVIDENCE = {"pr_created": 4, "pushed_branch": 3, "committed_branch": 2, "cwd_branch": 1}
+EVIDENCE = {"pr_created": 4, "pr_created_output": 4, "pushed_branch": 3,
+    "pushed_branch_output": 3, "committed_branch": 2, "cwd_branch": 1}
 
 
-def repositories(values):
-    if not values or any(not isinstance(v, str) or not re.fullmatch(REPO, v) for v in values):
+def repositories(values, *, allow_empty=False):
+    values = values or ()
+    if not values and not allow_empty or any(
+        not isinstance(v, str) or not re.fullmatch(REPO, v) for v in values):
         raise ValueError("Worker GitHub requires explicit owner/name repositories")
+    return tuple(sorted({v.lower() for v in values}))
+
+
+def repository_owners(values):
+    if any(not isinstance(v, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+", v)
+        for v in values):
+        raise ValueError("Worker GitHub requires valid repository owners")
     return tuple(sorted({v.lower() for v in values}))
 
 
@@ -54,7 +64,8 @@ def authorship(session, scan, gaps):
             if execution.started_at and execution.started_at <= at <= execution.at for ref in refs}
         if not action and not any(k == "push_result" for k, _ in output):
             continue
-        if execution.exit_code != 0:
+        output_only = execution.exit_code is None and execution.error is False
+        if execution.error is True or execution.exit_code != 0 and not output_only:
             gaps["failed_authorship_commands" if execution.exit_code is not None
                 else "authorship_exit_unknown"] += 1
             continue
@@ -67,6 +78,8 @@ def authorship(session, scan, gaps):
             gaps["link_conflicts"] += 1
             continue
         for kind, value in output:
+            if output_only and kind not in ("push_result", "pr_created"):
+                continue
             if (kind == "pr_created" and ("create", None) in action
                 or kind == "push_result"
                 or kind == "branch_committed" and ("commit", None) in action):
@@ -102,6 +115,8 @@ def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps
             evidence_repos.update(r for r in scope if r in repos)
         evidence = {"pr_created": "pr_created", "push_result": "pushed_branch",
             "branch_committed": "committed_branch"}[kind]
+        if execution.exit_code is None:
+            evidence += "_output"
         identities = ([value] if kind == "pr_created" else
             [p for r in scope if r in repos for p in outcomes.branch_pulls(r, value)])
         if kind != "pr_created" and len({p.rsplit("#", 1)[0] for p in identities}) > 1:

@@ -28,7 +28,7 @@ def run(args, root, window, agents, rules, resolved, sources, registration=None)
         root.error("Registration and both arms must use the same outcome source")
     if source == "worker-github":
         return run_workers(args, root, window, agents, rules, resolved, sources, registration)
-    if args.repo is not None:
+    if args.repo is not None or args.repo_owner is not None:
         root.error("Remote repository options require worker-github outcome source")
     if source == "local-verify":
         return _run_local(args, root, window, agents, resolved, registration)

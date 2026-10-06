@@ -1,5 +1,7 @@
 """Check interpreter-formatted output without cross-version byte comparisons."""
 
+import argparse
+
 from sumbi.cli import parser
 
 from .corpus import CASES
@@ -37,6 +39,8 @@ def check_output(case, artifacts):
     text = artifacts[stream]
     names = {selected.prog}
     for action in selected._actions:
+        if action.help == argparse.SUPPRESS:
+            continue
         # Help lists every alias; usage lists the first spelling of each option.
         names.update(action.option_strings if stream == "stdout.txt" else action.option_strings[:1])
         if isinstance(getattr(action, "choices", None), dict):

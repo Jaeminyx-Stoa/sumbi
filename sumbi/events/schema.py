@@ -179,6 +179,7 @@ class CommandExecution:
     require_pair: bool = False
     infer_cwd: bool = False
     source_identity: SourceIdentity | None = None
+    error: bool | None = None
 
 
 @dataclass(frozen=True)

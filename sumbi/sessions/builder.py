@@ -216,7 +216,8 @@ def paired_execution(state, event, identity, when, fallback):
             started_for_cwd = started
     if state.explicit and command in (None, "", []):
         session.local_evidence_gaps["command_content_unknown"] += 1
-    session.execution(identity, when, command, code, started_at=started, cwd=cwd)
+    error = None if event.deferred or launch and launch.deferred else event.error
+    session.execution(identity, when, command, code, started_at=started, cwd=cwd, error=error)
     if event.infer_cwd:
         if pending:
             state.pending_cwds[identity] = (started_for_cwd if event.pairing == "interval"

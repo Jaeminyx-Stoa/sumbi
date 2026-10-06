@@ -14,7 +14,8 @@ from sumbi.outcomes.github.deliver import judge
 from sumbi.outcomes.github.ledger import Deliverable
 from sumbi.outcomes.local_verify.workers import token_measurement
 from sumbi.outcomes.worker_github.links import (link_prs, public_links, references,
-    repositories, start_repo)
+    repositories, repository_owners, start_repo)
+from sumbi.outcomes.worker_github.scope import capture
 from sumbi.sessions.builder import collect
 from sumbi.sessions.session import TOKEN_KINDS
 
@@ -37,13 +38,15 @@ def dispatched(session):
     return session.dispatch_kind in ("subagent", "noninteractive_exec")
 
 
-def worker_judgment(session, lifetime, links, outcomes, days):
+def worker_judgment(session, lifetime, links, outcomes, days, authored=False):
     """Reuse constituent judgment, but a repair cannot recover this dispatch."""
     edits = any(lifetime.contains(t) for t in session.edits.values())
     incomplete = bool(session.local_evidence_gaps)
-    if not links or not edits and not incomplete:
-        return {"state": "no_pr" if edits or incomplete else "no_change",
-            "reason": "no_linked_pr" if edits or incomplete else "no_known_edit",
+    changed = edits or incomplete or authored or any(
+        evidence != "cwd_branch" for evidence, _, _ in links.values())
+    if not links or not changed:
+        return {"state": "no_pr" if changed else "no_change",
+            "reason": "no_linked_pr" if changed else "no_known_edit",
             "attempt_prs": []}
     # Link extraction already excludes actions after closure. Continued PRs
     # need their original creation bound only for the reused ledger judge;
@@ -66,12 +69,12 @@ def worker_judgment(session, lifetime, links, outcomes, days):
     return result
 
 
-def worker_row(session, scan, links, outcomes, days, scope, gaps):
+def worker_row(session, scan, links, outcomes, days, scope, gaps, authored=False):
     lifetime = Window(session.start_at, scan.until)
     tokens, complete, observed = token_measurement(session, lifetime)
     judgment_incomplete = False
     try:
-        result = worker_judgment(session, lifetime, links, outcomes, days)
+        result = worker_judgment(session, lifetime, links, outcomes, days, authored)
     except (ValueError, OverflowError, RecursionError):
         # Malformed temporal evidence or cyclic repairs affect this unit only.
         gaps["judgment_conflicts"] += 1
@@ -100,8 +103,10 @@ def worker_row(session, scan, links, outcomes, days, scope, gaps):
         "evidence_incomplete": bool(session.local_evidence_gaps) or judgment_incomplete}
 
 
-def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, follow_up_days=7):
-    repos = repositories(repos)
+def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, follow_up_days=7,
+    repo_owners=()):
+    owners = repository_owners(repo_owners)
+    repos = repositories(repos, allow_empty=bool(owners))
     if not math.isfinite(follow_up_days) or follow_up_days <= 0:
         raise ValueError("Follow-up days must be positive and finite")
     try:
@@ -113,12 +118,8 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
         initial, _ = sessions(home, window, agents)
         fixed = {s.id() for s in initial if s.start_at and window.contains(s.start_at)
             and dispatched(s)}
-        if callable(outcomes):
-            outcomes = outcomes([Deliverable("repository", window.since, (r,), (), ())
-                for r in repos])
-        observations = [outcomes.observation(r) for r in repos]
-        scan = Window(window.since, max([window.until, *[o.until for o in observations if o]]))
-        found, adapters = sessions(home, scan, agents)
+        repos, outcomes, observations, scan, found, adapters = capture(initial, window,
+            repos, owners, outcomes, fixed, lambda scan: sessions(home, scan, agents))
         units, overhead, excluded, gaps = [], [], Counter(), Counter()
         attributor = Attributor([])
         for session in found:
@@ -146,7 +147,8 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
                 continue
             if session.id() in fixed:
                 units.append(worker_row(session, scan, links, outcomes, follow_up_days,
-                    "start_origin" if origin_repo else "own_reference", gaps))
+                    "start_origin" if origin_repo else "own_reference", gaps,
+                    authored=bool(evidence_repos)))
         return worker_report(window, scan, repos, units, overhead, excluded, adapters,
             observations, follow_up_days, gaps)
 
@@ -162,7 +164,8 @@ def worker_report(window, scan, repos, units, overhead, excluded, adapters, obse
         "scan_until": scan.until.isoformat(), "follow_up_days": days,
         "pseudonyms": {"salted": current_key() is not None,
             "algorithm": "hmac-sha256" if current_key() is not None else "sha256"},
-        "states": {s: sum(r["state"] == s for r in units) for s in STATES}, "units": units,
+        "states": {s: sum(r["state"] == s for r in units) for s in STATES},
+        "state_reasons": state_reasons(units), "units": units,
         "success_rate": wilson(sum(r["state"] == "success" for r in retained), len(retained)),
         "cost": {"basis": "retained_worker_lifetime_only", "per_success":
             {m: {**estimate(retained, m), "interval_method": "not_estimated_descriptive"}
@@ -195,8 +198,19 @@ def text_summary(report):
         + str(rate["wilson_95"]), "Cost scope: retained worker sessions only",
         f"Dispatch overhead sessions: {report['dispatch_overhead']['sessions']}; observed "
         f"tokens {report['dispatch_overhead']['observed_total']}"]
+    lines.extend(reason_lines(report["state_reasons"]))
     for metric in ("total", "time"):
         row = report["cost"]["per_success"][metric]
         lines.append(f"Worker {metric} per success: {row['numerator']}/{row['denominator']} "
             f"= {row['value']}; descriptive only")
     return "\n".join(lines)
+
+
+def state_reasons(rows):
+    return {state: dict(sorted(Counter(r["reason"] for r in rows
+        if r["state"] == state).items())) for state in STATES}
+
+
+def reason_lines(reasons, prefix=""):
+    return [f"{prefix}{state}: {reason} {count}" for state, counts in reasons.items()
+        for reason, count in counts.items()]

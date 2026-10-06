@@ -48,3 +48,5 @@ effort mix total variation: 0
 cli_version mix total variation: 0
   before: 1.0 12/12 = 1
   after: 1.0 12/12 = 1
+before candidate success: accepted 12
+after candidate success: accepted 12

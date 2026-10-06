@@ -155,6 +155,16 @@
       "states": {
         "success": 12
       },
+      "state_reasons": {
+        "success": {
+          "accepted": 12
+        },
+        "failed": {},
+        "immature": {},
+        "in_progress": {},
+        "no_pr": {},
+        "no_change": {}
+      },
       "candidate_states": {
         "success": 12,
         "failed": 0,
@@ -162,6 +172,16 @@
         "in_progress": 0,
         "no_pr": 0,
         "no_change": 0
+      },
+      "candidate_state_reasons": {
+        "success": {
+          "accepted": 12
+        },
+        "failed": {},
+        "immature": {},
+        "in_progress": {},
+        "no_pr": {},
+        "no_change": {}
       },
       "checks_basis_counts": {
         "historical": 12
@@ -884,6 +904,16 @@
       "states": {
         "success": 12
       },
+      "state_reasons": {
+        "success": {
+          "accepted": 12
+        },
+        "failed": {},
+        "immature": {},
+        "in_progress": {},
+        "no_pr": {},
+        "no_change": {}
+      },
       "candidate_states": {
         "success": 12,
         "failed": 0,
@@ -891,6 +921,16 @@
         "in_progress": 0,
         "no_pr": 0,
         "no_change": 0
+      },
+      "candidate_state_reasons": {
+        "success": {
+          "accepted": 12
+        },
+        "failed": {},
+        "immature": {},
+        "in_progress": {},
+        "no_pr": {},
+        "no_change": {}
       },
       "checks_basis_counts": {
         "historical": 12
