@@ -507,7 +507,7 @@ class DeliverTests(unittest.TestCase):
         self.assertEqual(report["cost"]["cohort"]["successes"], 3)
 
     def test_shipped_fixtures_have_same_hand_computed_truth(self):
-        root = Path(__file__).parent / "fixtures/deliver"
+        root = Path(__file__).parents[1] / "fixtures/deliver"
         report = deliver(root / "home", WINDOW, root / "deliverables.csv", FixtureOutcomes(root / "outcomes"), rules=self.rules)
         self.assertEqual(report["states"], self.report()["states"])
         self.assertEqual(report["cost"]["cohort"]["tokens_per_success"]["total"], 60)

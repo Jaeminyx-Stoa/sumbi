@@ -18,7 +18,7 @@ from sumbi.outcomes.local_verify.source import LocalVerifySource
 from sumbi.outcomes.units import Unit, flag
 from sumbi.sessions.session import TOKEN_KINDS
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 REGISTRATION = ROOT / "tests/fixtures/compare/registration.json"
 
 

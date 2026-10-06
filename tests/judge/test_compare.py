@@ -19,7 +19,7 @@ from sumbi.measure.attribution import ProjectRule
 from sumbi.outcomes.github.recorded import FixtureOutcomes
 from sumbi.judge.registration import read_registration
 
-FIXTURE = Path(__file__).parent / "fixtures/compare"
+FIXTURE = Path(__file__).parents[1] / "fixtures/compare"
 
 
 class StatisticsTests(unittest.TestCase):

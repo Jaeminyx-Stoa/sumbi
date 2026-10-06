@@ -487,7 +487,7 @@ class UnitTests(unittest.TestCase):
         self.assertEqual(report["coverage"]["commands"]["unknown_execution_cwd"], 3)
 
     def registration(self, **changes):
-        data = json.loads((Path(__file__).parent / "fixtures/compare/registration.json").read_text())
+        data = json.loads((Path(__file__).parents[1] / "fixtures/compare/registration.json").read_text())
         data.update(outcome_source="local-verify", sample_size_per_arm=1,
                     before={"since": "2030-01-01T00:00:00Z", "until": "2030-01-02T00:00:00Z"},
                     after={"since": "2030-01-02T00:00:00Z", "until": "2030-01-03T00:00:00Z"},

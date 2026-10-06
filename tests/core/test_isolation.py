@@ -11,14 +11,14 @@ from sumbi.outcomes.github.live import outside_repository
 
 class IsolationTests(unittest.TestCase):
     def test_real_github_guard_still_sees_enclosing_checkout_metadata(self):
-        parent = Path(__file__).resolve().parents[1] / "local/isolation-test"
+        parent = Path(__file__).resolve().parents[2] / "local/isolation-test"
         parent.mkdir(parents=True, exist_ok=True)
         with IsolatedTemporaryDirectory(dir=parent) as temporary:
             with self.assertRaisesRegex(ValueError, "outside Git repositories"):
                 outside_repository(Path(temporary) / "cache")
 
     def test_unversioned_root_inside_worktree_cannot_find_parent_git(self):
-        parent = Path(__file__).resolve().parents[1] / "local/isolation-test"
+        parent = Path(__file__).resolve().parents[2] / "local/isolation-test"
         parent.mkdir(parents=True, exist_ok=True)
         with IsolatedTemporaryDirectory(dir=parent) as temporary:
             root = Path(temporary)
