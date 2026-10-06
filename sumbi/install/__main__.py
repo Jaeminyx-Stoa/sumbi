@@ -102,6 +102,11 @@ def run(args: argparse.Namespace) -> int:
             print(f"  conditional instruction tokens {agent}: {cost['estimated_tokens']} ({len(cost['paths'])} rules)")
         for key, convention in report["conventions"].items():
             print(f"  convention {key}: {convention['status']} " + json.dumps(convention["evidence"], sort_keys=True))
+        unknown = [key for key, convention in report["conventions"].items() if convention["status"] == "unknown"]
+        if unknown:
+            print("Unknown conventions: " + ", ".join(unknown))
+            print('  Declare owner guidance in .sumbi/config.toml under [conventions], '
+                  'using repository-relative existing paths, for example: ' + unknown[0] + ' = ["docs/process.md"]')
         print(f"  budget={args.budget}; warnings={len(report['warnings'])}")
         for entry in report["cost"]["skill_descriptions"]:
             print(f"  skill description {entry['path']}: characters={entry['characters']}, tokens={entry['estimated_tokens']}")

@@ -13,8 +13,7 @@
         "Latin"
       ],
       "exclude_lines": [
-        "\\b(?:roadmap|planned|ideas?|examples?|might|could|consider)\\b|\\b(?:not|never)\\s+(?:require|use|write|need)",
-        "\\b(?:not required|not needed|optional)\\b"
+        "\\b(?:roadmap|planned|ideas?|examples?|might|could|consider)\\b"
       ],
       "directives": {
         "review_gate": [
@@ -32,6 +31,50 @@
         "plan_approval": [
           "(?:\\b(?:write|record|create|critique|review|need|needs|must|approve|require)\\b[^\\n]{0,100}\\bplan\\b[^\\n]{0,160}\\b(?:approval|approve|before implementation)\\b|\\bplan\\b[^\\n]{0,80}\\b(?:needs|must|requires)\\b[^\\n]{0,100}\\b(?:approval|approve|before implementation)\\b)"
         ]
+      },
+      "topics": {
+        "review_gate": [
+          "\\b(?:reviews?|reviewers?)\\b"
+        ],
+        "handoff": [
+          "\\bhand[ -]?offs?\\b"
+        ],
+        "friction_line": [
+          "\\bfriction\\b"
+        ],
+        "parallel_worktree": [
+          "\\bworktrees?\\b"
+        ],
+        "plan_approval": [
+          "\\b(?:approvals?|plans?|planning|specs?|specifications?)\\b"
+        ]
+      },
+      "denials": {
+        "review_gate": [
+          "(?:\\b(?:reviews?|reviewers?)\\b)\\s+(?:(?:is|are)\\s+)?(?:not\\s+(?:required|needed)|optional|unnecessary)\\b",
+          "\\b(?:do\\s+not|never)\\s+(?:require|need)\\s+(?:a\\s+|an\\s+)?(?:\\b(?:reviews?|reviewers?)\\b)",
+          "\\bno\\s+(?:\\b(?:reviews?|reviewers?)\\b)\\s+(?:is\\s+)?(?:required|needed)\\b"
+        ],
+        "handoff": [
+          "(?:\\bhand[ -]?offs?\\b)\\s+(?:(?:is|are)\\s+)?(?:not\\s+(?:required|needed)|optional|unnecessary)\\b",
+          "\\b(?:do\\s+not|never)\\s+(?:require|need)\\s+(?:a\\s+|an\\s+)?(?:\\bhand[ -]?offs?\\b)",
+          "\\bno\\s+(?:\\bhand[ -]?offs?\\b)\\s+(?:is\\s+)?(?:required|needed)\\b"
+        ],
+        "friction_line": [
+          "(?:\\bfriction\\b)\\s+(?:(?:is|are)\\s+)?(?:not\\s+(?:required|needed)|optional|unnecessary)\\b",
+          "\\b(?:do\\s+not|never)\\s+(?:require|need)\\s+(?:a\\s+|an\\s+)?(?:\\bfriction\\b)",
+          "\\bno\\s+(?:\\bfriction\\b)\\s+(?:is\\s+)?(?:required|needed)\\b"
+        ],
+        "parallel_worktree": [
+          "(?:\\bworktrees?\\b)\\s+(?:(?:is|are)\\s+)?(?:not\\s+(?:required|needed)|optional|unnecessary)\\b",
+          "\\b(?:do\\s+not|never)\\s+(?:require|need)\\s+(?:a\\s+|an\\s+)?(?:\\bworktrees?\\b)",
+          "\\bno\\s+(?:\\bworktrees?\\b)\\s+(?:is\\s+)?(?:required|needed)\\b"
+        ],
+        "plan_approval": [
+          "(?:\\b(?:approvals?|plans?|planning|specs?|specifications?)\\b)\\s+(?:(?:is|are)\\s+)?(?:not\\s+(?:required|needed)|optional|unnecessary)\\b",
+          "\\b(?:do\\s+not|never)\\s+(?:require|need)\\s+(?:a\\s+|an\\s+)?(?:\\b(?:approvals?|plans?|planning|specs?|specifications?)\\b)",
+          "\\bno\\s+(?:\\b(?:approvals?|plans?|planning|specs?|specifications?)\\b)\\s+(?:is\\s+)?(?:required|needed)\\b"
+        ]
       }
     },
     "ko": {
@@ -39,19 +82,20 @@
         "Hangul"
       ],
       "exclude_lines": [
-        "(?:\\ub85c\\ub4dc\\ub9f5|\\ud5a5\\ud6c4|\\uc608\\uc815|\\uc544\\uc774\\ub514\\uc5b4|\\uc608\\uc2dc|\\uc608\\uc81c|\\uace0\\ub824|\\uac80\\ud1a0\\s*\\uc911)",
-        "(?:\\ud544\\uc694|\\ud544\\uc218|\\uc694\\uad6c|\\uc0ac\\uc6a9|\\uc791\\uc131|\\uc2b9\\uc778|\\ub9ac\\ubdf0|\\uc778\\uacc4)[^\\n]{0,40}(?:\\uc5c6|\\uc54a|\\uc544\\ub2c8|\\ubd88\\ud544\\uc694|\\uc0dd\\ub7b5|\\uc120\\ud0dd\\s*\\uc0ac\\ud56d)",
-        "(?:\\ubd88\\ud544\\uc694|\\uc120\\ud0dd\\s*\\uc0ac\\ud56d|\\ud558\\uc9c0\\s*\\ub9d0)"
+        "(?:\\ub85c\\ub4dc\\ub9f5|\\ud5a5\\ud6c4|\\uc608\\uc815|\\uc544\\uc774\\ub514\\uc5b4|\\uc608\\uc2dc|\\uc608\\uc81c|\\uace0\\ub824|\\uac80\\ud1a0\\s*\\uc911)"
       ],
       "directives": {
         "review_gate": [
           "\\ub2e4\\ub978\\s*(?:\\ubaa8\\ub378\\s*)?\\uacc4\\uc5f4[^\\n]{0,60}(?:\\ub3c5\\ub9bd\\s*)?\\ub9ac\\ubdf0",
           "(?:\\uc704\\ud5d8|\\ubcf4\\uc548|\\ub3c8|\\uacb0\\uc81c|\\uc778\\uc99d)[^\\n]{0,100}(?:\\ub9ac\\ubdf0|\\uac80\\ud1a0)[^\\n]{0,60}(?:\\ud544\\uc218|\\ud544\\uc694|\\uc694\\uad6c|\\ubc1b|\\uac70\\uce5c|\\ud55c\\ub2e4)",
-          "(?:\\ub9ac\\ubdf0|\\uac80\\ud1a0)\\s*(?:\\uc218\\uc900|\\ub2e8\\uacc4)[^\\n]{0,80}(?:\\uc801\\uc6a9|\\ub530\\ub978|\\ud544\\uc218|\\uc815\\ud55c)"
+          "(?:\\ub9ac\\ubdf0|\\uac80\\ud1a0)\\s*(?:\\uc218\\uc900|\\ub2e8\\uacc4)[^\\n]{0,80}(?:\\uc801\\uc6a9|\\ub530\\ub978|\\ud544\\uc218|\\uc815\\ud55c)",
+          "\ub2e4\ub978\\s*\ubaa8\ub378\\s*\ub9ac\ubdf0"
         ],
         "handoff": [
           "\\uc778\\uacc4[^\\n]{0,100}(?:\\uc791\\uc131|\\ub0a8\\uae34|\\ub0a8\\uae30|\\uae30\\ub85d|\\uc0ac\\uc6a9|\\ud544\\uc218|\\ud544\\uc694|\\ud55c\\ub2e4)",
-          "(?:\\uc791\\uc131|\\uae30\\ub85d|\\uc0ac\\uc6a9)[^\\n]{0,80}\\uc778\\uacc4"
+          "(?:\\uc791\\uc131|\\uae30\\ub85d|\\uc0ac\\uc6a9)[^\\n]{0,80}\\uc778\\uacc4",
+          "\uc778\uacc4\ubd80\ud130\\s*\uc77d(?:\ub294\ub2e4|\uc5b4\uc57c|\uace0)",
+          "(?:\uba48\ucd94\uac70\ub098|\ub118\uae38\\s*\ub54c)[^\\n]{0,100}\\bhandoff/[^\\n]{0,100}(?:\uc4f0\uace0|\uc791\uc131)"
         ],
         "friction_line": [
           "(?:\\ubcf4\\uace0|\\uc791\\uc131|\\uae30\\ub85d|\\ub0a8\\uae34|\\ub0a8\\uae30|\\ub05d|\\ud3ec\\ud568)[^\\n]{0,120}(?:Harness friction:|\\ud558\\ub124\\uc2a4\\s*\\ub9c8\\ucc30\\s*:)",
@@ -64,6 +108,40 @@
         "plan_approval": [
           "(?:\\uacc4\\ud68d|\\uad6c\\ud604|\\uc791\\uc5c5)[^\\n]{0,100}(?:\\ub300\\ud45c|\\uc18c\\uc720\\uc790)?\\s*\\uc2b9\\uc778[^\\n]{0,80}(?:\\ubc1b|\\ud544\\uc218|\\ud544\\uc694|\\ud6c4|\\uc804|\\uc694\\uad6c)",
           "\\ub300\\ud45c\\s*\\uc2b9\\uc778(?:\\uc740|\\uc744|\\uc774)?\\s*(?:\\ud544\\uc218|\\ud544\\uc694|\\ubc1b|\\uc720\\uc9c0|\\uadf8\\ub300\\ub85c)"
+        ]
+      },
+      "topics": {
+        "review_gate": [
+          "\ub9ac\ubdf0|\uac80\ud1a0"
+        ],
+        "handoff": [
+          "\uc778\uc218\uc778\uacc4|\uc778\uacc4"
+        ],
+        "friction_line": [
+          "\ub9c8\ucc30"
+        ],
+        "parallel_worktree": [
+          "\uc6cc\ud06c\ud2b8\ub9ac"
+        ],
+        "plan_approval": [
+          "\uc2b9\uc778|\uacc4\ud68d|\uc2a4\ud399"
+        ]
+      },
+      "denials": {
+        "review_gate": [
+          "(?:\ub9ac\ubdf0|\uac80\ud1a0)(?:\ub294|\uc740|\uac00|\uc774|\ub97c|\uc744)?\\s*(?:[:\uff1a]\\s*)?(?:\ud544\uc694\\s*\uc5c6(?:\ub2e4|\uc74c|\uc2b5\ub2c8\ub2e4)?|\ud544\uc218\uac00\\s*\uc544\ub2d8|\uc0dd\ub7b5(?:\ud55c\ub2e4|\ud569\ub2c8\ub2e4)?|\ubd88\ud544\uc694(?:\ud558\ub2e4|\ud569\ub2c8\ub2e4)?|\uc120\ud0dd\\s*\uc0ac\ud56d(?:\uc774\ub2e4|\uc785\ub2c8\ub2e4|\uc784)?)\\s*(?=[.!?|]|$)"
+        ],
+        "handoff": [
+          "(?:\uc778\uc218\uc778\uacc4|\uc778\uacc4)(?:\ub294|\uc740|\uac00|\uc774|\ub97c|\uc744)?\\s*(?:[:\uff1a]\\s*)?(?:\ud544\uc694\\s*\uc5c6(?:\ub2e4|\uc74c|\uc2b5\ub2c8\ub2e4)?|\ud544\uc218\uac00\\s*\uc544\ub2d8|\uc0dd\ub7b5(?:\ud55c\ub2e4|\ud569\ub2c8\ub2e4)?|\ubd88\ud544\uc694(?:\ud558\ub2e4|\ud569\ub2c8\ub2e4)?|\uc120\ud0dd\\s*\uc0ac\ud56d(?:\uc774\ub2e4|\uc785\ub2c8\ub2e4|\uc784)?)\\s*(?=[.!?|]|$)"
+        ],
+        "friction_line": [
+          "(?:\ub9c8\ucc30)(?:\ub294|\uc740|\uac00|\uc774|\ub97c|\uc744)?\\s*(?:[:\uff1a]\\s*)?(?:\ud544\uc694\\s*\uc5c6(?:\ub2e4|\uc74c|\uc2b5\ub2c8\ub2e4)?|\ud544\uc218\uac00\\s*\uc544\ub2d8|\uc0dd\ub7b5(?:\ud55c\ub2e4|\ud569\ub2c8\ub2e4)?|\ubd88\ud544\uc694(?:\ud558\ub2e4|\ud569\ub2c8\ub2e4)?|\uc120\ud0dd\\s*\uc0ac\ud56d(?:\uc774\ub2e4|\uc785\ub2c8\ub2e4|\uc784)?)\\s*(?=[.!?|]|$)"
+        ],
+        "parallel_worktree": [
+          "(?:\uc6cc\ud06c\ud2b8\ub9ac)(?:\ub294|\uc740|\uac00|\uc774|\ub97c|\uc744)?\\s*(?:[:\uff1a]\\s*)?(?:\ud544\uc694\\s*\uc5c6(?:\ub2e4|\uc74c|\uc2b5\ub2c8\ub2e4)?|\ud544\uc218\uac00\\s*\uc544\ub2d8|\uc0dd\ub7b5(?:\ud55c\ub2e4|\ud569\ub2c8\ub2e4)?|\ubd88\ud544\uc694(?:\ud558\ub2e4|\ud569\ub2c8\ub2e4)?|\uc120\ud0dd\\s*\uc0ac\ud56d(?:\uc774\ub2e4|\uc785\ub2c8\ub2e4|\uc784)?)\\s*(?=[.!?|]|$)"
+        ],
+        "plan_approval": [
+          "(?:\uc2b9\uc778|\uacc4\ud68d|\uc2a4\ud399)(?:\ub294|\uc740|\uac00|\uc774|\ub97c|\uc744)?\\s*(?:[:\uff1a]\\s*)?(?:\ud544\uc694\\s*\uc5c6(?:\ub2e4|\uc74c|\uc2b5\ub2c8\ub2e4)?|\ud544\uc218\uac00\\s*\uc544\ub2d8|\uc0dd\ub7b5(?:\ud55c\ub2e4|\ud569\ub2c8\ub2e4)?|\ubd88\ud544\uc694(?:\ud558\ub2e4|\ud569\ub2c8\ub2e4)?|\uc120\ud0dd\\s*\uc0ac\ud56d(?:\uc774\ub2e4|\uc785\ub2c8\ub2e4|\uc784)?)\\s*(?=[.!?|]|$)"
         ]
       }
     }

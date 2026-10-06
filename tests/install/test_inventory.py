@@ -286,4 +286,9 @@ class InventoryTests(OfflineTest):
         skill.parent.mkdir(parents=True)
         skill.write_text("---\nname: planning\ndescription: Write a plan before approval.\n---\n"
                          "Planning is a catalog topic.\n", encoding="utf-8")
-        self.assert_gaps(inventory(root), BASE_GAPS)
+        report = inventory(root)
+        self.assert_gaps(report, BASE_GAPS - {"missing-plan-approval", "missing-worktree-rule"})
+        for key in ("plan_approval", "parallel_worktree"):
+            paths = ([".agents/skills/planning/SKILL.md"] if key == "plan_approval" else []) + ["AGENTS.md"]
+            self.assertEqual(report["conventions"][key], {"status": "unknown", "evidence": [
+                {"path": path, "kind": "mentioned"} for path in paths]})

@@ -23,6 +23,19 @@ class CliTests(OfflineTest):
             result = main(args)
         return result, output.getvalue(), errors.getvalue()
 
+    def test_unknown_conventions_show_owner_declaration_help(self):
+        root = self.copy_fixture("empty")
+        (root / "AGENTS.md").write_text("## Handoff\n", encoding="utf-8")
+        result, output, errors = self.run_cli(["--root", str(root), "--select", "handoff"])
+        self.assertEqual(result, 0, errors)
+        self.assertIn("Unknown conventions: handoff", output)
+        self.assertIn(".sumbi/config.toml under [conventions]", output)
+        self.assertIn('handoff = ["docs/process.md"]', output)
+        self.assertIn('"kind": "mentioned", "path": "AGENTS.md"', output)
+        self.assertNotIn("missing-handoff", output)
+        self.assertIn("No changes proposed.", output)
+        self.assertNotIn("## Handoff", output)
+
     def test_default_is_read_only_and_diffs_have_no_original_text(self):
         root = self.copy_fixture("codex-only")
         before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}

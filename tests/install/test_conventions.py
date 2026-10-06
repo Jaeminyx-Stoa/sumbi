@@ -40,16 +40,118 @@ class ConventionTests(OfflineTest):
                 self.assertNotIn("convention-language-unsupported", {w["kind"] for w in report["warnings"]})
                 self.assertNotIn(directive, json.dumps(report, ensure_ascii=False))
 
-    def test_korean_roadmap_examples_and_denials_do_not_count(self):
+    def test_korean_roadmap_examples_are_mentions_not_directives(self):
         prefixes = ("\ub85c\ub4dc\ub9f5: ", "\uc608\uc2dc: ", "\uc544\uc774\ub514\uc5b4: ")
         for prefix in prefixes:
             with self.subTest(prefix=prefix):
                 root = self.copy_fixture("empty")
                 self.write(root, "AGENTS.md", "\n".join(prefix + text for text in KOREAN.values()))
-                self.assertTrue(all(c["status"] == "absent" for c in inventory(root)["conventions"].values()))
+                self.assertTrue(all(c == {"status": "unknown", "evidence": [
+                    {"path": "AGENTS.md", "kind": "mentioned"}]}
+                    for c in inventory(root)["conventions"].values()))
+
+    def test_prohibition_style_table_rows_keep_directives(self):
+        rows = {
+            "review_gate": "| \ubcf5\uc7a1\ud55c \ubcc0\uacbd | \ub2e4\ub978 \uacc4\uc5f4 \ub3c5\ub9bd \ub9ac\ubdf0\uc640 \uc18c\uc720\uc790 \uc2b9\uc778. \uc808\ucc28\ub97c \uc904\uc774\uc9c0 \uc54a\ub294\ub2e4 |",
+            "plan_approval": "| \uad6c\ud604 | \uc18c\uc720\uc790 \uc2b9\uc778\uc744 \ubc1b\ub294\ub2e4. \uc2b9\uc778 \uc5c6\ub294 \uc790\ub3d9\ubc30\ud3ec\ub294 \uae08\uc9c0\ud55c\ub2e4. \uac80\uc99d \ud1b5\uacfc\ub294 \uc2b9\uc778\uc774 \uc544\ub2c8\ub2e4 |",
+            "handoff": "| \uc885\ub8cc | \uc778\uacc4 \ubb38\uc11c\ub97c \uc791\uc131\ud55c\ub2e4. \uc808\ucc28\ub97c \uc0dd\ub7b5\ud558\uc9c0 \uc54a\ub294\ub2e4 |",
+        }
+        for key, text in rows.items():
+            with self.subTest(convention=key):
+                root = self.copy_fixture("empty")
+                self.write(root, "AGENTS.md", text + "\n")
+                self.assertEqual(inventory(root)["conventions"][key], {"status": "present",
+                    "evidence": [{"path": "AGENTS.md", "kind": "directive"}]})
+
+    def test_korean_real_shape_variants_confirm_directives(self):
+        for key, text in (
+            ("review_gate", "\ubcc0\uacbd\ub9c8\ub2e4 \ub2e4\ub978 \ubaa8\ub378 \ub9ac\ubdf0 2\ud68c\ub97c \ubc1b\ub294\ub2e4."),
+            ("handoff", "\ub2e4\uc74c \ub2f4\ub2f9\uc790\uc5d0\uac8c \ub118\uae38 \ub54c docs/handoff/summary.md\ub97c \uc4f0\uace0 \uacb0\uacfc\ub97c \uae30\ub85d\ud55c\ub2e4."),
+            ("handoff", "\uc0c8 \uc791\uc5c5\uc740 \uc778\uacc4\ubd80\ud130 \uc77d\ub294\ub2e4."),
+        ):
+            with self.subTest(convention=key, text=text):
+                root = self.copy_fixture("empty")
+                self.write(root, "AGENTS.md", text + "\n")
+                self.assertEqual(inventory(root)["conventions"][key]["status"], "present")
+
+    def test_heading_only_and_unseen_wording_have_mention_paths(self):
         root = self.copy_fixture("empty")
-        self.write(root, "AGENTS.md", "\n".join(text + " \ud544\uc694 \uc5c6\uc74c." for text in KOREAN.values()))
-        self.assertTrue(all(c["status"] == "absent" for c in inventory(root)["conventions"].values()))
+        self.write(root, "AGENTS.md", "## \ucc29\uc218\uc640 \uc778\uacc4\n")
+        self.write(root, "GEMINI.md", "Review coordination follows the rotating schedule.\n")
+        report = inventory(root)
+        for key, path in (("handoff", "AGENTS.md"), ("review_gate", "GEMINI.md")):
+            self.assertEqual(report["conventions"][key], {"status": "unknown",
+                "evidence": [{"path": path, "kind": "mentioned"}]})
+        self.assertEqual(CONVENTION_GAPS & {gap["id"] for gap in find_gaps(report)},
+            {"missing-friction-line", "missing-worktree-rule", "missing-plan-approval"})
+        self.assertEqual(build_plan(root, select=["handoff", "review-gates"]).changes, [])
+
+    def test_each_language_has_broad_topics_for_every_convention(self):
+        headings = {
+            "review_gate": ("Review", "\uac80\ud1a0"),
+            "handoff": ("Handoff", "\uc778\uc218\uc778\uacc4"),
+            "friction_line": ("Friction", "\ub9c8\ucc30"),
+            "parallel_worktree": ("Worktree", "\uc6cc\ud06c\ud2b8\ub9ac"),
+            "plan_approval": ("Approval", "Plan", "Spec", "\uc2b9\uc778", "\uacc4\ud68d", "\uc2a4\ud399"),
+        }
+        for key, topics in headings.items():
+            for topic in topics:
+                with self.subTest(convention=key, topic=topic):
+                    root = self.copy_fixture("empty")
+                    self.write(root, "AGENTS.md", "## " + topic + "\n")
+                    self.assertEqual(inventory(root)["conventions"][key]["status"], "unknown")
+
+    def test_explicit_non_requirements_are_mentions_only(self):
+        lines = (
+            "\ub2e4\ub978 \ubaa8\ub378 \ub9ac\ubdf0\ub294 \ud544\uc694 \uc5c6\ub2e4.",
+            "\uc778\uacc4\ub294 \uc0dd\ub7b5.", "\ub9ac\ubdf0\ub294 \uc120\ud0dd \uc0ac\ud56d.",
+            "\uc778\uacc4 \ubd88\ud544\uc694.",
+            "Risk review is not required.", "Do not require a handoff document.",
+            "Never need a handoff document.", "Risk review is optional.",
+        )
+        for text in lines:
+            with self.subTest(text=text):
+                root = self.copy_fixture("empty")
+                self.write(root, "AGENTS.md", text + "\n")
+                report = inventory(root)
+                self.assertFalse(any(c["status"] == "present" for c in report["conventions"].values()))
+                self.assertTrue(any(c["status"] == "unknown" for c in report["conventions"].values()))
+
+    def test_denial_of_another_topic_and_english_prohibition_keep_directives(self):
+        for text in ("Risk paths require review; do not write code before it.",
+                     "Risk paths require review; optional formatting is allowed.",
+                     "Risk paths require review; handoff is not required.",
+                     "\ub2e4\ub978 \ubaa8\ub378 \ub9ac\ubdf0\ub97c \ubc1b\ub294\ub2e4. \uc778\uacc4\ub294 \uc0dd\ub7b5."):
+            with self.subTest(text=text):
+                root = self.copy_fixture("empty")
+                self.write(root, "AGENTS.md", text + "\n")
+                self.assertEqual(inventory(root)["conventions"]["review_gate"]["status"], "present")
+
+    def test_korean_denial_words_used_in_prohibitions_keep_directives(self):
+        for ending in ("\uc778\uacc4\ub294 \uc0dd\ub7b5\ud558\uc9c0 \uc54a\ub294\ub2e4.",
+                       "\uc778\uacc4\ub294 \uc120\ud0dd \uc0ac\ud56d\uc774 \uc544\ub2c8\ub2e4.",
+                       "\uc778\uacc4 \uc0dd\ub7b5 \uae08\uc9c0."):
+            with self.subTest(ending=ending):
+                root = self.copy_fixture("empty")
+                self.write(root, "AGENTS.md", KOREAN["handoff"] + " " + ending + "\n")
+                self.assertEqual(inventory(root)["conventions"]["handoff"]["status"], "present")
+
+    def test_no_topic_terms_still_produce_all_convention_gaps(self):
+        root = self.copy_fixture("empty")
+        self.write(root, "AGENTS.md", "Keep generated assets in the cache.\n")
+        report = inventory(root)
+        self.assertTrue(all(c == {"status": "absent", "evidence": []} for c in report["conventions"].values()))
+        self.assertEqual(CONVENTION_GAPS & {gap["id"] for gap in find_gaps(report)}, CONVENTION_GAPS)
+
+    def test_confirmed_directive_or_declaration_overrides_mention(self):
+        root = self.copy_fixture("empty")
+        self.write(root, "AGENTS.md", "## Handoff\n")
+        self.write(root, "GEMINI.md", "Leave a handoff document.\n")
+        self.write(root, ".sumbi/config.toml", '[conventions]\nhandoff = ["AGENTS.md"]\n')
+        self.assertEqual(inventory(root)["conventions"]["handoff"], {"status": "present", "evidence": [
+            {"path": "AGENTS.md", "kind": "mentioned"},
+            {"path": "GEMINI.md", "kind": "directive"},
+            {"path": "AGENTS.md", "kind": "declared"}]})
 
     def test_uncovered_script_is_unknown_and_not_a_gap(self):
         root = self.copy_fixture("empty")

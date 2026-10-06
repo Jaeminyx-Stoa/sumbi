@@ -25,6 +25,10 @@ def detect(root: Path, paths: list[str], content, warnings: list[dict]) -> tuple
     exclusions = [re.compile(pattern, re.I) for language in languages for pattern in language["exclude_lines"]]
     directives = {key: [re.compile(pattern, re.I) for language in languages
                         for pattern in language["directives"].get(key, [])] for key in conventions}
+    topics = {key: [re.compile(pattern, re.I) for language in languages
+                    for pattern in language.get("topics", {}).get(key, [])] for key in conventions}
+    denials = {key: [re.compile(pattern, re.I) for language in languages
+                     for pattern in language.get("denials", {}).get(key, [])] for key in conventions}
     for path in paths:
         guidance = re.sub(r"\A---\s*\n.*?\n---(?:\s*\n|$)", "", content(path), flags=re.S)
         guidance = _without_code(guidance, inline=False)
@@ -32,8 +36,12 @@ def detect(root: Path, paths: list[str], content, warnings: list[dict]) -> tuple
         text = "\n".join(line for line in guidance.splitlines()
                          if not any(pattern.search(line) for pattern in exclusions))
         for key, patterns in directives.items():
-            if any(pattern.search(text) for pattern in patterns):
+            directive_text = "\n".join(line for line in text.splitlines()
+                                       if not any(pattern.search(line) for pattern in denials[key]))
+            if any(pattern.search(directive_text) for pattern in patterns):
                 conventions[key]["evidence"].append({"path": path, "kind": "directive"})
+            elif any(pattern.search(guidance) for pattern in topics[key]):
+                conventions[key]["evidence"].append({"path": path, "kind": "mentioned"})
 
     # Only letter counts vote: punctuation, digits and code cannot disguise the script.
     unsupported = {category: count for category, count in counts.items() if category not in covered}
@@ -66,6 +74,8 @@ def detect(root: Path, paths: list[str], content, warnings: list[dict]) -> tuple
                 else:
                     warnings.append({"kind": "convention-declaration-missing", "convention": key, "path": path})
     for convention in conventions.values():
-        if convention["evidence"]:
+        if any(entry["kind"] in {"directive", "declared"} for entry in convention["evidence"]):
             convention["status"] = "present"
+        elif convention["evidence"]:
+            convention["status"] = "unknown"
     return conventions, lexicon["version"]
