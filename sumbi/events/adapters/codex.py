@@ -1,0 +1,314 @@
+"""Codex rollout JSONL: cumulative counters, resumes and paired event times."""
+
+from pathlib import Path
+import re
+from typing import Callable, TypeVar
+
+from sumbi.events.tool_paths import tool_evidence
+from sumbi.events.references import branch, branch_query, tool_refs
+from sumbi.core.records import Coverage, records
+from sumbi.core.time import Window
+from sumbi.core.values import epoch, integer, label, mapping, timestamp
+from sumbi.core.paths import execution_cwd
+
+SessionT = TypeVar("SessionT")
+
+KNOWN = {"session_meta", "turn_context", "event_msg", "response_item", "compacted",
+         "token_usage_record", "inter_agent_communication_metadata", "world_state"}
+EVENTS = {"token_count", "item_completed", "item_started", "exec_command_begin", "exec_command_end",
+          "task_started", "task_complete", "task_completed", "thread_settings_applied",
+          "user_message", "agent_message", "agent_reasoning", "agent_reasoning_raw_content",
+          "agent_reasoning_section_break", "turn_aborted", "error", "warning", "shutdown_complete",
+          "context_compacted", "mcp_tool_call_begin", "mcp_tool_call_end", "request_user_input"}
+RESPONSES = {"message", "agent_message", "reasoning", "function_call", "function_call_output",
+             "custom_tool_call", "custom_tool_call_output", "web_search_call",
+             "local_shell_call", "image_generation_call", "compaction"}
+ITEMS = {"UserMessage", "AgentMessage", "Reasoning", "CommandExecution", "McpToolCall",
+         "Extension", "FileChange", "ContextCompaction", "SubAgentActivity", "ImageView",
+         "CollabAgentToolCall", "WebSearch"}
+TOOL_ITEMS = {"CommandExecution", "McpToolCall", "FileChange", "ImageView",
+              "CollabAgentToolCall", "WebSearch"}
+FIELDS = ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens")
+
+
+def exit_code(payload: dict) -> int | None:
+    """Read machine fields or the CLI's anchored completion envelope, never prose."""
+    value = payload.get("exit_code")
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    output = payload.get("output")
+    if isinstance(output, dict):
+        return exit_code(output)
+    if isinstance(output, str):
+        match = re.search(r"(?m)^Process exited with code (-?\d+)\s*$", output)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def verification_exit_code(payload: dict) -> int | None:
+    """Verification completion requires a numeric machine field, not output text."""
+    value = payload.get("exit_code")
+    return value if type(value) is int else None
+
+
+def _cwd_at_start(history, started_at, own_start):
+    """Use only unambiguous own-session context in force at execution start."""
+    if started_at is None or any(at is None for at, _ in history):
+        return None
+    eligible = [(at, cwd) for at, cwd in history if at <= started_at
+                and (own_start is None or at >= own_start)]
+    if not eligible:
+        return None
+    latest = max(at for at, _ in eligible)
+    values = {cwd for at, cwd in eligible if at == latest}
+    return next(iter(values)) if len(values) == 1 else None
+
+
+def collect(home: Path, window: Window, coverage: Coverage, *, local_review: bool = False,
+            collect_links: bool = False, session_factory: Callable[..., SessionT]) -> list[SessionT]:
+    root = home / ".codex" / "sessions"
+    sessions: dict[str, SessionT] = {}
+    snapshots: dict[str, list] = {}
+    contexts: dict[str, list] = {}
+    tool_names = {}
+    commands = {}
+    execution_context = {}
+    cwd_contexts = {}
+    pending_cwds = {}
+    for path in sorted(root.rglob("rollout-*.jsonl")):
+        session = None
+        meta_seen = False
+        for event in records(path, coverage):
+            kind = event.get("type")
+            payload = mapping(event.get("payload"))
+            inherited_meta = False
+            if kind == "session_meta" and not meta_seen:
+                raw_id = str(payload.get("id") or payload.get("session_id") or path.stem)
+                session = sessions.setdefault(raw_id, session_factory("codex", raw_id))
+                meta_seen = True
+                if payload.get("cli_version"):
+                    session.versions.add(label(payload["cli_version"], "version"))
+            elif kind == "session_meta" and str(payload.get("id") or payload.get("session_id")) != session.raw_id:
+                # Child rollouts can carry the parent's metadata after their own header.
+                # The first header identifies this stream; session_id can name its root.
+                inherited_meta = True
+                coverage.inherited_session_meta += 1
+            elif kind == "session_meta" and payload.get("cli_version"):
+                session.versions.add(label(payload["cli_version"], "version"))
+            if session is None:
+                # Without meta, keep coverage and a pseudonymous, unlinked session.
+                session = sessions.setdefault(path.stem, session_factory("codex", path.stem))
+            if not session.accept(event, coverage):
+                continue
+            when = timestamp(event.get("timestamp"))
+            if kind == "session_meta" and not inherited_meta:
+                session.start_evidence = "session-header"
+                if session.start_at is None or when is not None and when < session.start_at:
+                    session.start_at = when
+                    session.start_cwd = payload.get("cwd") if isinstance(payload.get("cwd"), str) else None
+                subagent = mapping(mapping(payload.get("source")).get("subagent"))
+                session.is_worker = session.is_worker or bool(subagent)
+                parent = mapping(subagent.get("thread_spawn")).get("parent_thread_id")
+                if isinstance(parent, str):
+                    session.parent_raw_id = parent
+            order = integer(event.get("ordinal"))
+            order = (order if order is not None else len(session.seen), len(session.seen))
+            if kind not in KNOWN:
+                coverage.unknown(kind)
+            if kind in ("session_meta", "turn_context") and not inherited_meta:
+                if "cwd" in payload:
+                    cwd_contexts.setdefault(session.raw_id, []).append((when,
+                        payload["cwd"] if isinstance(payload["cwd"], str) else None))
+                session.cwd(payload.get("cwd"), when)
+                session.context(when, order, payload.get("cwd"))
+                if collect_links and when:
+                    session.deliverable_events.append((when, order, "context",
+                        (branch(payload.get("branch") or mapping(payload.get("git")).get("branch")), payload.get("cwd"))))
+            if kind == "turn_context":
+                contexts.setdefault(session.raw_id, []).append((when, payload.get("model"), payload.get("effort")))
+            if kind == "compacted":
+                session.count("compactions", event.get("ordinal", len(session.seen)), when, window)
+            if kind == "event_msg":
+                subtype = payload.get("type")
+                identity = payload.get("call_id") or payload.get("turn_id") or event.get("ordinal", len(session.seen))
+                if subtype not in EVENTS:
+                    coverage.unknown("event_msg:" + str(subtype))
+                if subtype == "token_count":
+                    total = mapping(mapping(payload.get("info")).get("total_token_usage"))
+                    if total:
+                        values = {key: integer(total.get(key)) for key in FIELDS}
+                        if when is None or any(values[k] is None for k in FIELDS[:3]) \
+                                or values["cached_input_tokens"] > values["input_tokens"]:
+                            coverage.invalid_token_records += 1
+                        else:
+                            snapshots.setdefault(session.raw_id, []).append(
+                                (when, order, values))
+                elif subtype in ("task_started", "task_complete", "task_completed"):
+                    if subtype == "task_started":
+                        if window.contains(when):
+                            session.completed_at = None
+                    elif when is not None and when < window.until:
+                        session.completed_at = when
+                    start = epoch(payload.get("started_at"))
+                    end = epoch(payload.get("completed_at"))
+                    session.interval("request", identity, start or (when if subtype == "task_started" else None),
+                                     end or (when if subtype != "task_started" else None))
+                elif subtype in ("exec_command_begin", "mcp_tool_call_begin"):
+                    if subtype == "exec_command_begin":
+                        commands[session.raw_id, identity] = payload.get("command", payload.get("cmd"))
+                        execution_context[session.raw_id, identity] = (when,
+                            payload.get("cwd", payload.get("workdir")), "cwd" in payload or "workdir" in payload)
+                        cwd, paths = tool_evidence("exec_command", payload)
+                        session.tool_paths(when, order, cwd, paths)
+                        if collect_links and when:
+                            tool_names[session.raw_id, identity] = ("exec_command", branch_query("exec_command", payload))
+                            session.deliverable_events.append((when, order, "refs", tool_refs("exec_command", payload)))
+                    session.count("tool_calls", identity, when, window)
+                    session.interval("tool", identity, when, None)
+                elif subtype in ("exec_command_end", "mcp_tool_call_end"):
+                    if subtype == "exec_command_end":
+                        started, cwd, explicit = execution_context.get((session.raw_id, identity), (None, None, False))
+                        session.execution(identity, when, payload.get("command", commands.get((session.raw_id, identity))),
+                                          verification_exit_code(payload), started_at=started, cwd=cwd)
+                        key = session.raw_id, str(identity)
+                        if not explicit:
+                            pending_cwds[key] = started
+                        else:
+                            pending_cwds.pop(key, None)
+                    if collect_links and when:
+                        name, query = tool_names.get((session.raw_id, identity), (None, False))
+                        session.deliverable_events.append((when, order, "refs", tool_refs(
+                            name, payload.get("output"), output=True, query=query)))
+                    session.count("tool_results", identity, when, window)
+                    if exit_code(payload) not in (None, 0):
+                        session.count("tool_errors", identity, when, window)
+                    session.interval("tool", identity, None, when)
+                elif subtype in ("item_completed", "item_started"):
+                    item = mapping(payload.get("item"))
+                    item_type = item.get("type")
+                    identity = item.get("id") or identity
+                    start = epoch(payload.get("started_at_ms"), milliseconds=True)
+                    end = epoch(payload.get("completed_at_ms"), milliseconds=True)
+                    if item_type not in ITEMS:
+                        coverage.unknown("item:" + str(item_type))
+                    if item_type in TOOL_ITEMS:
+                        session.count("tool_calls", identity, start, window)
+                        if subtype == "item_completed":
+                            session.count("tool_results", identity, when, window)
+                            if exit_code(item) not in (None, 0):
+                                session.count("tool_errors", identity, when, window)
+                        session.interval("tool", identity, start, end)
+                    if item_type == "CommandExecution":
+                        session.cwd(item.get("cwd"), when)
+                        if subtype == "item_started":
+                            execution_context[session.raw_id, identity] = (start or when,
+                                item.get("cwd"), "cwd" in item)
+                        if subtype == "item_completed":
+                            started, cwd, explicit = execution_context.get((session.raw_id, identity), (None, None, False))
+                            has_pair = (session.raw_id, identity) in execution_context
+                            start_conflict = has_pair and (started is None or
+                                (start is not None and start != started))
+                            cwd_conflict = explicit and "cwd" in item and (
+                                execution_cwd(cwd) != execution_cwd(item["cwd"]))
+                            resolved_start = None if start_conflict else start or started
+                            paired_cwd = explicit and started is not None and not start_conflict
+                            resolved_cwd = None if start_conflict or cwd_conflict else (
+                                item.get("cwd") if "cwd" in item else cwd if paired_cwd else None)
+                            session.execution(identity, when, item.get("command"), verification_exit_code(item),
+                                started_at=resolved_start, cwd=resolved_cwd)
+                            key = session.raw_id, str(identity)
+                            if start_conflict or cwd_conflict or ("cwd" not in item and not paired_cwd):
+                                pending_cwds[key] = None if cwd_conflict else resolved_start
+                            else:
+                                pending_cwds.pop(key, None)
+                    if item_type == "FileChange" and subtype == "item_completed":
+                        session.edit(identity, when)
+                    if item_type in ("CommandExecution", "FileChange"):
+                        cwd, paths = tool_evidence(item_type, item)
+                        session.tool_paths(start or when, order, cwd, paths)
+                        if collect_links and (start or when):
+                            session.deliverable_events.append((start or when, order, "refs",
+                                tool_refs(item_type, item)))
+                    if item_type == "AgentMessage":
+                        session.local_text(item.get("content"), when, window, local_review)
+                elif subtype == "shutdown_complete":
+                    if when is not None and when < window.until:
+                        session.completed_at = when
+                elif subtype == "error":
+                    session.count("api_errors", identity, when, window)
+                elif subtype == "request_user_input":
+                    session.count("user_input_requests", identity, when, window)
+            elif kind == "response_item":
+                subtype = payload.get("type")
+                identity = payload.get("call_id") or payload.get("id") or event.get("ordinal", len(session.seen))
+                if subtype not in RESPONSES:
+                    coverage.unknown("response_item:" + str(subtype))
+                if subtype in ("function_call", "custom_tool_call", "local_shell_call", "web_search_call"):
+                    if str(payload.get("name", "")).split(".")[-1] == "apply_patch":
+                        session.edit(identity, when)
+                    cwd, paths = tool_evidence(payload.get("name", subtype),
+                                               payload.get("arguments", payload.get("input", payload.get("action"))))
+                    session.tool_paths(when, order, cwd, paths)
+                    if collect_links and when:
+                        tool_names[session.raw_id, identity] = (payload.get("name", subtype), branch_query(
+                            payload.get("name", subtype), payload.get("arguments", payload.get("input", payload.get("action")))))
+                        session.deliverable_events.append((when, order, "refs", tool_refs(
+                            payload.get("name", subtype), payload.get("arguments", payload.get("input", payload.get("action"))))))
+                    session.count("tool_calls", identity, when, window)
+                    session.interval("tool", identity, when, None)
+                    if str(payload.get("name", "")).split(".")[-1] in ("request_user_input", "request_user_input_async"):
+                        session.count("user_input_requests", identity, when, window)
+                elif subtype in ("function_call_output", "custom_tool_call_output"):
+                    if collect_links and when:
+                        name, query = tool_names.get((session.raw_id, identity), (None, False))
+                        session.deliverable_events.append((when, order, "refs", tool_refs(
+                            name, payload.get("output"), output=True, query=query)))
+                    session.count("tool_results", identity, when, window)
+                    if exit_code(payload) not in (None, 0):
+                        session.count("tool_errors", identity, when, window)
+                    session.interval("tool", identity, None, when)
+                if subtype in ("message", "agent_message"):
+                    session.local_text(payload.get("content"), when, window, local_review)
+    # Resolve after all streams are read: log ordering must not make a later
+    # context retroactively prove cwd, or hide a prior context recorded late.
+    for (raw_id, identity), started in pending_cwds.items():
+        session = sessions[raw_id]
+        execution = session.commands.get(identity)
+        if execution is not None:
+            execution.cwd = _cwd_at_start(cwd_contexts.get(raw_id, []), started, session.start_at)
+    for raw_id, entries in contexts.items():
+        eligible = [(t, model, effort) for t, model, effort in entries if t and t < window.until]
+        prior = [entry for entry in eligible if entry[0] < window.since]
+        relevant = [entry for entry in eligible if window.contains(entry[0])]
+        if prior:
+            relevant.append(max(prior, key=lambda entry: entry[0]))
+        for _, model, effort in relevant:
+            if model:
+                sessions[raw_id].models.add(label(model, "model"))
+            if effort:
+                sessions[raw_id].efforts.add(label(effort, "effort"))
+    for raw_id, entries in snapshots.items():
+        session = sessions[raw_id]
+        previous = dict.fromkeys(FIELDS, 0)
+        for when, order, total in sorted(entries, key=lambda e: (e[0], e[1])):
+            reset = any(total[k] is not None and previous[k] is not None and total[k] < previous[k]
+                        for k in FIELDS)
+            baseline = dict.fromkeys(FIELDS, 0) if reset else previous
+            delta = {k: total[k] - baseline[k] if total[k] is not None and baseline[k] is not None else None
+                     for k in FIELDS}
+            if reset and window.contains(when):
+                session.counts["counter_resets"] += 1
+            fresh = delta["input_tokens"] - delta["cached_input_tokens"]
+            if fresh < 0:
+                if window.contains(when):
+                    # A correction contradicts the nested cached-input contract. Expose the gap.
+                    coverage.invalid_token_records += 1
+            elif any(value for value in delta.values() if value is not None):
+                values = {"new_input": fresh, "cache_read": delta["cached_input_tokens"],
+                          "output": delta["output_tokens"], "reasoning_output": delta["reasoning_output_tokens"]}
+                session.usage(when, order, values)
+                if window.contains(when):
+                    session.add_tokens(values)
+            previous = total
+    return list(sessions.values())

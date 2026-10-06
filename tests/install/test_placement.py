@@ -8,7 +8,9 @@ from unittest.mock import Mock, patch
 
 from sumbi.install.placement import annotate_placement, load_rules, observed_starts, read_starts
 from sumbi.install.planner import build_plan
-from sumbi.model import Coverage, Session, Window
+from sumbi.core.records import Coverage
+from sumbi.sessions.session import Session
+from sumbi.core.time import Window
 from .test_inventory import OfflineTest
 
 NOW = datetime(2030, 1, 15, tzinfo=timezone.utc)
@@ -130,12 +132,14 @@ class PlacementTests(OfflineTest):
         home = Path.home()
         native_sessions = [Session("claude-code", "a"), Session("codex", "b")]
 
-        def collect_claude(home, window, measured):
+        def collect_claude(home, window, measured, *, session_factory):
+            self.assertIs(session_factory, Session)
             measured.files_scanned = 1
             measured.lines_read = 2
             return native_sessions[:1]
 
-        def collect_codex(home, window, measured):
+        def collect_codex(home, window, measured, *, session_factory):
+            self.assertIs(session_factory, Session)
             measured.files_scanned = 3
             measured.broken_lines = 1
             return native_sessions[1:]
@@ -144,7 +148,7 @@ class PlacementTests(OfflineTest):
         codex = Mock(collect=Mock(side_effect=collect_codex))
         generic = Mock(collect=Mock(side_effect=AssertionError("Opt-in adapter invoked")))
         registry = {"sumbi-events": generic, "codex": codex, "claude-code": claude}
-        with patch("sumbi.report.ADAPTERS", registry):
+        with patch("sumbi.install.placement.ADAPTERS", registry):
             sessions, window, coverage = read_starts(home, now=NOW)
 
         self.assertEqual(sessions, native_sessions)
@@ -177,7 +181,7 @@ class PlacementTests(OfflineTest):
 
     def test_adapter_failure_is_degraded_coverage_and_inventory_remains_available(self):
         root = self.workspace()
-        from sumbi.report import ADAPTERS
+        from sumbi.events.registry import ADAPTERS
         with patch.object(ADAPTERS["codex"], "collect", side_effect=RuntimeError("Synthetic private failure")):
             sessions, window, coverage = read_starts(Path.home(), now=NOW)
         plan = build_plan(root)

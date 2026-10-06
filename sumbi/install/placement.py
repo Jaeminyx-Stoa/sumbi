@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+from sumbi.sessions.session import Session
+
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path, PurePosixPath
 
-from sumbi.model import Coverage, Window, normalize_path
+from sumbi.core.records import Coverage
+from sumbi.core.time import Window
+from sumbi.core.paths import normalize_path
 from .errors import InstallError
 from .gaps import has_import
-from .inventory import read_bytes, safe_path
+from .files import read_bytes, safe_path
 from .exclusions import GitIgnore, excluded_by, local_git
+from sumbi.events.registry import ADAPTERS
+from .files import _without_code
+import posixpath
 
 
 class _IgnoreChecks:
@@ -47,7 +54,6 @@ def load_rules() -> dict:
 
 def read_starts(home: Path, *, now: datetime | None = None) -> tuple[list, Window, dict]:
     """Read default native adapter starts without exporting log text."""
-    from sumbi.report import ADAPTERS
 
     until = now or datetime.now(timezone.utc)
     window = Window(until - timedelta(days=14), until)
@@ -56,7 +62,7 @@ def read_starts(home: Path, *, now: datetime | None = None) -> tuple[list, Windo
         adapter = ADAPTERS[agent]
         measured = Coverage()
         try:
-            sessions.extend(adapter.collect(home, window, measured))
+            sessions.extend(adapter.collect(home, window, measured, session_factory=Session))
         except Exception:
             coverage[agent] = {**measured.as_dict(), "status": "unavailable"}
             continue
@@ -288,13 +294,11 @@ def annotate_placement(plan, sessions, window: Window | None = None, coverage: d
     # Imports introduced by this plan also participate in launch guidance.
     report = dict(plan.report)
     report["claude_imports"] = list(report["claude_imports"])
-    from .inventory import _without_code
     for change in plan.changes:
         if change.path.endswith("CLAUDE.md"):
             added = change.after[len(change.before or b""):].decode("utf-8-sig")
             for line in _without_code(added).splitlines():
                 if line.startswith("@"):
-                    import posixpath
                     target = posixpath.normpath(posixpath.join(str(PurePosixPath(change.path).parent), line[1:]))
                     if target in contents:
                         report["claude_imports"].append({"source": change.path, "path": target, "status": "resolved"})

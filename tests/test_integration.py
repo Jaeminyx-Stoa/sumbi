@@ -16,11 +16,14 @@ from unittest.mock import patch
 
 from sumbi import __version__
 from sumbi.cli import main
-from sumbi.collect import baseline
+from sumbi.install.baseline import record_baseline as baseline
 from sumbi.install import apply_plan, build_plan
 from sumbi.install.errors import InstallError
-from sumbi.model import RepositoryAttributor, Window, label, pseudonym, timestamp
-from sumbi.report import collect, text_summary
+from sumbi.measure.attribution import RepositoryAttributor
+from sumbi.core.time import Window
+from sumbi.core.values import label, timestamp
+from sumbi.core.privacy import pseudonym
+from sumbi.measure.report import collect, text_summary
 
 NOW = timestamp("2030-01-15T00:00:00Z")
 WINDOW = Window(NOW - timedelta(days=14), NOW)

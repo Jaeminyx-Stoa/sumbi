@@ -11,8 +11,8 @@ from unittest.mock import patch
 
 from sumbi.catalog import load_catalog
 from sumbi.cli import main, parser
-from sumbi.interventions import exposure_gap, in_exposure_gap
-from sumbi.registration import read_registration
+from sumbi.judge.interventions import exposure_gap, in_exposure_gap
+from sumbi.judge.registration import read_registration
 
 
 class RegistrationCommandTests(unittest.TestCase):

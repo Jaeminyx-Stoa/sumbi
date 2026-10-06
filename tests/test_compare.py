@@ -11,13 +11,13 @@ import unittest
 from unittest.mock import patch
 
 from sumbi.cli import main
-from sumbi.compare import compare, mix_distance, text_summary, verdict
-from sumbi.compare_stats import bootstrap, classify_ratio, newcombe, sample_size
-from sumbi.deliver import wilson
-from sumbi.ledger import read_ledger
-from sumbi.model import ProjectRule
-from sumbi.outcomes import FixtureOutcomes
-from sumbi.registration import read_registration
+from sumbi.judge.compare_github import compare, mix_distance, text_summary, verdict
+from sumbi.judge.stats import bootstrap, classify_ratio, newcombe, sample_size
+from sumbi.outcomes.github.deliver import wilson
+from sumbi.outcomes.github.ledger import read_ledger
+from sumbi.measure.attribution import ProjectRule
+from sumbi.outcomes.github.recorded import FixtureOutcomes
+from sumbi.judge.registration import read_registration
 
 FIXTURE = Path(__file__).parent / "fixtures/compare"
 

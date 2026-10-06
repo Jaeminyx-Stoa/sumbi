@@ -1,6 +1,6 @@
 """Offline harness inventory and additive installation.
 
-The collect integration point is ``sumbi.collect.baseline(repository=Path)``.
+The collect integration point is ``sumbi.install.baseline.record_baseline(repository=Path)``.
 It must be read-only and offline, and return JSON-safe aggregate metadata.
 """
 

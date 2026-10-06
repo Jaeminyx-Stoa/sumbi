@@ -225,7 +225,7 @@ verdict. The deliverable ledger and comparison command remain out of M1a scope.
 
 ## Install baselines
 
-`sumbi install --apply` invokes `sumbi.collect.baseline` once before practice
+`sumbi install --apply` invokes `sumbi.install.baseline.record_baseline` once before practice
 writes when the plan has changes. It collects `[now - 14 days, now)` in UTC,
 scoped to the target repository. A normalized Git origin, when available, matches
 other local clones of that repository exactly. Otherwise normalized paths match

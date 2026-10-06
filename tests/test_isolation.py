@@ -6,7 +6,7 @@ import subprocess
 import unittest
 
 from support import IsolatedTemporaryDirectory
-from sumbi.github_outcomes import outside_repository
+from sumbi.outcomes.github.live import outside_repository
 
 
 class IsolationTests(unittest.TestCase):

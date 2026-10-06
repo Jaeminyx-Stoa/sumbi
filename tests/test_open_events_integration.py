@@ -11,13 +11,15 @@ from support import IsolatedTemporaryDirectory
 import unittest
 
 from sumbi.cli import main
-from sumbi.deliver import deliver
-from sumbi.ledger import COLUMNS
-from sumbi.local_compare import compare_local, text_summary as compare_summary
-from sumbi.local_outcomes import deliver_local, text_summary as deliver_summary
-from sumbi.model import ProjectRule, Window, timestamp
-from sumbi.outcomes import FixtureOutcomes
-from sumbi.report import collect, text_summary as collect_summary
+from sumbi.outcomes.github.deliver import deliver
+from sumbi.outcomes.github.ledger import COLUMNS
+from sumbi.judge.compare_local import compare_local, text_summary as compare_summary
+from sumbi.outcomes.local_verify.workers import deliver_local, text_summary as deliver_summary
+from sumbi.measure.attribution import ProjectRule
+from sumbi.core.time import Window
+from sumbi.core.values import timestamp
+from sumbi.outcomes.github.recorded import FixtureOutcomes
+from sumbi.measure.report import collect, text_summary as collect_summary
 
 FIXTURES = Path(__file__).parent / "fixtures/open_events"
 SCRIPT = "scripts/check.sh"

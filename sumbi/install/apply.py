@@ -13,42 +13,9 @@ import re
 from sumbi.catalog import VERSION, load_judgment_policy
 from .baseline import baseline
 from .errors import InstallError
-from .inventory import read_bytes, safe_path
+from .files import _checked, _write, read_bytes, safe_path
 from .planner import Plan, build_plan, digest
-
-
-def _checked(root: Path, relative: str, expected: bytes | None) -> Path:
-    path = safe_path(root, relative)
-    if path.exists() and (not path.is_file() or path.stat().st_nlink != 1):
-        raise InstallError("Apply requires single-link regular files.")
-    if read_bytes(root, relative) != expected:
-        raise InstallError("Repository changed since planning; rebuild the plan.")
-    return path
-
-
-def _write(root: Path, relative: str, expected: bytes | None,
-           data: bytes, mode: int) -> None:
-    """Stage bytes in the destination directory, recheck, then replace."""
-    path = _checked(root, relative, expected)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    safe_path(root, relative)
-    descriptor, temporary = tempfile.mkstemp(prefix=".sumbi-", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(data)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.chmod(temporary, mode)
-        _checked(root, relative, expected)
-        if expected is None:
-            # A same-directory hard link publishes staged bytes exclusively.
-            # Unlike replace, it cannot overwrite an unanticipated new file.
-            os.link(temporary, path)
-        else:
-            os.replace(temporary, path)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+from sumbi.outcomes.github.ledger import LABEL
 
 
 LOCAL_IGNORES = b"backups/\nbaseline/\ninstall.lock\n"
@@ -69,7 +36,6 @@ def _protect_local_artifacts(root: Path) -> None:
 
 
 def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = None, intervention_id=None) -> dict:
-    from sumbi.ledger import LABEL
     if intervention_id is not None and (not isinstance(intervention_id, str) or not re.fullmatch(LABEL, intervention_id)):
         raise InstallError("Intervention ID must be a bounded public-safe label.")
     if not plan.changes:

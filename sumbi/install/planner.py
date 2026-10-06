@@ -12,7 +12,8 @@ import re
 from sumbi.catalog import VERSION, load_catalog
 from .errors import InstallError
 from .gaps import find_gaps, has_import, shared_target
-from .inventory import MAX_BYTES, inventory, read_bytes
+from .files import MAX_BYTES, read_bytes
+from .inventory import inventory
 from .exclusions import GitIgnore, excluded_by
 
 MARKER = re.compile(r"^<!-- sumbi:(begin|end) ([a-z][a-z0-9-]*) -->$")

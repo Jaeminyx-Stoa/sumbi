@@ -16,10 +16,10 @@ import urllib.error
 import urllib.parse
 
 from sumbi.cli import main
-from sumbi.deliver import deliverable_basis, judge
-from sumbi.github_outcomes import GitHubOutcomes, NoRedirect, PLAN_UNAVAILABLE, github_token
-from sumbi.ledger import COLUMNS, Deliverable, read_ledger
-from sumbi.outcomes import FixtureOutcomes
+from sumbi.outcomes.github.deliver import deliverable_basis, judge
+from sumbi.outcomes.github.live import GitHubOutcomes, NoRedirect, PLAN_UNAVAILABLE, github_token
+from sumbi.outcomes.github.ledger import COLUMNS, Deliverable, read_ledger
+from sumbi.outcomes.github.recorded import FixtureOutcomes
 from test_deliver import START, WINDOW, REPO, time, pull
 
 END = datetime.fromisoformat(time(32).replace("Z", "+00:00"))
@@ -44,14 +44,14 @@ class GitHubTests(unittest.TestCase):
         opener = patch("urllib.request.OpenerDirector.open", side_effect=self.respond)
         self.open = opener.start()
         self.addCleanup(opener.stop)
-        clock = patch("sumbi.github_outcomes.datetime", wraps=datetime)
+        clock = patch("sumbi.outcomes.github.live.datetime", wraps=datetime)
         self.clock = clock.start()
         self.clock.now.return_value = END
         self.addCleanup(clock.stop)
-        epoch = patch("sumbi.github_outcomes.time.time", return_value=END.timestamp())
+        epoch = patch("sumbi.outcomes.github.live.time.time", return_value=END.timestamp())
         epoch.start()
         self.addCleanup(epoch.stop)
-        salt = patch("sumbi.deliver.read_salt", return_value=None)
+        salt = patch("sumbi.outcomes.github.deliver.read_salt", return_value=None)
         salt.start()
         self.addCleanup(salt.stop)
 
@@ -134,7 +134,7 @@ class GitHubTests(unittest.TestCase):
             return self.respond(request, **kwargs)
 
         self.open.side_effect = limited
-        with patch("sumbi.github_outcomes.time.sleep") as sleep:
+        with patch("sumbi.outcomes.github.live.time.sleep") as sleep:
             self.adapter()
         sleep.assert_called_once_with(3)
 
@@ -142,21 +142,21 @@ class GitHubTests(unittest.TestCase):
         error = urllib.error.HTTPError("https://api.github.com", 429, "private", {"Retry-After": "2"}, io.BytesIO())
         self.open.side_effect = [error, *[io.BytesIO(json.dumps(self.routes[p]).encode()) for p in (
             "/repos/example/sample/pulls", "/repos/example/sample/commits", "/repos/example/sample/commits")]]
-        with patch("sumbi.github_outcomes.time.sleep") as sleep:
+        with patch("sumbi.outcomes.github.live.time.sleep") as sleep:
             self.adapter()
         sleep.assert_called_once_with(3)
 
     def test_rate_limit_retries_are_bounded(self):
         self.open.side_effect = lambda *a, **k: (_ for _ in ()).throw(urllib.error.HTTPError(
             "https://api.github.com", 429, "private", {"Retry-After": "0"}, io.BytesIO()))
-        with patch("sumbi.github_outcomes.time.sleep"), self.assertRaisesRegex(ValueError, "HTTP 429"):
+        with patch("sumbi.outcomes.github.live.time.sleep"), self.assertRaisesRegex(ValueError, "HTTP 429"):
             self.adapter()
         self.assertEqual(self.open.call_count, 4)
 
     def test_permission_403_does_not_wait_for_reset(self):
         self.open.side_effect = urllib.error.HTTPError("https://api.github.com", 403, "private", {
             "X-RateLimit-Remaining": "99", "X-RateLimit-Reset": str(END.timestamp() + 100)}, io.BytesIO(b"access denied"))
-        with patch("sumbi.github_outcomes.time.sleep") as sleep, self.assertRaisesRegex(ValueError, "HTTP 403"):
+        with patch("sumbi.outcomes.github.live.time.sleep") as sleep, self.assertRaisesRegex(ValueError, "HTTP 403"):
             self.adapter()
         sleep.assert_not_called()
 
@@ -167,7 +167,7 @@ class GitHubTests(unittest.TestCase):
         self.open.side_effect = lambda *a, **k: (_ for _ in ()).throw(urllib.error.HTTPError(
             "https://api.github.com", 403, "private", {"X-RateLimit-Remaining": "0"},
             io.BytesIO(b'{"message":"API rate limit exceeded"}')))
-        with patch("sumbi.github_outcomes.time.sleep"), self.assertRaisesRegex(ValueError, "HTTP 403"):
+        with patch("sumbi.outcomes.github.live.time.sleep"), self.assertRaisesRegex(ValueError, "HTTP 403"):
             adapter._get("/repos/example/sample/rules/branches/main", policy=True)
         self.assertEqual(self.open.call_count, 4)
         self.assertEqual({p.name for p in (self.root / "cache").glob("*.json")}, before)
@@ -186,7 +186,7 @@ class GitHubTests(unittest.TestCase):
     def test_expired_cache_is_refetched(self):
         self.adapter()
         self.open.reset_mock()
-        with patch("sumbi.github_outcomes.time.time", return_value=END.timestamp() + 301):
+        with patch("sumbi.outcomes.github.live.time.time", return_value=END.timestamp() + 301):
             self.adapter()
         self.assertGreater(self.open.call_count, 0)
 

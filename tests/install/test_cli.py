@@ -5,10 +5,9 @@ import importlib
 import io
 import json
 from pathlib import Path
-import types
 from unittest.mock import patch
 
-from sumbi.install.__main__ import main
+from sumbi.cli.install import main
 from sumbi.install.baseline import baseline
 from sumbi.install.errors import InstallError
 from .test_inventory import OfflineTest
@@ -102,8 +101,7 @@ class CliTests(OfflineTest):
             self.assertNotIn(tree + "/CLAUDE.md", output + raw)
 
     def test_pending_baseline(self):
-        missing = ModuleNotFoundError("Synthetic unavailable entry point", name="sumbi.collect")
-        with patch.object(baseline_module.importlib, "import_module", side_effect=missing):
+        with patch.object(baseline_module, "record_baseline", None):
             self.assertEqual(baseline(Path(".")), {"status": "pending (collect not available)"})
 
     def test_available_baseline_is_only_run_before_apply(self):
@@ -113,9 +111,7 @@ class CliTests(OfflineTest):
             self.assertFalse((repository / "AGENTS.md").exists())
             calls.append(repository)
             return {"private_text": "SYNTHETIC_PRIVATE_BASELINE"}
-        module = types.ModuleType("sumbi.collect")
-        module.baseline = entry
-        with patch.dict("sys.modules", {"sumbi.collect": module}):
+        with patch.object(baseline_module, "record_baseline", entry):
             result, output, errors = self.run_cli(["--root", str(root), "--dry-run"])
             self.assertEqual(result, 0, errors)
             self.assertIn("baseline: available (runs before apply)", output)
@@ -129,11 +125,9 @@ class CliTests(OfflineTest):
 
     def test_baseline_failure_prevents_practice_writes(self):
         root = self.copy_fixture("empty")
-        module = types.ModuleType("sumbi.collect")
         def entry(*, repository, home=None):
             raise ValueError("SYNTHETIC_PRIVATE_ERROR")
-        module.baseline = entry
-        with patch.dict("sys.modules", {"sumbi.collect": module}):
+        with patch.object(baseline_module, "record_baseline", entry):
             result, output, errors = self.run_cli(["--root", str(root), "--apply"])
         self.assertEqual(result, 1)
         self.assertIn("Collect baseline failed", errors)
@@ -143,8 +137,8 @@ class CliTests(OfflineTest):
 
     def test_broken_collect_dependency_is_not_silently_pending(self):
         missing = ModuleNotFoundError("Synthetic missing dependency", name="dependency")
-        with patch.object(baseline_module.importlib, "import_module", side_effect=missing), self.assertRaises(InstallError):
-            baseline(Path("."))
+        with patch.object(baseline_module, "record_baseline", side_effect=missing), self.assertRaises(InstallError):
+            baseline(Path("."), run=True)
 
     def test_invalid_budget_and_selection_fail_with_sanitized_errors(self):
         root = self.copy_fixture("empty")
