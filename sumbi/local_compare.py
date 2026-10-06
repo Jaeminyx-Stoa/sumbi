@@ -8,7 +8,7 @@ from sumbi.compare import (DECISION_ORDER, EXCLUDED_SHARE, MIX_DISTANCE, fractio
                            agent_only_in_one_arm, mix_distance, mix_report, verdict)
 from sumbi.compare_stats import bootstrap, newcombe, sample_size
 from sumbi.deliver import wilson
-from sumbi.local_outcomes import METRICS, STATES, deliver_local, verifier_summary
+from sumbi.local_outcomes import METRICS, STATES, deliver_local, verifier_signals, verifier_summary
 from sumbi.interventions import exposure_gap, exposure_side, gap_summary, in_exposure_gap
 from sumbi.model import Window, timestamp
 from sumbi.privacy import pseudonym, pseudonym_key, read_salt
@@ -27,17 +27,20 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
     key = salt if salt is not None else read_salt()
     with pseudonym_key(key):
         period = Window(registration.before.since, registration.after.until)
+        windows = {"before": registration.before, "after": registration.after}
         measured = deliver_local(home, period, repository, agents=agents, verify=verify,
                                  scan_until=scan_until, active_minutes=active_minutes, salt=key,
-                                 verification_windows=(registration.before, registration.after))
-        windows = {"before": registration.before, "after": registration.after}
+                                 verification_windows=windows)
+        verification_arms = measured["verification"]["arms"]
+        signals = ([{"name": "verifier_never_passed", "evidence": verification_arms}]
+                   if any(verifier_signals(counts) for counts in verification_arms.values()) else [])
         candidates = {arm: [r for r in measured["units"] if w.contains(timestamp(r["dispatched_at"]))]
                       for arm, w in windows.items()}
         arms, exclusions = {}, {}
         flags, mixes = [], {}
         def flag(name, blocking, evidence):
             flags.append({"name": name, "blocking": blocking, "evidence": evidence})
-        for signal in measured["signals"]:
+        for signal in signals:
             flag(signal["name"], True, signal["evidence"])
         scope_mismatches = {arm: dict(Counter(r["start_scope"] for r in rows
                             if r["start_scope"] == "same_origin_other_checkout")) for arm, rows in candidates.items()}
@@ -148,7 +151,7 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
             arms=arms, registered_size=registration.sample_size_per_arm, success=success,
             margin_pp=registration.margin_pp, ratios=ratios)
         return {"schema_version": "local-compare-1.0", "outcome_source": "local-verify",
-            "verification": measured["verification"], "signals": measured["signals"],
+            "verification": measured["verification"], "signals": signals,
             **({"exposure_gap": gap} if gap is not None else {}),
             "registration": {"outcome_source": registration.outcome_source,
                 "intervention_id": pseudonym("intervention", registration.intervention_id),
@@ -176,7 +179,9 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
 def text_summary(report):
     lines = ["sumbi compare local verification"]
     if report.get("signals"):
-        lines.append(verifier_summary(report["verification"]))
+        lines.append("; ".join(arm + " " + verifier_summary(counts)
+                              for arm, counts in report["verification"]["arms"].items()
+                              if verifier_signals(counts)))
     lines.extend(["Outcome source: local-verify", "Verdict proposal: " +
                   report["verdict"]["proposal"], "Reasons: " + ", ".join(report["verdict"]["reasons"])])
     if "exposure_gap" in report:

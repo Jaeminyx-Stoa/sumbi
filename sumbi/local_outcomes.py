@@ -101,6 +101,7 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
         units, overhead, excluded_scope, start_scopes = [], [], Counter(), Counter()
         adapters, command_coverage = {}, Counter()
         verification_counts = Counter()
+        arm_counts = {arm: Counter() for arm in verification_windows or {}}
         for agent in agents if agents is not None else DEFAULT_AGENTS:
             measured = Coverage()
             sessions = ADAPTERS[agent].collect(home, scan, measured)
@@ -120,10 +121,13 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                 # workers and dispatchers. Lifetime follow-up checks outside the
                 # measurement windows cannot conceal a never-passing gate.
                 for execution in session.commands.values():
-                    if (any(w.contains(execution.at) for w in (verification_windows or (window,)))
+                    if (any(w.contains(execution.at) for w in (verification_windows.values() if verification_windows else (window,)))
                             and recognize(execution.command, declared) == "matched"
                             and type(execution.exit_code) is int):
                         verification_counts[execution.exit_code] += 1
+                        for arm, arm_window in (verification_windows or {}).items():
+                            if arm_window.contains(execution.at):
+                                arm_counts[arm][execution.exit_code] += 1
                 if not session.is_worker:
                     if session.in_window(scan):
                         tokens, complete, observed = token_measurement(session, scan)
@@ -155,6 +159,8 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
         from sumbi.deliver import wilson
         from sumbi.compare_stats import estimate
         verification = verification_report(verification_counts)
+        if verification_windows:
+            verification["arms"] = {arm: verification_report(counts) for arm, counts in arm_counts.items()}
         return {"schema_version": "local-deliver-1.0", "outcome_source": "local-verify",
                 "verification": verification, "signals": verifier_signals(verification),
                 "unit": "worker_session", "dispatch_window": {"since": window.since.isoformat(),

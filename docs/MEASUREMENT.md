@@ -47,7 +47,13 @@ filter, line cap or model-search cap.
 Claude sources are the JSONL files directly inside each project directory and
 all JSONL files below its subagent directories, including nested histories.
 The session header or file identity stays stable when later records omit IDs.
-Subagents have distinct IDs linked to the parent session. Assistant messages are
+Subagents have distinct IDs linked to the parent session. Older layouts store
+sidechain streams as project-level `agent-<id>.jsonl` files. A stream whose first
+record has `isSidechain: true` uses the same identity as a `subagents/` stream:
+`<parent>:subagent:<agentId>`, falling back to the agent filename ID when
+`agentId` is absent. Its `sessionId` identifies the parent, not the child.
+The worker role is fixed when the stream is identified; later records cannot
+change a session's role. Assistant messages are
 deduplicated by message ID across the entire session. The snapshot with the
 largest reported output wins; a tie selects the latest timestamp. The selected
 snapshot's timestamp assigns the entire message to one window. Thus a streamed
@@ -958,8 +964,11 @@ including launch or prerequisite failures, and does not prove that tests ran.
 Scoped parent sessions and no-change workers contribute to this health signal.
 Unknown exit codes remain coverage gaps and do not count as known completions.
 Completions outside the dispatch measurement window, including later lifetime
-follow-up passes, cannot suppress it. Comparison uses the union of its two
-registered windows, excluding any intervening hiatus. The signal is a blocking
+follow-up passes, cannot suppress it. Comparison counts each registered arm
+window separately, excluding any intervening hiatus. Any arm with matched
+completed verifications and zero passes emits the signal, even if the other arm
+passes. JSON evidence includes completed, passed and exit-code counts per arm;
+the text summary identifies the failing arms. The signal is a blocking
 comparability flag with reason `verifier_never_passed`, after coverage and before
 success non-inferiority. This prevents success-based proposals from interpreting
 a never-passing gate as an intervention effect. Commands are never emitted.

@@ -58,9 +58,11 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
         session = None
         for event in records(path, coverage):
             if session is None:
+                child = child or (path.stem.startswith("agent-") and event.get("isSidechain") is True)
                 parent = str(event.get("sessionId") or parent_hint)
                 raw_id = parent + ":subagent:" + str(event.get("agentId") or agent_hint) if child else parent
-                session = sessions.setdefault(raw_id, Session("claude-code", raw_id, parent if child else None))
+                session = sessions.setdefault(raw_id, Session("claude-code", raw_id, parent if child else None,
+                                                              is_worker=child))
             raw_id = session.raw_id
             if not session.accept(event, coverage):
                 continue
@@ -72,7 +74,6 @@ def collect(home: Path, window: Window, coverage: Coverage, *, local_review: boo
                 start_cwds[raw_id] = when
                 session.start_cwd = event["cwd"]
                 session.start_evidence = "first-observed-cwd"
-            session.is_worker = child or event.get("isSidechain") is True
             order = (len(session.seen), len(session.seen))
             session.cwd(event.get("cwd"), when)
             if event.get("version"):

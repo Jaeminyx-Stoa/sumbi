@@ -592,7 +592,8 @@ class UnitTests(unittest.TestCase):
                 counts = {str(c): (before, after).count(c) for c in (before, after) if c is not None}
                 for report, summary in ((delivered, deliver_summary), (compared, compare_summary)):
                     self.assertEqual(report["verification"]["exit_code_counts"], counts)
-                    self.assertEqual(bool(report["signals"]), expected)
+                    signal_expected = expected if report is delivered else any(c is not None and c != 0 for c in (before, after))
+                    self.assertEqual(bool(report["signals"]), signal_expected)
                     if expected:
                         self.assertIn("verifier_never_passed", summary(report).splitlines()[1])
                         self.assertIn("exit 2: 1", summary(report).splitlines()[1])
@@ -603,6 +604,32 @@ class UnitTests(unittest.TestCase):
                     self.assertIn("verifier_never_passed", compared["verdict"]["reasons"])
                     self.assertNotIn("inconclusive_success", compared["verdict"]["reasons"])
                     self.assertTrue(next(f for f in compared["flags"] if f["name"] == "verifier_never_passed")["blocking"])
+
+    def test_compare_verifier_health_per_arm(self):
+        from sumbi.local_compare import text_summary
+        for before, after in ((2, 0), (0, 3), (2, 3), (0, 0)):
+            with self.subTest(codes=(before, after)):
+                self.write_codex("before", code=before)
+                self.write_codex("after", start="2030-01-02T01:00:00Z", code=after)
+                report = compare_local(self.home, self.repo, self.registration(), verify=[SCRIPT], resamples=100)
+                evidence = {arm: {"completed": 1, "passed": int(code == 0), "exit_code_counts": {str(code): 1}}
+                            for arm, code in (("before", before), ("after", after))}
+                self.assertEqual(report["verification"]["arms"], evidence)
+                flags = [f for f in report["flags"] if f["name"] == "verifier_never_passed"]
+                if before or after:
+                    self.assertEqual(report["signals"], [{"name": "verifier_never_passed", "evidence": evidence}])
+                    self.assertEqual(flags, [{"name": "verifier_never_passed", "blocking": True, "evidence": evidence}])
+                    self.assertEqual(report["verdict"]["proposal"], "withhold")
+                    self.assertIn("verifier_never_passed", report["verdict"]["reasons"])
+                    self.assertNotIn("inconclusive_success", report["verdict"]["reasons"])
+                    for arm, code in (("before", before), ("after", after)):
+                        if code:
+                            self.assertIn(arm + " verifier_never_passed", text_summary(report).splitlines()[1])
+                            self.assertIn(f"exit {code}: 1", text_summary(report).splitlines()[1])
+                else:
+                    self.assertEqual(report["signals"], [])
+                    self.assertEqual(flags, [])
+                    self.assertNotIn("verifier_never_passed", report["verdict"]["reasons"])
 
     def test_verifier_window_excludes_followup_pass_and_includes_no_change_workers(self):
         self.write_codex("before", code=2, edits=False)
