@@ -13,6 +13,7 @@ sys.path.insert(0, str(TESTS.parent))
 sys.path.insert(0, str(TESTS))
 
 from characterization.corpus import DIRECTORY, run_corpus
+from characterization.argparse_contract import CASES, check_output, is_argparse_artifact
 
 
 def difference(expected, actual, name):
@@ -44,6 +45,8 @@ def main():
         for name in ("TMPDIR", "TEMP", "TMP"):
             os.environ[name] = str(root)
     corpus = run_corpus()
+    for case in CASES:
+        check_output(case, corpus[case["name"]])
     if args.dump:
         args.dump.write_text(json.dumps(corpus, indent=2) + "\n", encoding="utf-8", newline="\n")
         return 0
@@ -67,7 +70,7 @@ def main():
         if name not in expected or name not in actual:
             print("Unexpected artifact set: " + name)
             failed = True
-        elif actual[name] != expected[name]:
+        elif not is_argparse_artifact(name) and actual[name] != expected[name]:
             print(difference(expected[name], actual[name], name), end="")
             failed = True
     return int(failed)

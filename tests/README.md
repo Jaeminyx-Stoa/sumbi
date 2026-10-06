@@ -76,7 +76,8 @@ routing, local review, recorded GitHub delivery and comparison, native and event
 local verification, every install fixture's dry-run and JSON plan, and each
 fixture's apply/revert lifecycle. The fully configured install fixture has an
 empty plan: its attempted revert pins the missing-backup diagnostic too.
-Root help, version and the missing-command error are also pinned.
+Root help and the missing-command error have the argparse contract below;
+version output remains byte-pinned.
 The merged measurement commands add catalog pre-registration (both outcome
 sources, late registration and refusal/error paths), verifier-never-passed
 signals, actual apply-time exposure, named installation interventions, native
@@ -114,6 +115,23 @@ never changed. Golden mismatches show a unified diff; a missing or extra output
 artifact fails too. The suite runs the corpus again in the same process and twice
 in fresh Python processes, comparing every artifact to the first run. Running
 that suite on Windows and WSL checks both platforms against the same goldens.
+
+## Argparse output contract
+
+Argparse help and usage formatting belongs to the Python interpreter and can
+change between supported versions. Help stdout and usage-error stderr (exit 2)
+are not byte-compared with captured goldens, including in the regeneration
+command's check mode. Their exit status, nonempty expected stream and empty
+opposite stream are checked, along with the parser's command name, every option
+and every subcommand name. Help must include all option aliases; usage must
+include each option's first spelling, as argparse usage omits aliases. Usage
+checks select the parser that emits the error: the register subparser for missing
+registration arguments, and the root parser for root-level validation errors.
+
+All sumbi-formatted output and the complete artifact set remain byte-pinned.
+Same-process and fresh-process determinism still compare every artifact,
+including argparse output, byte-for-byte within the running Python version.
+Existing argparse goldens remain capture records, not cross-version contracts.
 
 ## Normalization boundary
 

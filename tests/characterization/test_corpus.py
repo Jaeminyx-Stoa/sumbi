@@ -9,6 +9,7 @@ import unittest
 from sumbi.cli import parser
 from support import IsolatedTemporaryDirectory
 from .corpus import CASES, DIRECTORY, run_corpus
+from .argparse_contract import check_output, is_argparse_artifact
 from .regenerate import difference, flatten, golden_files
 
 
@@ -20,9 +21,11 @@ class CorpusTests(unittest.TestCase):
         cls.expected = golden_files()
         cls.observed = run_corpus()
 
-    def assert_artifacts_equal(self, expected, actual):
+    def assert_artifacts_equal(self, expected, actual, *, goldens=False):
         self.assertEqual(set(expected), set(actual), "The set of output artifacts changed")
         for name in sorted(expected):
+            if goldens and is_argparse_artifact(name):
+                continue
             if expected[name] != actual[name]:
                 self.fail(difference(expected[name], actual[name], name))
 
@@ -68,7 +71,8 @@ def golden_test(case):
         prefix = case["name"] + "/"
         expected = {name: value for name, value in self.expected.items() if name.startswith(prefix)}
         actual = {prefix + name: value for name, value in self.observed[case["name"]].items()}
-        self.assert_artifacts_equal(expected, actual)
+        check_output(case, self.observed[case["name"]])
+        self.assert_artifacts_equal(expected, actual, goldens=True)
     return test
 
 
