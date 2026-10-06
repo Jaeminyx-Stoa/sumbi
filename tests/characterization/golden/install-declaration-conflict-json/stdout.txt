@@ -1,0 +1,49 @@
+Inventory (offline; paths and parsed labels only):
+  excluded roots: 1
+  git-ignored roots: 0
+  nested git repositories: 0
+  observed starts: {"adapter_coverage": {"claude-code": {"broken_lines": 0, "duplicate_events": 0, "files_scanned": 0, "inherited_session_meta": 0, "invalid_timestamps": 0, "invalid_token_records": 0, "lines_read": 0, "unknown_record_types": {}, "unreadable_files": 0}, "codex": {"broken_lines": 0, "duplicate_events": 0, "files_scanned": 0, "inherited_session_meta": 0, "invalid_timestamps": 0, "invalid_token_records": 0, "lines_read": 0, "unknown_record_types": {}, "unreadable_files": 0}}, "agents": [], "coverage": {}, "paths": [], "placement_sessions": 0, "roles": {"top-level": 0, "worker": 0}, "sessions": 0, "start_evidence": {}, "status": "no-starts-found", "window": {"since": "<START_WINDOW_SINCE>", "until": "<START_WINDOW_UNTIL>"}}
+  exclude **/.git: 0
+  exclude **/.sumbi: 1
+  exclude **/node_modules: 0
+  exclude **/vendor: 0
+  exclude **/.venv: 0
+  exclude **/venv: 0
+  exclude **/dist: 0
+  exclude **/build: 0
+  exclude **/__pycache__: 0
+  exclude **/.tmp: 0
+  exclude **/test/**/fixtures: 0
+  exclude **/test/**/testdata: 0
+  exclude **/tests/**/fixtures: 0
+  exclude **/tests/**/testdata: 0
+  agents: 1 (AGENTS.md)
+  capabilities: claude_skills=0, agent_skills=0, commands=0, agents=0
+  workflows=0, codeowners=0, test_sources=0
+  codeowners: 0
+  pr_templates: 0
+  git_hooks: 0
+  lint: 0
+  format: 0
+  type_check: 0
+  required checks: unknown (offline); rulesets: unknown (offline)
+  estimate: script-aware-v1: ceil(other_characters / 4) + Hangul/Han/Hiragana/Katakana characters
+  instruction tokens (root/largest scope): codex=7/7, claude=0/0, gemini=0/0, copilot=0/0, cursor=0/0
+  conditional instruction tokens claude: 0 (0 rules)
+  convention review_gate: absent []
+  convention handoff: present [{"kind": "directive", "path": "AGENTS.md"}, {"kind": "declared-absent", "path": ".sumbi/config.toml"}]
+  convention friction_line: absent []
+  convention parallel_worktree: absent []
+  convention plan_approval: absent []
+  budget=2000; warnings=2
+  warning: {"kind": "root-not-versioned"}
+  warning: {"convention": "handoff", "kind": "convention-declaration-conflict"}
+Gaps: missing-test-command, missing-risk-review, missing-friction-line, missing-worktree-rule, missing-plan-approval
+  missing-test-command: {"paths": []}; candidates=test-and-verify
+  missing-risk-review: {"paths": [], "searched_paths": ["AGENTS.md"]}; candidates=review-gates
+  missing-friction-line: {"paths": [], "searched_paths": ["AGENTS.md"]}; candidates=friction-line
+  missing-worktree-rule: {"paths": [], "searched_paths": ["AGENTS.md"]}; candidates=parallel-worktrees
+  missing-plan-approval: {"paths": [], "searched_paths": ["AGENTS.md"]}; candidates=plan-and-approval
+Practices: none
+baseline: available (runs before apply)
+No changes proposed.

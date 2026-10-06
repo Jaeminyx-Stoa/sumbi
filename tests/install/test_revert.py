@@ -87,7 +87,7 @@ class RevertTests(OfflineTest):
     def test_modified_file_refused_per_file_then_retry_and_idempotence(self):
         root, plan, backup_id = self.installed()
         target = root / "AGENTS.md"
-        manual = target.read_bytes() + b"Owner's manual change.\n"
+        manual = target.read_bytes().replace(b"Leave a handoff document", b"Owner's changed handoff rule")
         target.write_bytes(manual)
         result = revert_install(root, backup_id)
         self.assertEqual(result["refused"], 1)

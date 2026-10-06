@@ -125,7 +125,8 @@ dependency. Flow mappings, anchors and multiline names have explicit unknown
 diagnostics; this is not a complete YAML parser.
 
 Each convention reports a `status` of `present`, `absent` or `unknown` and an
-`evidence` list of paths with kinds `directive` or `declared`. Only `absent`
+`evidence` list of paths with kinds `directive`, `mentioned`, `declared`, or
+`declared-absent`. Only `absent`
 produces a convention gap or an installation proposal. Detection is a
 conservative text heuristic over agent entry files,
 rules, skills, commands, subagents and resolved Claude imports. Ordinary README,
@@ -161,10 +162,45 @@ paths. A missing path produces `convention-declaration-missing` and supplies
 no presence evidence. Unknown IDs, malformed path lists, links, absolute paths
 and traversal are rejected with sanitized errors. Paths use forward slashes
 and must stay within the inspected repository.
+
+To confirm that a convention is missing even when its topic is mentioned, use
+the string `"absent"` instead of a path list:
+
+```toml
+[conventions]
+handoff = "absent"
+```
+
+This records `declared-absent` evidence at `.sumbi/config.toml` and enables the
+corresponding `missing-*` gap and practice candidate. It also overrides unknown
+language coverage. A detected directive always wins: the status stays `present`
+and `convention-declaration-conflict` identifies the conflicting convention.
+Remove or update the declaration after adopting the rule.
 CODEOWNERS alone does not establish a risk review gate. A configured test runner
 or a documented test command supplies test evidence; no test command is printed.
 
 ## Additive application
+
+Every practice has English and Korean text with equivalent rules and the same
+links. Set the top-level `language = "en"` or `language = "ko"` in
+`.sumbi/config.toml` to override selection (before any `[conventions]` table).
+Otherwise the dominant covered script in searched guidance selects the language:
+Hangul selects Korean, and other covered scripts select English. Only letters
+vote; front matter, fenced blocks and inline code do not. A Latin/Hangul tie,
+empty guidance or no covered letters defaults to English. Unsearched README
+documents and owner-declared path contents do not vote. Inventory records
+`practice_language`; proposals and intervention records carry `language`.
+Prediction, judgment and provenance metadata remain language-neutral.
+
+If Git ignores a practice document under `docs/sumbi/`, sumbi does not write it.
+The entry block uses a link-free variant of the same rule, so it cannot point
+to an ignored document. `practice-docs-ignored` lists affected practice IDs.
+Explicit glob exclusions of documents also select the link-free variant.
+Tracked documents remain eligible under Git's normal ignore semantics. Apply
+rechecks ignore rules before writing. An ignored `.sumbi/` directory is supported:
+its interventions ledger and backups are local by design. Output explains this
+once when Git ignores that directory; sumbi does not change the outer ignore
+policy or stage metadata.
 
 Each practice inserts a block bounded by:
 
@@ -193,12 +229,15 @@ on inherited ACLs.
 
 Before target writes, `.sumbi/backups/<UTC timestamp>/files/` holds original
 bytes and `manifest.json` records original modes, hashes and absent new files.
-Version 1 manifests also record applied target hashes and change status from
+Version 1 manifests also record applied target hashes, exact added block bytes
+and any single blank separator line added before each block, and change status from
 `prepared` to `applied` only after successful writes.
 The manifest also pre-registers the planned intervention predictions. Successful
 application appends one record per practice to `.sumbi/interventions.jsonl`;
 the existing ledger is backed up too. `content_hash` is SHA-256 of the canonical
-catalog practice object, including its template text and prediction. Records
+catalog practice object with `language` and the actual proposed target/text
+entries replacing its bilingual file templates. This includes link-free variants
+and resolved shared imports, as well as prediction metadata. Records
 carry the catalog version, source IDs, touched paths, judgment policy and UTC
 time. A second run with the same selection adds no files, backups or records.
 
@@ -209,7 +248,8 @@ the manifest's hashes with local files, restore the listed originals or remove
 listed newly created files, and remove the lock only after resolving the
 transaction. If another writer changed a target, recovery needs owner attention.
 On first apply, `.sumbi/.gitignore` excludes `backups/`, `baseline/` and
-`install.lock`; `interventions.jsonl` stays committable. Existing ignore-file
+`install.lock`. The ledger is local; it may be shared explicitly after review
+when the repository's ignore policy allows it. Existing ignore-file
 bytes are preserved, with the local exclusions appended if needed. Protection
 is written before collection and backup creation and stays in place if later
 application fails. Do not commit backups: they contain original repository
@@ -234,18 +274,27 @@ Links, hard-linked targets, traversal, duplicate paths, unsafe portable names,
 and repository metadata targets are rejected. Manifests are local recovery
 evidence, not authenticated against deliberate editing by their owner.
 
-For each target, revert restores original bytes and mode, or deletes a file
-that was originally absent, only when its current hash equals the applied hash.
-Modified, missing or unsafe targets are refused individually; other eligible
-files can still be restored. Refusals return a nonzero CLI status. Original
+For each target whose hash still equals the applied hash, revert restores original
+bytes and mode, or deletes a file that was originally absent. If an existing
+file changed elsewhere, revert removes each added managed block only when its
+bytes exactly match the saved block. It removes at most the one blank separator
+line sumbi added, preserving all other bytes and the file's current mode.
+Edited, missing or ambiguous blocks are refused individually; unchanged blocks
+in the same file can still be removed. Files created by sumbi are deleted only
+when unchanged; modified created files never receive partial reversal. Old version
+1 manifests without block records retain whole-file hash protection.
+Missing or unsafe targets are refused individually. Refusals return a nonzero
+CLI status. Original
 POSIX permission modes include set-ID and sticky bits where supported; manifest
 modes exclude file-type bits. The ledger retains its current permission mode.
 Revert never restores the old intervention ledger: it appends an `action: revert` record with
-backup ID, UTC time and per-file statuses, retaining earlier and later records.
+backup ID, UTC time, per-file statuses and per-block outcomes, retaining earlier
+and later records. `blocks-removed` distinguishes partial file restoration;
+block outcomes are `removed`, `refused`, or `already-reverted`.
 If the ledger append fails, reverted files are rolled back without clobbering
 concurrent edits. The shared exclusive install lock also guards revert.
 
-Successful paths are remembered by the audit records. Repeated revert skips
+Successful paths and blocks are remembered by the audit records. Repeated revert skips
 them even if new owner work or a later installation has changed those paths.
 Unchanged retries add no duplicate record; changed per-file outcomes append one.
 Refused paths can be retried after the owner restores exactly the applied bytes.
@@ -287,18 +336,18 @@ report key order. Conditional-rule reads remain after convention detection to
 preserve diagnostic ordering. Skill metadata is read before configurations and
 its estimates are carried into the cost section.
 
-The current policy boundaries also identify the next changes without adding them:
+The policy boundaries are:
 
-- Confirmed-absent declarations belong in convention declaration handling.
-- Localized practice text belongs at the catalog-text selection in `planner.py`;
+- Confirmed-absent declarations are handled by the convention scanner.
+- Localized practice text is selected from the catalog in `planner.py`;
   `_append_block` only validates and appends the selected bytes.
-- Allowlist-ignore repositories belong at traversal's git-ignore contexts and
+- Allowlist-ignore repositories use traversal's git-ignore contexts and
   the planner's prospective-target ignore check.
-- Block-level revert belongs at the per-target hash/restoration decision in
-  `revert.py`; the current behavior still restores whole files.
+- Block-level revert uses exact suffix records in `blocks.py` and the per-target
+  hash/restoration decision in `revert.py`.
 
 Apply keeps locking and rollback in `apply_plan`; preparation and backup writing
 are mechanical helpers. Placement separates start counting from report assembly.
 Install functions are limited to 80 source lines, enforced by the structural test.
-The characterization corpus remains the byte-identity gate; this refactor does
-not regenerate golden outputs.
+The characterization corpus pins intended output changes; affected goldens must
+be explicitly regenerated and explained in the PR.

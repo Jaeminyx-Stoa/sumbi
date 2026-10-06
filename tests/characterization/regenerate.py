@@ -59,6 +59,8 @@ def main():
         for name in sorted(previous.keys() - actual.keys()):
             (DIRECTORY / "golden" / name).unlink()
         for name, text in actual.items():
+            if previous.get(name) == text or name in previous and is_argparse_artifact(name):
+                continue  # Preserve unchanged files and interpreter-specific capture records.
             path = DIRECTORY / "golden" / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8", newline="\n")

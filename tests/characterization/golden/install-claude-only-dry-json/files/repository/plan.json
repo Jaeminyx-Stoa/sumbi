@@ -225,6 +225,7 @@
     "convention_search_paths": [
       "CLAUDE.md"
     ],
+    "practice_language": "en",
     "warnings": [
       {
         "kind": "root-not-versioned"
@@ -373,11 +374,12 @@
     {
       "id": "instruction-map",
       "risk": "low",
+      "language": "en",
       "files": [
         "AGENTS.md",
         "docs/sumbi/instructions.md"
       ],
-      "content_hash": "6380a73e9f12ae6650bf8e7c1b797b703b20a3f01d16e7d03a9814f3c7e4ffab",
+      "content_hash": "a266e886e63c5cc306fc7505ae750e43801eac18246ce5cff298ed62448f428b",
       "prediction": {
         "metric": "input_tokens_per_success",
         "direction": "decrease",
@@ -392,10 +394,11 @@
     {
       "id": "shared-instructions",
       "risk": "low",
+      "language": "en",
       "files": [
         "CLAUDE.md"
       ],
-      "content_hash": "9d5669ed8893b7c9f1c92e2af396e4f1351e75f59eda63df8374b20d3d068d1b",
+      "content_hash": "205040e89bcd5f2e41c198971f39250807525ef78e9b1b0b1bbeacd7ffe13fba",
       "prediction": {
         "metric": "instruction_divergence_followups_per_deliverable",
         "direction": "decrease",
@@ -410,11 +413,12 @@
     {
       "id": "test-and-verify",
       "risk": "low",
+      "language": "en",
       "files": [
         "AGENTS.md",
         "docs/sumbi/testing.md"
       ],
-      "content_hash": "11d859f8360f054cba09022b8c7a7ef99b7fe63879722c3e0a399aa46d32fd91",
+      "content_hash": "996ec36f399d7dcc399a08bd583f9d9d322784fc31483c62629c0a7607da63f4",
       "prediction": {
         "metric": "followup_fixes_per_deliverable",
         "direction": "decrease",
@@ -429,11 +433,12 @@
     {
       "id": "review-gates",
       "risk": "medium",
+      "language": "en",
       "files": [
         "AGENTS.md",
         "docs/sumbi/review.md"
       ],
-      "content_hash": "979fa8f0c66a74df173489ddd23f9ef9097ec9c61fa5807faba3bd5e6dea6719",
+      "content_hash": "20433fad3bcdeb05ba5297c3e84071e5c03c0df97e3a4909791be97ec73799c1",
       "prediction": {
         "metric": "risk_related_followups_per_deliverable",
         "direction": "decrease",
@@ -450,11 +455,12 @@
     {
       "id": "plan-and-approval",
       "risk": "low",
+      "language": "en",
       "files": [
         "AGENTS.md",
         "docs/sumbi/planning.md"
       ],
-      "content_hash": "99034c48bdab87dda2faf0b52f93c020873e184fdf8b500e78d9863f897d52c3",
+      "content_hash": "07ffa0922dede2688ee6695a34018b7bbd0907b7e85d2cd127e8d44e7089aa46",
       "prediction": {
         "metric": "rework_time_per_success",
         "direction": "decrease",
@@ -470,11 +476,12 @@
     {
       "id": "handoff",
       "risk": "low",
+      "language": "en",
       "files": [
         "AGENTS.md",
         "docs/sumbi/handoff.md"
       ],
-      "content_hash": "e578a73303c340dba8f2fa76bfdd6b3cc6860f6943d24f47ae42f77a3f66dbcc",
+      "content_hash": "29efa4263eab3f54aa4832e3a2bb9a281db03ff0ac0811632ec89daadbcdf273",
       "prediction": {
         "metric": "restart_time_per_success",
         "direction": "decrease",
@@ -489,11 +496,12 @@
     {
       "id": "friction-line",
       "risk": "low",
+      "language": "en",
       "files": [
         "AGENTS.md",
         "docs/sumbi/friction.md"
       ],
-      "content_hash": "03bbb326e73a6500be8233a3af219d144c41ed535a6dc184898d93744da1e14f",
+      "content_hash": "1fe31d11093c3cedad2c66688085ebe42b8e8f28bd40de56d6a41f19898a10c4",
       "prediction": {
         "metric": "unclassified_harness_obstacles",
         "direction": "decrease",
@@ -508,11 +516,12 @@
     {
       "id": "parallel-worktrees",
       "risk": "low",
+      "language": "en",
       "files": [
         "AGENTS.md",
         "docs/sumbi/parallel.md"
       ],
-      "content_hash": "7e0ceb8b6b99f59034824d6281ebd8c687af6e70d276cd4eb20ec93a6f520423",
+      "content_hash": "687788d6746651eb4253fbba55d3cfb6605ef0d61f85d64eb31fd41097a173b2",
       "prediction": {
         "metric": "conflict_recovery_time_per_success",
         "direction": "decrease",

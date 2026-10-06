@@ -1,0 +1,166 @@
+Inventory (offline; paths and parsed labels only):
+  excluded roots: 1
+  git-ignored roots: 0
+  nested git repositories: 0
+  observed starts: {"adapter_coverage": {"claude-code": {"broken_lines": 0, "duplicate_events": 0, "files_scanned": 0, "inherited_session_meta": 0, "invalid_timestamps": 0, "invalid_token_records": 0, "lines_read": 0, "unknown_record_types": {}, "unreadable_files": 0}, "codex": {"broken_lines": 0, "duplicate_events": 0, "files_scanned": 0, "inherited_session_meta": 0, "invalid_timestamps": 0, "invalid_token_records": 0, "lines_read": 0, "unknown_record_types": {}, "unreadable_files": 0}}, "agents": [], "coverage": {}, "paths": [], "placement_sessions": 0, "roles": {"top-level": 0, "worker": 0}, "sessions": 0, "start_evidence": {}, "status": "no-starts-found", "window": {"since": "<START_WINDOW_SINCE>", "until": "<START_WINDOW_UNTIL>"}}
+  exclude **/.git: 0
+  exclude **/.sumbi: 1
+  exclude **/node_modules: 0
+  exclude **/vendor: 0
+  exclude **/.venv: 0
+  exclude **/venv: 0
+  exclude **/dist: 0
+  exclude **/build: 0
+  exclude **/__pycache__: 0
+  exclude **/.tmp: 0
+  exclude **/test/**/fixtures: 0
+  exclude **/test/**/testdata: 0
+  exclude **/tests/**/fixtures: 0
+  exclude **/tests/**/testdata: 0
+  claude: 1 (CLAUDE.md)
+  capabilities: claude_skills=0, agent_skills=0, commands=0, agents=0
+  workflows=0, codeowners=0, test_sources=0
+  codeowners: 0
+  pr_templates: 0
+  git_hooks: 0
+  lint: 0
+  format: 0
+  type_check: 0
+  required checks: unknown (offline); rulesets: unknown (offline)
+  estimate: script-aware-v1: ceil(other_characters / 4) + Hangul/Han/Hiragana/Katakana characters
+  instruction tokens (root/largest scope): codex=0/0, claude=2182/2182, gemini=0/0, copilot=0/0, cursor=0/0
+  conditional instruction tokens claude: 0 (0 rules)
+  convention review_gate: absent []
+  convention handoff: absent []
+  convention friction_line: absent []
+  convention parallel_worktree: absent []
+  convention plan_approval: absent []
+  budget=2000; warnings=1
+  warning: {"kind": "root-not-versioned"}
+Gaps: missing-agents, instruction-budget, missing-test-command, missing-risk-review, missing-handoff, missing-friction-line, missing-worktree-rule, missing-plan-approval
+  missing-agents: {"expected_path": "AGENTS.md", "paths": []}; candidates=instruction-map
+  instruction-budget: {"agent": "claude", "budget": 2000, "estimated_tokens": 2182, "paths": ["CLAUDE.md"]}; candidates=instruction-map
+  missing-test-command: {"paths": []}; candidates=test-and-verify
+  missing-risk-review: {"paths": [], "searched_paths": ["CLAUDE.md"]}; candidates=review-gates
+  missing-handoff: {"paths": [], "searched_paths": ["CLAUDE.md"]}; candidates=handoff
+  missing-friction-line: {"paths": [], "searched_paths": ["CLAUDE.md"]}; candidates=friction-line
+  missing-worktree-rule: {"paths": [], "searched_paths": ["CLAUDE.md"]}; candidates=parallel-worktrees
+  missing-plan-approval: {"paths": [], "searched_paths": ["CLAUDE.md"]}; candidates=plan-and-approval
+Practices: instruction-map, shared-instructions, test-and-verify, review-gates, plan-and-approval, handoff, friction-line, parallel-worktrees
+baseline: available (runs before apply)
+--- /dev/null
++++ b/AGENTS.md
+@@ -0,0 +1,27 @@
++<!-- sumbi:begin instruction-map -->
++이 진입 파일은 짧게 유지한다. 자세한 지침은 작업에 필요할 때만 연다. [지침 관리](docs/sumbi/instructions.md)를 참고한다.
++<!-- sumbi:end instruction-map -->
++
++<!-- sumbi:begin test-and-verify -->
++완료를 보고하기 전에 작업에 맞는 검사를 실행하고 결과를 기록한다. [테스트 증거](docs/sumbi/testing.md)를 참고한다.
++<!-- sumbi:end test-and-verify -->
++
++<!-- sumbi:begin review-gates -->
++위험 경로는 릴리스 전에 리뷰를 받아야 한다. 기존 승인 절차를 유지하고 보안, 권한, 금전 경로에는 독립 리뷰를 요구한다. [리뷰 수준](docs/sumbi/review.md)을 참고한다.
++<!-- sumbi:end review-gates -->
++
++<!-- sumbi:begin plan-and-approval -->
++큰 변경은 구현 전에 빠진 요구사항을 확인하고, 인수 기준이 담긴 계획을 작성한 뒤 비판적으로 검토한다. 기존 승인 정책을 따른다. [계획 수립](docs/sumbi/planning.md)을 참고한다.
++<!-- sumbi:end plan-and-approval -->
++
++<!-- sumbi:begin handoff -->
++작업을 넘길 때는 인수 기준, 증거, 남은 작업, 다음 행동을 담은 인계 문서를 남긴다. [인계](docs/sumbi/handoff.md)를 참고한다.
++<!-- sumbi:end handoff -->
++
++<!-- sumbi:begin friction-line -->
++작업 보고서는 `Harness friction: none` 또는 하네스 장애를 짧게 설명하는 한 줄로 끝낸다. 민감한 내용은 로컬 메모에 둔다. [마찰 피드백](docs/sumbi/friction.md)를 참고한다.
++<!-- sumbi:end friction-line -->
++
++<!-- sumbi:begin parallel-worktrees -->
++병렬 에이전트는 별도 워크트리를 사용하고 파일 소유권을 명확히 정한다. 다른 에이전트의 작업 사본은 수정하지 않는다. [병렬 작업](docs/sumbi/parallel.md)을 참고한다.
++<!-- sumbi:end parallel-worktrees -->
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -302,0 +303,4 @@
++
++<!-- sumbi:begin shared-instructions -->
++@AGENTS.md
++<!-- sumbi:end shared-instructions -->
+--- /dev/null
++++ b/docs/sumbi/friction.md
+@@ -0,0 +1,7 @@
++<!-- sumbi:begin friction-line -->
++# 마찰 피드백
++
++마지막 마찰 줄에는 작업을 막거나 반복하게 한 지침, 도구, 검사를 적는다. 실패한 계층과 그 영향을 짧게 설명한다. 공유하는 출력에는 프롬프트, 대화록, 비밀 정보, 기기 식별자를 넣지 않는다.
++
++지침을 추가하기 전에 반복되는 장애를 검토한다. 원인을 해결할 수 있다면 신뢰할 수 있는 검사나 더 단순한 작업 절차를 우선한다. 보고서는 조사할 증거이며, 제안한 수정이 비용을 줄인다는 증명은 아니다.
++<!-- sumbi:end friction-line -->
+--- /dev/null
++++ b/docs/sumbi/handoff.md
+@@ -0,0 +1,7 @@
++<!-- sumbi:begin handoff -->
++# 인계 규칙
++
++진행 중인 인계 문서는 저장소 소유자가 승인한 로컬 위치에 둔다. 세션 대화록, 비밀 정보, 기기 경로는 커밋하지 않는다.
++
++결과물 ID와 인수 기준, 현재 상태, 변경 파일, 실제 실행한 검사, 미해결 위험, 다음 행동을 기록한다. 관찰과 가정을 구분한다. 후임자가 조사를 반복하지 않고 작업을 이어 갈 수 있어야 한다.
++<!-- sumbi:end handoff -->
+--- /dev/null
++++ b/docs/sumbi/instructions.md
+@@ -0,0 +1,7 @@
++<!-- sumbi:begin instruction-map -->
++# 지침 관리
++
++진입 파일에는 목차와 항상 적용할 규칙만 둔다. 예시, 배경 설명, 전문 절차는 필요할 때 여는 문서로 옮긴다.
++
++소유자는 토큰 추정치를 검토하고 선택적 내용을 옮긴 뒤, 승인과 검토 절차가 모든 관련 에이전트에 계속 전달되는지 확인한다. sumbi는 이 지침을 추가할 뿐, 기존 지침을 자동으로 줄이지 않는다.
++<!-- sumbi:end instruction-map -->
+--- /dev/null
++++ b/docs/sumbi/parallel.md
+@@ -0,0 +1,7 @@
++<!-- sumbi:begin parallel-worktrees -->
++# 병렬 작업
++
++병렬 에이전트마다 별도 브랜치와 워크트리, 담당 파일 목록을 지정한다. 수정 전에 공통 인터페이스에 합의한다. 변경하기 전에 작업 사본과 브랜치를 확인한다.
++
++리뷰를 거친 변경으로 통합한다. 다른 에이전트의 미커밋 작업을 보존하고 겹치는 부분은 소유자와 함께 해결한다. 작업이 끝난 것 같다는 이유만으로 워크트리나 브랜치를 삭제하지 않는다.
++<!-- sumbi:end parallel-worktrees -->
+--- /dev/null
++++ b/docs/sumbi/planning.md
+@@ -0,0 +1,7 @@
++<!-- sumbi:begin plan-and-approval -->
++# 계획 수립
++
++올바르게 구현하는 데 꼭 필요한 정보만 질문한다. 결과물, 인수 기준, 제약, 예상 실패 사례를 기록한다. 큰 변경에 착수하기 전에 이 기준으로 계획을 비판적으로 검토한다. 작고 되돌릴 수 있는 수정에는 규모에 맞는 절차를 적용한다.
++
++최종 승인을 요청하기 전에 구체적으로 검토할 수 있는 결과물을 준비한다. 파괴적 작업이나 외부 작업에는 기존 승인 절차가 계속 적용된다. 침묵을 승인으로 간주하지 않으며, 요청 범위가 이미 승인되었다면 다시 묻지 않는다.
++<!-- sumbi:end plan-and-approval -->
+--- /dev/null
++++ b/docs/sumbi/review.md
+@@ -0,0 +1,11 @@
++<!-- sumbi:begin review-gates -->
++# 리뷰 수준
++
++| 작업 규모 또는 위험 | 증거와 리뷰 |
++| --- | --- |
++| 간단한 문구 또는 로컬 설정 | 최종 변경을 읽고 영향을 받는 동작을 확인한다. |
++| 여러 구성 요소에 걸친 동작 | 독립적인 엔지니어링 리뷰를 요청하고 관련 테스트 증거를 첨부한다. |
++| 보안, 권한, 금전 또는 되돌릴 수 없는 작업 | 소유자 승인과 다른 모델 계열의 리뷰를 요구하고 해당 보안 및 릴리스 검사 결과를 첨부한다. |
++
++소유자는 저장소의 위험 경로별로 이 역할을 지정해야 한다. 역할은 리뷰 책임을 뜻하며, 도구가 이를 강제한다는 의미는 아니다. 기존의 더 엄격한 절차는 계속 적용한다. 리뷰를 받을 수 없으면 위험 작업을 보류한다.
++<!-- sumbi:end review-gates -->
+--- /dev/null
++++ b/docs/sumbi/testing.md
+@@ -0,0 +1,7 @@
++<!-- sumbi:begin test-and-verify -->
++# 테스트 증거
++
++소유자가 준비할 내용: 저장소의 정확한 테스트 명령과 필요한 환경을 여기에 기록한다. 그 전까지 테스트 명령 누락은 해결되지 않은 상태로 남는다.
++
++동작을 바꿀 때는 먼저 문제를 드러내는 집중 검사를 보여 준 뒤 통과시킨다. 최종 변경에 필요한 검사를 실행한다. 로컬 인계 문서에 명령, 결과, 확인하지 못한 범위를 명시한다. 실행할 예정인 검사를 이미 실행한 것처럼 보고하지 않는다.
++<!-- sumbi:end test-and-verify -->
+Applied: instruction-map, shared-instructions, test-and-verify, review-gates, plan-and-approval, handoff, friction-line, parallel-worktrees
+baseline: no sessions found
+Baseline file: .sumbi/baseline/__BASELINE_ID__.json
+Backup: .sumbi/backups/__BACKUP_ID__
+Backup ID: __BACKUP_ID__

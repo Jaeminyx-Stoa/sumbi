@@ -78,6 +78,10 @@ fixture's apply/revert lifecycle. The fully configured install fixture has an
 empty plan: its attempted revert pins the missing-backup diagnostic too.
 Root help and the missing-command error have the argparse contract below;
 version output remains byte-pinned.
+Additional authored install cases pin confirmed absence and declaration conflicts,
+Korean practice application, allowlist ignores with link-free entry blocks, and
+block-level revert after an unrelated entry-file edit. They configure private
+copies of the existing fixtures; no real workspace evidence is captured.
 The merged measurement commands add catalog pre-registration (both outcome
 sources, late registration and refusal/error paths), verifier-never-passed
 signals, actual apply-time exposure, named installation interventions, native
@@ -166,6 +170,10 @@ write if the two runs differ:
 ```sh
 python tests/characterization/regenerate.py --write --temp-root local/test-tmp
 ```
+
+Write mode replaces only changed artifacts and preserves existing argparse
+capture records, which are validated structurally across interpreter versions.
+Unchanged cases remain untouched. New cases capture their full artifact set.
 
 Omit `--write` to check against existing goldens with unified diffs. `--dump PATH`
 writes a private determinism snapshot, without touching any golden files; the

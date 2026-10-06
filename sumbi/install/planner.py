@@ -93,81 +93,122 @@ class Plan:
                 "notes": self.notes}
 
 
+class _Targets:
+    """Share prospective-target checks and additive bytes across practices."""
+
+    def __init__(self, root: Path, report: dict):
+        self.root, self.report = root, report
+        self.patterns = tuple(entry["pattern"] for entry in report["exclusions"]["patterns"])
+        self.git_contexts = {}
+        self.ignore_results = {}
+        self.before, self.after, self.notes = {}, {}, []
+
+    def ignored(self, target: str) -> bool:
+        if target in self.ignore_results:
+            return self.ignore_results[target]
+        repositories = self.report["versioning"]["nested_repositories"]["paths"]
+        scope = next((p for p in sorted(repositories, key=len, reverse=True)
+                      if target.startswith(p + "/")), "")
+        if scope not in self.git_contexts:
+            self.git_contexts[scope] = GitIgnore(self.root / scope)
+        context = self.git_contexts[scope]
+        ignored = context.check(target[len(scope) + 1:] if scope else target)
+        warning = {"kind": "gitignore-unavailable"}
+        if not context.available and warning not in self.report["warnings"]:
+            self.report["warnings"].append(warning)
+        self.ignore_results[target] = ignored
+        return ignored
+
+    def excluded(self, target: str) -> bool:
+        return bool(excluded_by(target, self.patterns))
+
+    def append(self, target: str, identifier: str, text: str) -> bool:
+        if target not in self.before:
+            self.before[target] = read_bytes(self.root, target)
+            self.after[target] = self.before[target] or b""
+        updated = _append_block(self.after[target], identifier, text, target, self.notes)
+        if updated is None:
+            return False
+        self.after[target] = updated
+        return True
+
+
 def build_plan(repository: Path | str = ".", *, budget: int = 2000,
                select: list[str] | None = None,
                exclude: list[str] | tuple[str, ...] = ()) -> Plan:
     root = Path(repository).resolve()
     report = inventory(root, budget, exclude=exclude)
-    git_contexts = {}
-
-    def ignored_target(target: str) -> bool:
-        repositories = report["versioning"]["nested_repositories"]["paths"]
-        scope = next((p for p in sorted(repositories, key=len, reverse=True)
-                      if target.startswith(p + "/")), "")
-        if scope not in git_contexts:
-            git_contexts[scope] = GitIgnore(root / scope)
-        context = git_contexts[scope]
-        ignored = context.check(target[len(scope) + 1:] if scope else target)
-        if not context.available and {"kind": "gitignore-unavailable"} not in report["warnings"]:
-            report["warnings"].append({"kind": "gitignore-unavailable"})
-        return ignored
-    patterns = tuple(entry["pattern"] for entry in report["exclusions"]["patterns"])
-    gaps = find_gaps(report)
-    catalog = load_catalog()
+    targets = _Targets(root, report)
+    gaps, catalog = find_gaps(report), load_catalog()
     ids = {p["id"] for p in catalog}
     if select is not None and (not select or not set(select).issubset(ids)):
         raise InstallError("Selection must contain known catalog IDs.")
     candidates = {p for gap in gaps for p in gap["candidates"]}
-    # Sharing becomes necessary when the plan seeds AGENTS.md for Claude.
     if "instruction-map" in candidates and report["instructions"]["claude"]["count"]:
         candidates.add("shared-instructions")
     if select is not None:
         candidates.intersection_update(select)
-    before: dict[str, bytes | None] = {}
-    after: dict[str, bytes] = {}
-    proposals, notes = [], []
+    proposals, ignored_docs = [], []
     for practice in catalog:
-        if practice["id"] not in candidates:
-            continue
-        identifier = practice["id"]
-        changed = []
-        for item in practice["files"]:
-            relative = item["path"]
-            # Nested Claude entry files import the root instructions relatively.
-            targets = [relative]
+        if practice["id"] in candidates:
+            proposal, ignored = _plan_practice(practice, targets)
+            if ignored:
+                ignored_docs.append(practice["id"])
+            if proposal:
+                proposals.append(proposal)
+    if ignored_docs:
+        report["warnings"].append({"kind": "practice-docs-ignored", "practice_ids": ignored_docs})
+    if targets.ignored(".sumbi/"):
+        report["warnings"].append({"kind": "local-install-metadata",
+            "message": "The .sumbi/ interventions ledger and backups are local by design; ignored metadata is supported."})
+    changes = [Change(path, targets.before[path], data) for path, data in sorted(targets.after.items())
+               if data != (targets.before[path] or b"")]
+    return Plan(root, report, gaps, proposals, changes, targets.notes, tuple(exclude))
+
+
+def _plan_practice(practice: dict, targets: _Targets) -> tuple[dict | None, bool]:
+    identifier, report = practice["id"], targets.report
+    language = report["practice_language"]
+    ignored_docs = {item["path"] for item in practice["files"]
+                    if item["path"].startswith("docs/sumbi/") and targets.ignored(item["path"])}
+    unavailable_docs = ignored_docs | {item["path"] for item in practice["files"]
+                                       if item["path"].startswith("docs/sumbi/") and targets.excluded(item["path"])}
+    rendered = []
+    for item in practice["files"]:
+        relative = item["path"]
+        paths = report["instructions"]["claude"]["paths"] if identifier == "shared-instructions" else [relative]
+        for target in paths:
+            if targets.excluded(target) or target in ignored_docs or targets.ignored(target):
+                targets.notes.append({"id": identifier, "status": "excluded-target-preserved"})
+                continue
+            texts = item["text_without_links"] if unavailable_docs and "text_without_links" in item else item["text"]
+            text = texts[language]
             if identifier == "shared-instructions":
-                targets = report["instructions"]["claude"]["paths"]
-            for target in targets:
-                if excluded_by(target, patterns) or ignored_target(target):
-                    notes.append({"id": identifier, "status": "excluded-target-preserved"})
+                text = _shared_text(target, targets)
+                if text is None:
                     continue
-                if target not in before:
-                    before[target] = read_bytes(root, target)
-                    after[target] = before[target] or b""
-                data = after[target]
-                text = item["text"]
-                if identifier == "shared-instructions":
-                    agent_paths = report["instructions"]["agents"]["paths"] + (["AGENTS.md"] if "AGENTS.md" in after else [])
-                    shared = shared_target(target, agent_paths)
-                    if shared not in agent_paths or excluded_by(shared, patterns) or ignored_target(shared):
-                        raise InstallError("Shared instructions require an existing or selected AGENTS.md.")
-                    depth = len(Path(target).parts) - len(Path(shared).parts)
-                    text = "@" + "../" * depth + "AGENTS.md"
-                    if has_import(report, target, shared):
-                        continue
-                updated = _append_block(data, identifier, text, target, notes)
-                if updated is None:
-                    continue
-                after[target] = updated
-                changed.append(target)
-        if changed:
-            payload = json.dumps(practice, sort_keys=True, separators=(",", ":")).encode()
-            proposals.append({"id": identifier, "risk": practice["risk"],
-                              "files": sorted(set(changed)), "content_hash": digest(payload),
-                              "prediction": practice["prediction"], "judgment": practice["judgment"],
-                              "provenance": practice["sources"]})
-    changes = [Change(path, before[path], data) for path, data in sorted(after.items()) if data != (before[path] or b"")]
-    return Plan(root, report, gaps, proposals, changes, notes, tuple(exclude))
+            if targets.append(target, identifier, text):
+                rendered.append({"path": target, "mode": item["mode"], "text": text})
+    if not rendered:
+        return None, bool(ignored_docs)
+    payload = {**practice, "language": language, "files": rendered}
+    content_hash = digest(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode())
+    return {"id": identifier, "risk": practice["risk"], "language": language,
+            "files": sorted({item["path"] for item in rendered}), "content_hash": content_hash,
+            "prediction": practice["prediction"], "judgment": practice["judgment"],
+            "provenance": practice["sources"]}, bool(ignored_docs)
+
+
+def _shared_text(target: str, targets: _Targets) -> str | None:
+    report = targets.report
+    agent_paths = report["instructions"]["agents"]["paths"] + (["AGENTS.md"] if "AGENTS.md" in targets.after else [])
+    shared = shared_target(target, agent_paths)
+    if shared not in agent_paths or targets.excluded(shared) or targets.ignored(shared):
+        raise InstallError("Shared instructions require an existing or selected AGENTS.md.")
+    if has_import(report, target, shared):
+        return None
+    depth = len(Path(target).parts) - len(Path(shared).parts)
+    return "@" + "../" * depth + "AGENTS.md"
 
 
 def _append_block(data: bytes, identifier: str, text: str, target: str, notes: list[dict]) -> bytes | None:

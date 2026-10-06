@@ -1496,6 +1496,102 @@
         "2030-01-02T01:02:00Z"
       ],
       "expected_exit": 0
+    },
+    {
+      "name": "install-declared-absent-json",
+      "command": "install",
+      "setup": "install:codex-only",
+      "install_config": "[conventions]\nhandoff = \"absent\"\n",
+      "install_guidance": "## Handoff\n",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run",
+        "--select",
+        "handoff",
+        "--json",
+        "plan.json"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-declaration-conflict-json",
+      "command": "install",
+      "setup": "install:codex-only",
+      "install_config": "[conventions]\nhandoff = \"absent\"\n",
+      "install_guidance": "Leave a handoff document.\n",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run",
+        "--select",
+        "handoff",
+        "--json",
+        "plan.json"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-korean-apply-revert",
+      "command": "install",
+      "setup": "install:claude-only",
+      "install_config": "language = \"ko\"\n",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--apply"
+      ],
+      "expected_exit": 0,
+      "lifecycle": true
+    },
+    {
+      "name": "install-ignored-docs-apply-revert",
+      "command": "install",
+      "setup": "install:codex-only",
+      "install_config": "language = \"ko\"\n",
+      "install_gitignore": "/*\n!.gitignore\n!AGENTS.md\n",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--apply",
+        "--select",
+        "handoff,parallel-worktrees"
+      ],
+      "expected_exit": 0,
+      "lifecycle": true
+    },
+    {
+      "name": "install-edited-entry-apply-revert",
+      "command": "install",
+      "setup": "install:codex-only",
+      "revert_edit": {
+        "path": "AGENTS.md",
+        "append": "Owner's unrelated addition.\n"
+      },
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--apply",
+        "--select",
+        "handoff"
+      ],
+      "expected_exit": 0,
+      "lifecycle": true
     }
   ]
 }

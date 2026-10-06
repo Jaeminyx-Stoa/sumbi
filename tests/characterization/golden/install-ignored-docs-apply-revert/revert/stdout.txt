@@ -1,0 +1,1 @@
+Revert: {"backup_id": "__BACKUP_ID__", "files": [{"blocks": [{"id": "handoff", "status": "removed"}, {"id": "parallel-worktrees", "status": "removed"}], "path": "AGENTS.md", "status": "restored"}], "refused": 0}
