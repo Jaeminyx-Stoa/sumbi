@@ -1,0 +1,365 @@
+{
+  "schema_version": "local-deliver-1.0",
+  "outcome_source": "local-verify",
+  "unit": "worker_session",
+  "dispatch_window": {
+    "since": "2030-01-01T00:00:00+00:00",
+    "until": "2030-01-03T00:00:00+00:00",
+    "bounds": "[since,until)"
+  },
+  "scan_until": "2030-01-04T00:00:00+00:00",
+  "active_minutes": 5.0,
+  "pseudonyms": {
+    "method": "hmac_sha256",
+    "salted": true,
+    "local_only": true
+  },
+  "states": {
+    "success": 2,
+    "failed": 1,
+    "unverified": 2,
+    "in_progress": 0,
+    "no_change": 1
+  },
+  "units": [
+    {
+      "id": "session_0a3faeda8fd7a41d037aebd4",
+      "agent": "codex",
+      "parent_id": "session_2939c3e6d1b7042207fea642",
+      "dispatched_at": "2030-01-02T01:00:00+00:00",
+      "last_at": "2030-01-02T01:00:06+00:00",
+      "start_scope": "repository_root",
+      "state": "unverified",
+      "reason": "no_check_after_last_edit",
+      "task_type": null,
+      "tokens": {
+        "new_input": 50,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 0,
+        "reasoning_output": null,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 6.0,
+      "model": [
+        "synthetic-model"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "command_coverage": {}
+    },
+    {
+      "id": "session_5a21b4f9b6ef95fc201022ff",
+      "agent": "codex",
+      "parent_id": "session_2939c3e6d1b7042207fea642",
+      "dispatched_at": "2030-01-02T01:00:00+00:00",
+      "last_at": "2030-01-02T01:00:06+00:00",
+      "start_scope": "repository_root",
+      "state": "no_change",
+      "reason": "no_known_edit",
+      "task_type": null,
+      "tokens": {
+        "new_input": null,
+        "cache_write": null,
+        "cache_read": null,
+        "output": null,
+        "reasoning_output": null,
+        "total": null
+      },
+      "tokens_complete": false,
+      "observed_total": 0,
+      "elapsed_seconds": 6.0,
+      "model": [
+        "synthetic-model"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "command_coverage": {}
+    },
+    {
+      "id": "session_7a73194a2c318d20cd3eab11",
+      "agent": "codex",
+      "parent_id": "session_2939c3e6d1b7042207fea642",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "last_at": "2030-01-01T01:00:06+00:00",
+      "start_scope": "repository_root",
+      "state": "failed",
+      "reason": "last_check_failed",
+      "task_type": null,
+      "tokens": {
+        "new_input": 100,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 0,
+        "reasoning_output": null,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 6.0,
+      "model": [
+        "synthetic-model"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "command_coverage": {
+        "matched": 1,
+        "unknown_execution_cwd": 0,
+        "unknown_execution_start": 0,
+        "unknown_exit_code": 0
+      }
+    },
+    {
+      "id": "session_7f0ee122b7bd8c48ebe445c7",
+      "agent": "codex",
+      "parent_id": "session_2939c3e6d1b7042207fea642",
+      "dispatched_at": "2030-01-02T01:00:00+00:00",
+      "last_at": "2030-01-02T01:00:05+00:00",
+      "start_scope": "repository_root",
+      "state": "unverified",
+      "reason": "no_check_after_last_edit",
+      "task_type": null,
+      "tokens": {
+        "new_input": 50,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 0,
+        "reasoning_output": null,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 5.0,
+      "model": [
+        "synthetic-model"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "command_coverage": {}
+    },
+    {
+      "id": "session_cb9adfc5e3febd28a16a0ec8",
+      "agent": "codex",
+      "parent_id": "session_2939c3e6d1b7042207fea642",
+      "dispatched_at": "2030-01-02T01:00:00+00:00",
+      "last_at": "2030-01-02T01:00:06+00:00",
+      "start_scope": "repository_root",
+      "state": "success",
+      "reason": "last_check_passed",
+      "task_type": null,
+      "tokens": {
+        "new_input": 50,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 0,
+        "reasoning_output": null,
+        "total": 50
+      },
+      "tokens_complete": true,
+      "observed_total": 50,
+      "elapsed_seconds": 6.0,
+      "model": [
+        "synthetic-model"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "command_coverage": {
+        "matched": 1,
+        "unknown_execution_cwd": 0,
+        "unknown_execution_start": 0,
+        "unknown_exit_code": 0
+      }
+    },
+    {
+      "id": "session_fccfe0b7a0e1e65b7867eb86",
+      "agent": "codex",
+      "parent_id": "session_2939c3e6d1b7042207fea642",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "last_at": "2030-01-01T01:00:06+00:00",
+      "start_scope": "repository_root",
+      "state": "success",
+      "reason": "last_check_passed",
+      "task_type": null,
+      "tokens": {
+        "new_input": 100,
+        "cache_write": null,
+        "cache_read": 0,
+        "output": 0,
+        "reasoning_output": null,
+        "total": 100
+      },
+      "tokens_complete": true,
+      "observed_total": 100,
+      "elapsed_seconds": 6.0,
+      "model": [
+        "synthetic-model"
+      ],
+      "effort": [
+        "high"
+      ],
+      "cli_version": [
+        "1.0"
+      ],
+      "command_coverage": {
+        "matched": 1,
+        "unknown_execution_cwd": 0,
+        "unknown_execution_start": 0,
+        "unknown_exit_code": 0
+      }
+    }
+  ],
+  "success_rate": {
+    "numerator": 2,
+    "denominator": 5,
+    "rate": 0.4,
+    "wilson_95": [
+      0.11762077423264783,
+      0.769275718723987
+    ]
+  },
+  "cost": {
+    "basis": "retained_worker_lifetime_only",
+    "per_success": {
+      "new_input": {
+        "numerator": 350,
+        "denominator": 2,
+        "value": 175.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "cache_write": {
+        "numerator": null,
+        "denominator": 2,
+        "value": null,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "cache_read": {
+        "numerator": 0,
+        "denominator": 2,
+        "value": 0.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "output": {
+        "numerator": 0,
+        "denominator": 2,
+        "value": 0.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "reasoning_output": {
+        "numerator": null,
+        "denominator": 2,
+        "value": null,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "total": {
+        "numerator": 350,
+        "denominator": 2,
+        "value": 175.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "time": {
+        "numerator": 29.0,
+        "denominator": 2,
+        "value": 14.5,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      }
+    }
+  },
+  "dispatch_overhead": {
+    "sessions": 1,
+    "rows": [
+      {
+        "id": "session_2939c3e6d1b7042207fea642",
+        "agent": "codex",
+        "tokens": {
+          "new_input": 10,
+          "cache_write": null,
+          "cache_read": 0,
+          "output": 0,
+          "reasoning_output": null,
+          "total": 10
+        },
+        "tokens_complete": true,
+        "observed_total": 10
+      }
+    ],
+    "observed_total": 10
+  },
+  "excluded_worker_spend": {
+    "observed_total": 0
+  },
+  "coverage": {
+    "adapters": {
+      "claude-code": {
+        "files_scanned": 0,
+        "lines_read": 0,
+        "broken_lines": 0,
+        "duplicate_events": 0,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 0
+      },
+      "codex": {
+        "files_scanned": 7,
+        "lines_read": 35,
+        "broken_lines": 0,
+        "duplicate_events": 0,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 7
+      }
+    },
+    "commands": {
+      "matched": 3,
+      "unknown_execution_cwd": 0,
+      "unknown_execution_start": 0,
+      "unknown_exit_code": 0
+    },
+    "start_scope_counts": {
+      "repository_root": 6
+    },
+    "excluded_scope": {}
+  },
+  "limitations": [
+    "agent_triggered_machine_check",
+    "no_human_acceptance_or_revert_window",
+    "shell_edits_invisible",
+    "worker_costs_exclude_dispatch_overhead",
+    "last_observed_time_is_not_acceptance",
+    "deleted_logs_undetectable"
+  ]
+}

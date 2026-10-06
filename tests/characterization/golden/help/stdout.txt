@@ -1,0 +1,13 @@
+usage: sumbi [-h] [--version] {install,collect,deliver,compare} ...
+
+positional arguments:
+  {install,collect,deliver,compare}
+    install             Inventory and seed repository practices offline
+    collect             Measure local session logs without transcripts
+    deliver             Join a dispatch ledger with recorded or live GitHub
+                        outcomes
+    compare             Propose a verdict for one pre-registered intervention
+
+options:
+  -h, --help            show this help message and exit
+  --version             show program's version number and exit

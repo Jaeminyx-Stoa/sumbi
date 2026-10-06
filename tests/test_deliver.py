@@ -7,7 +7,7 @@ import io
 import json
 import os
 from pathlib import Path
-import tempfile
+from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -98,7 +98,7 @@ def write_fixture(root):
 
 class DeliverTests(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
+        temporary = IsolatedTemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.ledger, self.outcome_dir, self.home = write_fixture(self.root)

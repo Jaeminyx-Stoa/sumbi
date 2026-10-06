@@ -1,0 +1,13 @@
+name: Synthetic checks
+on: [pull_request]
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo SYNTHETIC_PRIVATE_STEP
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo SYNTHETIC_PRIVATE_LINT

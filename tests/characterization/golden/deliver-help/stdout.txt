@@ -1,0 +1,37 @@
+usage: sumbi deliver [-h] --since SINCE --until UNTIL [--home HOME]
+                     [--agents AGENTS] [--project PROJECT]
+                     [--match-origin MATCH_ORIGIN] [--match-path MATCH_PATH]
+                     [--idle-minutes IDLE_MINUTES] [--json OUT]
+                     [--salt-file SALT_FILE]
+                     [--outcome-source {github,local-verify}]
+                     [--ledger LEDGER] [--outcomes github|DIR]
+                     [--repository REPOSITORY] [--verify VERIFY]
+                     [--scan-until SCAN_UNTIL]
+                     [--active-minutes ACTIVE_MINUTES] [--cache DIR]
+                     [--record DIR] [--follow-up-days FOLLOW_UP_DAYS]
+
+options:
+  -h, --help            show this help message and exit
+  --since SINCE
+  --until UNTIL
+  --home HOME
+  --agents AGENTS
+  --project PROJECT
+  --match-origin MATCH_ORIGIN
+  --match-path MATCH_PATH
+  --idle-minutes IDLE_MINUTES
+  --json OUT
+  --salt-file SALT_FILE
+                        Local pseudonym key file (overrides SUMBI_SALT)
+  --outcome-source {github,local-verify}
+  --ledger LEDGER
+  --outcomes github|DIR
+  --repository REPOSITORY
+                        Repository scope for local verification units
+  --verify VERIFY       Repository-relative executed verification script
+  --scan-until SCAN_UNTIL
+                        Lifetime observation end for local verification
+  --active-minutes ACTIVE_MINUTES
+  --cache DIR           Private GitHub response cache outside repositories
+  --record DIR          Record filtered GitHub responses for offline replay
+  --follow-up-days FOLLOW_UP_DAYS

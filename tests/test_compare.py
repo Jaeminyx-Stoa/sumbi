@@ -6,7 +6,7 @@ import io
 import json
 from pathlib import Path
 import shutil
-import tempfile
+from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -118,7 +118,7 @@ class DecisionOrderTests(unittest.TestCase):
 
 class CompareRoundTests(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
+        temporary = IsolatedTemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name) / "round"
         shutil.copytree(FIXTURE, self.root)

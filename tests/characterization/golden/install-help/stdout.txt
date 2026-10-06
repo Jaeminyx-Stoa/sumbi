@@ -1,0 +1,23 @@
+usage: sumbi install [-h] [--root ROOT]
+                     [--dry-run | --apply | --revert BACKUP_ID]
+                     [--select SELECT] [--budget BUDGET] [--exclude GLOB]
+                     [--json PATH] [--home HOME] [--salt-file SALT_FILE]
+
+options:
+  -h, --help            show this help message and exit
+  --root ROOT           Repository to inspect (default: current directory).
+  --dry-run             Print additive unified diffs (the default).
+  --apply               Apply additions with backups and an intervention
+                        ledger.
+  --revert BACKUP_ID    Restore unchanged applied files from an install
+                        backup.
+  --select SELECT       Comma-separated catalog IDs; apply only matching gap
+                        candidates.
+  --budget BUDGET       Instruction token budget (default: 2000).
+  --exclude GLOB        Exclude repository-relative paths and descendants;
+                        repeatable.
+  --json PATH           Create a JSON plan at a repository-relative path;
+                        never overwrite.
+  --home HOME           Local agent-log home for start placement and baseline.
+  --salt-file SALT_FILE
+                        Local pseudonym key file (overrides SUMBI_SALT).

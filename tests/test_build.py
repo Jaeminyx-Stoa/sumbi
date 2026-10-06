@@ -11,7 +11,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tarfile
-import tempfile
+from support import IsolatedTemporaryDirectory
 import tomllib
 import unittest
 from unittest.mock import patch
@@ -22,7 +22,7 @@ import sumbi_build
 
 class BuildTests(unittest.TestCase):
     def test_wheel_metadata_entry_point_and_file_integrity(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with IsolatedTemporaryDirectory() as directory:
             name = sumbi_build.build_wheel(directory)
             with zipfile.ZipFile(Path(directory) / name) as archive:
                 metadata = archive.read(sumbi_build.INFO + "/METADATA").decode()
@@ -53,7 +53,7 @@ class BuildTests(unittest.TestCase):
                         self.assertEqual(int(size), len(data))
 
     def test_sdist_can_rebuild_wheel_without_external_backend(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with IsolatedTemporaryDirectory() as directory:
             root = Path(directory)
             name = sumbi_build.build_sdist(root)
             with tarfile.open(root / name) as archive:
@@ -109,7 +109,7 @@ class BuildTests(unittest.TestCase):
                     sumbi_build.metadata()
 
     def test_distribution_sources_do_not_follow_links(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with IsolatedTemporaryDirectory() as directory:
             root = Path(directory)
             (root / "sumbi").mkdir()
             outside = root / "synthetic-private.json"

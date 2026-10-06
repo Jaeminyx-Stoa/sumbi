@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
-import tempfile
+from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -18,7 +18,7 @@ INSTRUCTION_KEYS = ("agents", "claude", "claude_rules", "gemini", "copilot", "cu
 
 class OfflineTest(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
+        temporary = IsolatedTemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         home = Path(temporary.name)
         guard = patch.object(Path, "home", return_value=home)
@@ -34,7 +34,7 @@ class OfflineTest(unittest.TestCase):
             self.addCleanup(guard.stop)
 
     def copy_fixture(self, name):
-        temporary = tempfile.TemporaryDirectory()
+        temporary = IsolatedTemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         root = Path(temporary.name) / "repository"
         shutil.copytree(FIXTURES / name, root)
@@ -54,7 +54,7 @@ class InventoryTests(OfflineTest):
             self.assertTrue(gap["candidates"])
 
     def test_empty_truth(self):
-        report = inventory(FIXTURES / "empty")
+        report = inventory(self.copy_fixture("empty"))
         self.assert_instructions(report)
         self.assertEqual(report["claude_imports"], [])
         self.assertEqual(report["configurations"], [])
@@ -75,21 +75,21 @@ class InventoryTests(OfflineTest):
         self.assert_gaps(report, BASE_GAPS | {"missing-agents"})
 
     def test_claude_only_truth(self):
-        report = inventory(FIXTURES / "claude-only")
+        report = inventory(self.copy_fixture("claude-only"))
         self.assert_instructions(report, claude=["CLAUDE.md"])
         self.assertEqual(report["cost"]["instructions"]["claude"], {
             "paths": ["CLAUDE.md"], "characters": 8726, "estimated_tokens": 2182, "root_estimated_tokens": 2182})
         self.assert_gaps(report, BASE_GAPS | {"missing-agents", "instruction-budget"})
 
     def test_codex_only_truth(self):
-        report = inventory(FIXTURES / "codex-only")
+        report = inventory(self.copy_fixture("codex-only"))
         self.assert_instructions(report, agents=["AGENTS.md"])
         self.assertEqual(report["enforcement"]["test_sources"], [{"path": "AGENTS.md", "kind": "documented-command"}])
         self.assertEqual(report["cost"]["instructions"]["codex"]["estimated_tokens"], 23)
         self.assert_gaps(report, BASE_GAPS - {"missing-test-command"})
 
     def test_both_truth(self):
-        report = inventory(FIXTURES / "both")
+        report = inventory(self.copy_fixture("both"))
         self.assert_instructions(report, agents=["AGENTS.md"], claude=["CLAUDE.md"])
         self.assertEqual(report["claude_imports"], [{"source": "CLAUDE.md", "path": "AGENTS.md", "status": "resolved"}])
         self.assertEqual(report["cost"]["instructions"]["claude"], {
@@ -97,7 +97,7 @@ class InventoryTests(OfflineTest):
         self.assert_gaps(report, BASE_GAPS - {"missing-test-command"})
 
     def test_configured_truth(self):
-        report = inventory(FIXTURES / "configured")
+        report = inventory(self.copy_fixture("configured"))
         self.assert_instructions(report, agents=["AGENTS.md", "src/AGENTS.md"], claude=["CLAUDE.md"],
                                  claude_rules=[".claude/rules/checks.md"], gemini=["GEMINI.md"],
                                  copilot=[".github/copilot-instructions.md"], cursor_rules=[".cursor/rules/checks.mdc"])
@@ -141,7 +141,7 @@ class InventoryTests(OfflineTest):
         self.assert_gaps(report, set())
 
     def test_export_has_no_source_contents(self):
-        report = inventory(FIXTURES / "configured")
+        report = inventory(self.copy_fixture("configured"))
         encoded = json.dumps(report)
         self.assertNotIn("SYNTHETIC_PRIVATE", encoded)
         self.assertNotIn("@example-reviewer", encoded)

@@ -1,0 +1,1 @@
+sumbi install: Expected a repository directory and a positive token budget.

@@ -1,0 +1,28 @@
+sumbi collect
+Window: 2030-01-01T00:00:00Z to 2030-01-03T00:00:00Z [since,until)
+Sessions in window: 4
+Reported tokens (observed): 340
+Pseudonym keys: salted (HMAC-SHA256)
+sumbi-events:agent_9e260e54ae0e8fd149c80532: sessions 2; tokens 260 (observed)
+  new_input 200; cache_write 0; cache_read 40; output 20; reasoning_output 4
+  Counts (observed): compactions 0; tool_calls 2; tool_results 2; tool_errors 0; api_errors 0; user_input_requests 0; counter_resets 0
+sumbi-events:agent_dafcddd422574acb5f48fb2b: sessions 2; tokens 80 (observed)
+  new_input 60; cache_write 0; cache_read 0; output 20; reasoning_output not reported
+  Counts (observed): compactions 0; tool_calls 0; tool_results 0; tool_errors 0; api_errors 0; user_input_requests 0; counter_resets 0
+Summed wall span (observed): 16 seconds
+Summed active time (estimated, idle 5 minutes): 16 seconds
+Active sensitivity (estimated seconds): 2 minutes 16; 5 minutes 16; 10 minutes 16
+Paired tool durations (observed): 2 seconds; pairs 2; unpaired starts 0; unpaired ends 0
+Paired request durations (observed): 0 seconds; pairs 0; unpaired starts 0; unpaired ends 0
+Parallel session times are summed; they are not human waiting time.
+Coverage sumbi-events: files_scanned 3; lines_read 22; broken_lines 0; duplicate_events 2; unreadable_files 0; invalid_timestamps 0; invalid_token_records 0; inherited_session_meta 0; sessions_read 4; sessions_in_window 4
+  Unknown record types: none
+Spend other: 0 tokens (observed); share 0.000000
+  Evidence events: cwd 0; tool_path 0; previous_event 0; unassigned 0; fallback token share 0.000000
+Spend project project_e3db46d1b932ef2c778ba7cc: 340 tokens (observed); share 1.000000
+  Evidence events: cwd 4; tool_path 0; previous_event 0; unassigned 0; fallback token share 0.000000
+Spend unassigned: 0 tokens (observed); share 0.000000
+  Evidence events: cwd 0; tool_path 0; previous_event 0; unassigned 0; fallback token share 0.000000
+Unassigned token share: 0.000000
+Evidence token shares: cwd 1.000000; tool_path 0.000000; previous_event 0.000000; unassigned 0.000000
+Unattributed token share: 0.000000

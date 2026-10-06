@@ -1,0 +1,23 @@
+sumbi compare local verification
+Outcome source: local-verify
+Verdict proposal: withhold
+Reasons: inconclusive_success
+Cost proposal scope: retained worker sessions only
+Excluded dispatch overhead: 2 sessions; observed tokens 80
+Sample per arm: registered 1; needed 0; actual {'before': 1, 'after': 1}
+before success: 1/1; Wilson 95% [0.20654931437723745, 1.0]
+before candidate states: success 1; failed 0; unverified 0; in_progress 0; no_change 0
+before worker total per success: 130/1 = 130.0; bootstrap 95% [130.0, 130.0]
+before worker time per success: 6.0/1 = 6.0; bootstrap 95% [6.0, 6.0]
+after success: 1/1; Wilson 95% [0.20654931437723745, 1.0]
+after candidate states: success 1; failed 0; unverified 0; in_progress 0; no_change 0
+after worker total per success: 130/1 = 130.0; bootstrap 95% [130.0, 130.0]
+after worker time per success: 6.0/1 = 6.0; bootstrap 95% [6.0, 6.0]
+After - before success: 0.0; Newcombe 95% [-0.7934506856227626, 0.7934506856227626]; inconclusive; margin 50 percentage points
+Worker total after/before: 130.0/130.0 = 1.0; bootstrap 95% [1.0, 1.0]; uncertain
+Worker time after/before: 6.0/6.0 = 1.0; bootstrap 95% [1.0, 1.0]; uncertain
+Bootstrap: seed 1729; resamples 5000
+before excluded: 0/1; counts {}
+after excluded: 0/1; counts {}
+Flag dispatch_overhead_excluded: informational
+Command coverage: matched 2; unknown_execution_cwd 0; unknown_execution_start 0; unknown_exit_code 0

@@ -1,1 +1,3 @@
 tests/install/fixtures/** text eol=lf
+# Golden text includes intentional trailing whitespace from the real CLI.
+tests/characterization/golden/** text eol=lf whitespace=-blank-at-eol

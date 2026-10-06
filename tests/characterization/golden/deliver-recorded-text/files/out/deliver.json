@@ -1,0 +1,710 @@
+{
+  "schema_version": "deliver-1.0",
+  "pseudonyms": {
+    "salted": true,
+    "algorithm": "hmac-sha256"
+  },
+  "window": {
+    "since": "2030-01-01T00:00:00+00:00",
+    "until": "2030-01-10T00:00:00+00:00",
+    "bounds": "[since,until)"
+  },
+  "follow_up_days": 7.0,
+  "states": {
+    "success": 3,
+    "failed": 2,
+    "in_progress": 0,
+    "immature": 1
+  },
+  "checks_basis_counts": {
+    "historical": 5,
+    "current_policy": 0,
+    "all_visible": 0,
+    "unknown": 1
+  },
+  "success_rate": {
+    "numerator": 3,
+    "denominator": 6,
+    "rate": 0.5,
+    "wilson_95": [
+      0.1876163064826506,
+      0.8123836935173494
+    ]
+  },
+  "first_pass_success_rate": {
+    "numerator": 2,
+    "denominator": 6,
+    "rate": 0.3333333333333333,
+    "wilson_95": [
+      0.09677141110578041,
+      0.700006684861608
+    ]
+  },
+  "cost": {
+    "operational": {
+      "spend": {
+        "new_input": 90,
+        "cache_write": 18,
+        "cache_read": 27,
+        "output": 45,
+        "reasoning_output": null,
+        "total": 180
+      },
+      "successes": 3,
+      "tokens_per_success": {
+        "new_input": 30.0,
+        "cache_write": 6.0,
+        "cache_read": 9.0,
+        "output": 15.0,
+        "reasoning_output": null,
+        "total": 60.0
+      },
+      "basis": "reported_tokens_excluding_reasoning_subset",
+      "monetary_cost": "not_evaluated"
+    },
+    "operational_linked": {
+      "spend": {
+        "new_input": 80,
+        "cache_write": 16,
+        "cache_read": 24,
+        "output": 40,
+        "reasoning_output": null,
+        "total": 160
+      },
+      "successes": 3,
+      "tokens_per_success": {
+        "new_input": 26.666666666666668,
+        "cache_write": 5.333333333333333,
+        "cache_read": 8.0,
+        "output": 13.333333333333334,
+        "reasoning_output": null,
+        "total": 53.333333333333336
+      },
+      "basis": "reported_tokens_excluding_reasoning_subset",
+      "monetary_cost": "not_evaluated"
+    },
+    "cohort": {
+      "spend": {
+        "new_input": 90,
+        "cache_write": 18,
+        "cache_read": 27,
+        "output": 45,
+        "reasoning_output": null,
+        "total": 180
+      },
+      "successes": 3,
+      "tokens_per_success": {
+        "new_input": 30.0,
+        "cache_write": 6.0,
+        "cache_read": 9.0,
+        "output": 15.0,
+        "reasoning_output": null,
+        "total": 60.0
+      },
+      "basis": "reported_tokens_excluding_reasoning_subset",
+      "monetary_cost": "not_evaluated"
+    },
+    "cohort_success_rate": {
+      "numerator": 3,
+      "denominator": 6,
+      "rate": 0.5,
+      "wilson_95": [
+        0.1876163064826506,
+        0.8123836935173494
+      ]
+    },
+    "period_spend": {
+      "linked": {
+        "new_input": 80,
+        "cache_write": 16,
+        "cache_read": 24,
+        "output": 40,
+        "reasoning_output": null,
+        "total": 160
+      },
+      "unallocated": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      },
+      "unassigned": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      },
+      "other": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    "lifetime_scan_spend": {
+      "linked": {
+        "new_input": 90,
+        "cache_write": 18,
+        "cache_read": 27,
+        "output": 45,
+        "reasoning_output": null,
+        "total": 180
+      },
+      "unallocated": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      },
+      "unassigned": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      },
+      "other": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    "projects": [
+      {
+        "id": "repository_43523e188c49217989df5a27",
+        "spend": {
+          "new_input": 90,
+          "cache_write": 18,
+          "cache_read": 27,
+          "output": 45,
+          "reasoning_output": null,
+          "total": 180
+        },
+        "successes": 3,
+        "tokens_per_success": {
+          "new_input": 30.0,
+          "cache_write": 6.0,
+          "cache_read": 9.0,
+          "output": 15.0,
+          "reasoning_output": null,
+          "total": 60.0
+        },
+        "basis": "reported_tokens_excluding_reasoning_subset",
+        "monetary_cost": "not_evaluated"
+      }
+    ]
+  },
+  "coverage": {
+    "adapters": {
+      "claude-code": {
+        "files_scanned": 11,
+        "lines_read": 12,
+        "broken_lines": 0,
+        "duplicate_events": 0,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 11,
+        "sessions_in_period": 10,
+        "sessions_in_lifetime_scan": 11
+      },
+      "codex": {
+        "files_scanned": 0,
+        "lines_read": 0,
+        "broken_lines": 0,
+        "duplicate_events": 0,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 0,
+        "sessions_in_period": 0,
+        "sessions_in_lifetime_scan": 0
+      }
+    },
+    "outcome_files_read": 1,
+    "ledger_rows_read": 6,
+    "observations": [
+      {
+        "repository_id": "repository_43523e188c49217989df5a27",
+        "coverage_start": "2030-01-01T00:00:00+00:00",
+        "observed_at": "2030-02-01T00:00:00+00:00",
+        "pulls_complete": true,
+        "commits_complete": true
+      }
+    ],
+    "missing_prs": 0,
+    "missing_repository_observations": 0,
+    "evidence_counts": {
+      "deliverable_id": 9,
+      "tool_reference": 0,
+      "project_time_weak": 0,
+      "ambiguous": 1,
+      "unallocated": 0,
+      "unassigned": 1,
+      "other": 1
+    },
+    "evidence_tokens": {
+      "deliverable_id": 180,
+      "tool_reference": 0,
+      "project_time_weak": 0,
+      "ambiguous": 20,
+      "unallocated": 0,
+      "unassigned": 20,
+      "other": 20
+    },
+    "not_reported_token_events": {
+      "period": {
+        "new_input": 0,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 0,
+        "reasoning_output": 11
+      },
+      "lifetime_scan": {
+        "new_input": 0,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 0,
+        "reasoning_output": 12
+      }
+    },
+    "unattributed_period_share": 0.2727272727272727,
+    "savings_verdict": "not_evaluated",
+    "lifetime_scan_seconds": 2678400.0,
+    "lifetime_scan_end": "2030-02-01T00:00:00+00:00"
+  },
+  "deliverables": [
+    {
+      "id": "D1",
+      "task_type": null,
+      "state": "success",
+      "reason": "accepted",
+      "checks_basis": "historical",
+      "first_pass_success": true,
+      "eventual_success": true,
+      "prs": [
+        "pr_72e8db35ee757c7268853645"
+      ],
+      "pr_outcomes": [
+        {
+          "id": "pr_72e8db35ee757c7268853645",
+          "merged": true,
+          "role": "constituent",
+          "head_sha": "0000000000000000000000000000000000000001",
+          "checks_at_merge": "green",
+          "checks_basis": "historical",
+          "checks_reason": "",
+          "observed_checks_at_merge": "unknown",
+          "follow_up_commit_count": 0,
+          "merged_at": "2030-01-02T00:00:00+00:00",
+          "dispatch_to_merge_seconds": 86400.0
+        }
+      ],
+      "elapsed_seconds": 86400.0,
+      "elapsed_measurement": "observed",
+      "tokens": {
+        "new_input": 20,
+        "cache_write": 4,
+        "cache_read": 6,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 40
+      }
+    },
+    {
+      "id": "Dfail",
+      "task_type": null,
+      "state": "failed",
+      "reason": "abandoned",
+      "checks_basis": "unknown",
+      "first_pass_success": false,
+      "eventual_success": false,
+      "prs": [],
+      "pr_outcomes": [],
+      "elapsed_seconds": 86400.0,
+      "elapsed_measurement": "observed",
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "id": "Drev",
+      "task_type": null,
+      "state": "failed",
+      "reason": "reverted",
+      "checks_basis": "historical",
+      "first_pass_success": false,
+      "eventual_success": false,
+      "prs": [
+        "pr_33f6ceeda7b80669d0df9f50"
+      ],
+      "pr_outcomes": [
+        {
+          "id": "pr_33f6ceeda7b80669d0df9f50",
+          "merged": true,
+          "role": "constituent",
+          "head_sha": "0000000000000000000000000000000000000002",
+          "checks_at_merge": "green",
+          "checks_basis": "historical",
+          "checks_reason": "",
+          "observed_checks_at_merge": "unknown",
+          "follow_up_commit_count": 0,
+          "merged_at": "2030-01-02T00:00:00+00:00",
+          "dispatch_to_merge_seconds": 86400.0
+        }
+      ],
+      "elapsed_seconds": 86400.0,
+      "elapsed_measurement": "observed",
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "id": "Dimm",
+      "task_type": null,
+      "state": "immature",
+      "reason": "window_open",
+      "checks_basis": "historical",
+      "first_pass_success": false,
+      "eventual_success": false,
+      "prs": [
+        "pr_a71440b17e1058a09996a943"
+      ],
+      "pr_outcomes": [
+        {
+          "id": "pr_a71440b17e1058a09996a943",
+          "merged": true,
+          "role": "constituent",
+          "head_sha": "0000000000000000000000000000000000000003",
+          "checks_at_merge": "green",
+          "checks_basis": "historical",
+          "checks_reason": "",
+          "observed_checks_at_merge": "unknown",
+          "follow_up_commit_count": 0,
+          "merged_at": "2030-01-28T00:00:00+00:00",
+          "dispatch_to_merge_seconds": 2332800.0
+        }
+      ],
+      "elapsed_seconds": 2332800.0,
+      "elapsed_measurement": "observed",
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "id": "Dsplit",
+      "task_type": null,
+      "state": "success",
+      "reason": "accepted",
+      "checks_basis": "historical",
+      "first_pass_success": true,
+      "eventual_success": true,
+      "prs": [
+        "pr_943aae3ffa4fea3293bf790f",
+        "pr_41ffae962e0b0e50cd65c89f"
+      ],
+      "pr_outcomes": [
+        {
+          "id": "pr_943aae3ffa4fea3293bf790f",
+          "merged": true,
+          "role": "constituent",
+          "head_sha": "0000000000000000000000000000000000000004",
+          "checks_at_merge": "green",
+          "checks_basis": "historical",
+          "checks_reason": "",
+          "observed_checks_at_merge": "unknown",
+          "follow_up_commit_count": 0,
+          "merged_at": "2030-01-02T00:00:00+00:00",
+          "dispatch_to_merge_seconds": 86400.0
+        },
+        {
+          "id": "pr_41ffae962e0b0e50cd65c89f",
+          "merged": true,
+          "role": "constituent",
+          "head_sha": "0000000000000000000000000000000000000005",
+          "checks_at_merge": "green",
+          "checks_basis": "historical",
+          "checks_reason": "",
+          "observed_checks_at_merge": "unknown",
+          "follow_up_commit_count": 0,
+          "merged_at": "2030-01-02T00:00:00+00:00",
+          "dispatch_to_merge_seconds": 86400.0
+        }
+      ],
+      "elapsed_seconds": 86400.0,
+      "elapsed_measurement": "observed",
+      "tokens": {
+        "new_input": 20,
+        "cache_write": 4,
+        "cache_read": 6,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 40
+      }
+    },
+    {
+      "id": "Dfollow",
+      "task_type": null,
+      "state": "success",
+      "reason": "accepted",
+      "checks_basis": "historical",
+      "first_pass_success": false,
+      "eventual_success": true,
+      "prs": [
+        "pr_821bb524102856b6295d6299",
+        "pr_518aa7b1ef445e3950797848"
+      ],
+      "pr_outcomes": [
+        {
+          "id": "pr_821bb524102856b6295d6299",
+          "merged": true,
+          "role": "constituent",
+          "head_sha": "0000000000000000000000000000000000000006",
+          "checks_at_merge": "green",
+          "checks_basis": "historical",
+          "checks_reason": "",
+          "observed_checks_at_merge": "unknown",
+          "follow_up_commit_count": 0,
+          "merged_at": "2030-01-02T00:00:00+00:00",
+          "dispatch_to_merge_seconds": 86400.0
+        },
+        {
+          "id": "pr_518aa7b1ef445e3950797848",
+          "merged": true,
+          "role": "followup",
+          "head_sha": "0000000000000000000000000000000000000007",
+          "checks_at_merge": "green",
+          "checks_basis": "historical",
+          "checks_reason": "",
+          "observed_checks_at_merge": "unknown",
+          "follow_up_commit_count": 0,
+          "merged_at": "2030-01-05T00:00:00+00:00",
+          "dispatch_to_merge_seconds": 345600.0
+        }
+      ],
+      "elapsed_seconds": 345600.0,
+      "elapsed_measurement": "observed",
+      "tokens": {
+        "new_input": 20,
+        "cache_write": 4,
+        "cache_read": 6,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 40
+      }
+    }
+  ],
+  "links": [
+    {
+      "session_id": "session_38822a4fa778b649ceb76974",
+      "deliverable_id": "Dimm",
+      "bucket": "linked",
+      "evidence": "deliverable_id",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_4c90ced3064a9222ddb8cd27",
+      "deliverable_id": "Drev",
+      "bucket": "linked",
+      "evidence": "deliverable_id",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_55615779fe21fa61efc087f8",
+      "deliverable_id": null,
+      "bucket": "other",
+      "evidence": "other",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_67b816123fbb2f1b35601039",
+      "deliverable_id": null,
+      "bucket": "unassigned",
+      "evidence": "unassigned",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_76ea529b26935725d2e25103",
+      "deliverable_id": "Dfollow",
+      "bucket": "linked",
+      "evidence": "deliverable_id",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_88d7b732f722d36170a843b8",
+      "deliverable_id": "D1",
+      "bucket": "linked",
+      "evidence": "deliverable_id",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_88d7b732f722d36170a843b8",
+      "deliverable_id": "Dsplit",
+      "bucket": "linked",
+      "evidence": "deliverable_id",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_b4a75dd7cbe0a40b646bd638",
+      "deliverable_id": "Dfail",
+      "bucket": "linked",
+      "evidence": "deliverable_id",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_ced88f1bf15e68de0317d2d2",
+      "deliverable_id": "Dfollow",
+      "bucket": "linked",
+      "evidence": "deliverable_id",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_d1564b264addd1781a8d59c6",
+      "deliverable_id": null,
+      "bucket": "unallocated",
+      "evidence": "ambiguous",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_d7d88bfe2f6c452243ac22ed",
+      "deliverable_id": "Dsplit",
+      "bucket": "linked",
+      "evidence": "deliverable_id",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    },
+    {
+      "session_id": "session_ef417587822b7c693a2f7b3b",
+      "deliverable_id": "D1",
+      "bucket": "linked",
+      "evidence": "deliverable_id",
+      "events": 1,
+      "tokens": {
+        "new_input": 10,
+        "cache_write": 2,
+        "cache_read": 3,
+        "output": 5,
+        "reasoning_output": null,
+        "total": 20
+      }
+    }
+  ]
+}

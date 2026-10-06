@@ -12,3 +12,5 @@ build/
 /local/
 *.jsonl
 !tests/fixtures/**/*.jsonl
+!tests/characterization/fixtures/**/*.jsonl
+!tests/characterization/golden/**/*.jsonl

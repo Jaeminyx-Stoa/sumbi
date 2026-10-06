@@ -7,7 +7,7 @@ from datetime import timedelta
 import io
 import json
 from pathlib import Path
-import tempfile
+from support import IsolatedTemporaryDirectory
 import unittest
 
 from sumbi.cli import main
@@ -26,7 +26,7 @@ SALT = b"synthetic-flow-key"
 
 class OpenEventsFlows(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
+        self.temporary = IsolatedTemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.home = self.root / "home"

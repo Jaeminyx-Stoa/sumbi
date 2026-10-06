@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-import tempfile
+from support import IsolatedTemporaryDirectory
 from unittest.mock import patch
 import unittest
 
@@ -16,7 +16,7 @@ from .test_inventory import OfflineTest
 class InventoryBoundaryTests(OfflineTest):
     def setUp(self):
         super().setUp()
-        temporary = tempfile.TemporaryDirectory()
+        temporary = IsolatedTemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name) / "workspace"
         self.root.mkdir()

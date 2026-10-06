@@ -1,0 +1,49 @@
+sumbi compare
+Verdict proposal: adopt
+Reasons: non_inferior_with_cost_improvement
+Sample per arm: registered 20; needed 11; actual before 20, after 20
+before success: 16/20; Wilson 95% [0.583983, 0.919342]
+before merged-attempt checks bases: historical 16
+before new_input per success: 1200/16 = 75; bootstrap 95% [63.1579, 100]
+before cache_write per success: not reported/16 = not reported; bootstrap 95% not reported
+before cache_read per success: 400/16 = 25; bootstrap 95% [21.0526, 33.3333]
+before output per success: 400/16 = 25; bootstrap 95% [21.0526, 33.3333]
+before reasoning_output per success: 100/16 = 6.25; bootstrap 95% [5.26316, 8.33333]
+before total per success: 2000/16 = 125; bootstrap 95% [105.263, 166.667]
+before time per success: 2000/16 = 125; bootstrap 95% [105.263, 166.667]
+after success: 16/20; Wilson 95% [0.583983, 0.919342]
+after merged-attempt checks bases: historical 16
+after new_input per success: 480/16 = 30; bootstrap 95% [25.2632, 40]
+after cache_write per success: not reported/16 = not reported; bootstrap 95% not reported
+after cache_read per success: 160/16 = 10; bootstrap 95% [8.42105, 13.3333]
+after output per success: 160/16 = 10; bootstrap 95% [8.42105, 13.3333]
+after reasoning_output per success: 40/16 = 2.5; bootstrap 95% [2.10526, 3.33333]
+after total per success: 800/16 = 50; bootstrap 95% [42.1053, 66.6667]
+after time per success: 800/16 = 50; bootstrap 95% [42.1053, 66.6667]
+After - before success: 0; Newcombe 95% [-0.246792, 0.246792]; non_inferior; margin 50 percentage points
+new_input after/before: 30/75 = 0.4; bootstrap 95% [0.288889, 0.545664]; improved
+cache_write after/before: not reported/not reported = not reported; bootstrap 95% not reported; uncertain
+cache_read after/before: 10/25 = 0.4; bootstrap 95% [0.288889, 0.545664]; improved
+output after/before: 10/25 = 0.4; bootstrap 95% [0.288889, 0.545664]; improved
+reasoning_output after/before: 2.5/6.25 = 0.4; bootstrap 95% [0.288889, 0.545664]; improved
+total after/before: 50/125 = 0.4; bootstrap 95% [0.288889, 0.545664]; improved
+time after/before: 50/125 = 0.4; bootstrap 95% [0.288889, 0.545664]; improved
+Bootstrap: seed 1729; resamples 5000
+before excluded or unlinked: 0/20; 
+after excluded or unlinked: 0/20; 
+model mix total variation: 0
+  before: synthetic-model 20/20 = 1
+  after: synthetic-model 20/20 = 1
+effort mix total variation: 0
+  before: high 20/20 = 1
+  after: high 20/20 = 1
+cli_version mix total variation: 0
+  before: 1.0 20/20 = 1
+  after: 1.0 20/20 = 1
+task_type mix total variation: 0
+  before: feature 20/20 = 1
+  after: feature 20/20 = 1
+Task type feature (descriptive only): before 16/20; Wilson 95% [0.583983, 0.919342]; after 16/20; Wilson 95% [0.583983, 0.919342]
+Unattributed lifetime tokens: 0/2800; share 0
+Other-project lifetime tokens (context): 0
+Coverage codex: sessions 40; files 40; broken lines 0; unreadable files 0

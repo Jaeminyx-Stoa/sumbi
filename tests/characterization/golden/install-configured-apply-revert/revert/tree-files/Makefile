@@ -1,0 +1,2 @@
+test:
+	@echo SYNTHETIC_PRIVATE_MAKE
