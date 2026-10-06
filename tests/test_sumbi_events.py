@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-import tempfile
+from support import IsolatedTemporaryDirectory
 from types import SimpleNamespace
 import unittest
 
@@ -15,7 +15,7 @@ from sumbi.privacy import pseudonym, pseudonym_key
 
 class OpenEventAdapterTests(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
+        temporary = IsolatedTemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.home = Path(temporary.name)
         self.root = self.home / ".sumbi/events"

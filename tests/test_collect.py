@@ -6,7 +6,7 @@ import io
 import json
 from pathlib import Path
 import subprocess
-import tempfile
+from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -22,7 +22,7 @@ WINDOW = Window(timestamp("2030-01-01T00:00:00Z"), timestamp("2030-01-01T00:10:0
 
 class SyntheticHome(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
+        self.temporary = IsolatedTemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.home = Path(self.temporary.name)
         self.one = self.home / "one"

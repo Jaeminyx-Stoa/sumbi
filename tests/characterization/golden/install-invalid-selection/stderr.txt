@@ -1,0 +1,1 @@
+sumbi install: Selection must contain known catalog IDs.

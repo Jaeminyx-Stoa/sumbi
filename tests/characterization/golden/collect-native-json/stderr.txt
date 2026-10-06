@@ -1,0 +1,30 @@
+sumbi collect
+Window: 2030-01-01T00:00:00Z to 2030-01-01T00:10:00Z [since,until)
+Sessions in window: 3
+Reported tokens (observed): 263
+Pseudonym keys: salted (HMAC-SHA256)
+claude-code: sessions 2; tokens 95 (observed)
+  new_input 14; cache_write 25; cache_read 39; output 17; reasoning_output not reported
+  Counts (observed): compactions 1; tool_calls 3; tool_results 3; tool_errors 2; api_errors 1; user_input_requests 1; counter_resets 0
+codex: sessions 1; tokens 168 (observed)
+  new_input 65; cache_write not reported; cache_read 65; output 38; reasoning_output 12
+  Counts (observed): compactions 1; tool_calls 3; tool_results 3; tool_errors 1; api_errors 0; user_input_requests 1; counter_resets 1
+Summed wall span (observed): 1200 seconds
+Summed active time (estimated, idle 5 minutes): 1200 seconds
+Active sensitivity (estimated seconds): 2 minutes 1200; 5 minutes 1200; 10 minutes 1200
+Paired tool durations (observed): 480 seconds; pairs 6; unpaired starts 0; unpaired ends 0
+Paired request durations (observed): 120 seconds; pairs 1; unpaired starts 0; unpaired ends 0
+Parallel session times are summed; they are not human waiting time.
+Coverage claude-code: files_scanned 2; lines_read 18; broken_lines 1; duplicate_events 1; unreadable_files 0; invalid_timestamps 0; invalid_token_records 0; inherited_session_meta 0; sessions_read 2; sessions_in_window 2
+  Unknown record types: fixture_record 1
+Coverage codex: files_scanned 2; lines_read 25; broken_lines 0; duplicate_events 3; unreadable_files 0; invalid_timestamps 0; invalid_token_records 0; inherited_session_meta 0; sessions_read 1; sessions_in_window 1
+  Unknown record types: fixture_record 1
+Spend other: 0 tokens (observed); share 0.000000
+  Evidence events: cwd 0; tool_path 0; previous_event 0; unassigned 0; fallback token share 0.000000
+Spend project sample project_e3db46d1b932ef2c778ba7cc: 263 tokens (observed); share 1.000000
+  Evidence events: cwd 8; tool_path 0; previous_event 0; unassigned 0; fallback token share 0.000000
+Spend unassigned: 0 tokens (observed); share 0.000000
+  Evidence events: cwd 0; tool_path 0; previous_event 0; unassigned 0; fallback token share 0.000000
+Unassigned token share: 0.000000
+Evidence token shares: cwd 1.000000; tool_path 0.000000; previous_event 0.000000; unassigned 0.000000
+Unattributed token share: 0.000000

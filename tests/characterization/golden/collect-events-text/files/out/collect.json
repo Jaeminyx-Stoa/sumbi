@@ -1,0 +1,870 @@
+{
+  "schema_version": "1.1",
+  "pseudonyms": {
+    "salted": true,
+    "algorithm": "hmac-sha256"
+  },
+  "window": {
+    "since": "2030-01-01T00:00:00Z",
+    "until": "2030-01-03T00:00:00Z",
+    "bounds": "[since,until)"
+  },
+  "summary": {
+    "sessions": 4,
+    "tokens": {
+      "new_input": 260,
+      "cache_write": 0,
+      "cache_read": 40,
+      "output": 40,
+      "reasoning_output": 4,
+      "total": 340,
+      "measurement": "observed",
+      "not_reported_sessions": {
+        "new_input": 0,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 0,
+        "reasoning_output": 2
+      },
+      "total_basis": "reported_components_excluding_reasoning_subset",
+      "complete_total": 340,
+      "evidence_incomplete": false,
+      "not_reported_events": {
+        "new_input": 0,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 0,
+        "reasoning_output": 2
+      }
+    },
+    "counts": {
+      "compactions": 0,
+      "tool_calls": 2,
+      "tool_results": 2,
+      "tool_errors": 0,
+      "api_errors": 0,
+      "user_input_requests": 0,
+      "counter_resets": 0
+    },
+    "time": {
+      "wall_span_seconds": {
+        "measurement": "observed",
+        "value": 16.0
+      },
+      "active_seconds": {
+        "measurement": "estimated",
+        "value": 16.0,
+        "idle_minutes": 5.0
+      },
+      "active_sensitivity_seconds": {
+        "measurement": "estimated",
+        "values": {
+          "2": 16.0,
+          "5": 16.0,
+          "10": 16.0
+        }
+      },
+      "durations": {
+        "tool": {
+          "measurement": "observed",
+          "seconds": 2.0,
+          "paired_intervals": 2,
+          "unpaired_starts": 0,
+          "unpaired_ends": 0
+        },
+        "request": {
+          "measurement": "observed",
+          "seconds": 0,
+          "paired_intervals": 0,
+          "unpaired_starts": 0,
+          "unpaired_ends": 0
+        }
+      },
+      "parallel_session_time": true
+    }
+  },
+  "by_agent": {
+    "sumbi-events:agent_9e260e54ae0e8fd149c80532": {
+      "sessions": 2,
+      "tokens": {
+        "new_input": 200,
+        "cache_write": 0,
+        "cache_read": 40,
+        "output": 20,
+        "reasoning_output": 4,
+        "total": 260,
+        "measurement": "observed",
+        "not_reported_sessions": {
+          "new_input": 0,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 0,
+          "reasoning_output": 0
+        },
+        "total_basis": "reported_components_excluding_reasoning_subset",
+        "complete_total": 260,
+        "evidence_incomplete": false,
+        "not_reported_events": {
+          "new_input": 0,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 0,
+          "reasoning_output": 0
+        }
+      },
+      "counts": {
+        "compactions": 0,
+        "tool_calls": 2,
+        "tool_results": 2,
+        "tool_errors": 0,
+        "api_errors": 0,
+        "user_input_requests": 0,
+        "counter_resets": 0
+      },
+      "time": {
+        "wall_span_seconds": {
+          "measurement": "observed",
+          "value": 12.0
+        },
+        "active_seconds": {
+          "measurement": "estimated",
+          "value": 12.0,
+          "idle_minutes": 5.0
+        },
+        "active_sensitivity_seconds": {
+          "measurement": "estimated",
+          "values": {
+            "2": 12.0,
+            "5": 12.0,
+            "10": 12.0
+          }
+        },
+        "durations": {
+          "tool": {
+            "measurement": "observed",
+            "seconds": 2.0,
+            "paired_intervals": 2,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          },
+          "request": {
+            "measurement": "observed",
+            "seconds": 0,
+            "paired_intervals": 0,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          }
+        },
+        "parallel_session_time": true
+      }
+    },
+    "sumbi-events:agent_dafcddd422574acb5f48fb2b": {
+      "sessions": 2,
+      "tokens": {
+        "new_input": 60,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 20,
+        "reasoning_output": null,
+        "total": 80,
+        "measurement": "observed",
+        "not_reported_sessions": {
+          "new_input": 0,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 0,
+          "reasoning_output": 2
+        },
+        "total_basis": "reported_components_excluding_reasoning_subset",
+        "complete_total": 80,
+        "evidence_incomplete": false,
+        "not_reported_events": {
+          "new_input": 0,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 0,
+          "reasoning_output": 2
+        }
+      },
+      "counts": {
+        "compactions": 0,
+        "tool_calls": 0,
+        "tool_results": 0,
+        "tool_errors": 0,
+        "api_errors": 0,
+        "user_input_requests": 0,
+        "counter_resets": 0
+      },
+      "time": {
+        "wall_span_seconds": {
+          "measurement": "observed",
+          "value": 4.0
+        },
+        "active_seconds": {
+          "measurement": "estimated",
+          "value": 4.0,
+          "idle_minutes": 5.0
+        },
+        "active_sensitivity_seconds": {
+          "measurement": "estimated",
+          "values": {
+            "2": 4.0,
+            "5": 4.0,
+            "10": 4.0
+          }
+        },
+        "durations": {
+          "tool": {
+            "measurement": "observed",
+            "seconds": 0,
+            "paired_intervals": 0,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          },
+          "request": {
+            "measurement": "observed",
+            "seconds": 0,
+            "paired_intervals": 0,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          }
+        },
+        "parallel_session_time": true
+      }
+    }
+  },
+  "coverage": {
+    "adapters": {
+      "sumbi-events": {
+        "files_scanned": 3,
+        "lines_read": 22,
+        "broken_lines": 0,
+        "duplicate_events": 2,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 4,
+        "sessions_in_window": 4
+      }
+    },
+    "sessions_in_window": 4,
+    "spend": [
+      {
+        "bucket": "other",
+        "project_key": null,
+        "rule": null,
+        "sessions": 0,
+        "events": 0,
+        "tokens": 0,
+        "tokens_by_kind": {
+          "new_input": null,
+          "cache_write": null,
+          "cache_read": null,
+          "output": null,
+          "reasoning_output": null
+        },
+        "evidence_counts": {
+          "cwd": 0,
+          "tool_path": 0,
+          "previous_event": 0,
+          "unassigned": 0
+        },
+        "evidence_tokens": {
+          "cwd": 0,
+          "tool_path": 0,
+          "previous_event": 0,
+          "unassigned": 0
+        },
+        "share": 0.0,
+        "measurement": "observed",
+        "fallback_share": 0.0
+      },
+      {
+        "bucket": "project",
+        "project_key": "project_e3db46d1b932ef2c778ba7cc",
+        "rule": null,
+        "sessions": 4,
+        "events": 4,
+        "tokens": 340,
+        "tokens_by_kind": {
+          "new_input": 260,
+          "cache_write": 0,
+          "cache_read": 40,
+          "output": 40,
+          "reasoning_output": 4
+        },
+        "evidence_counts": {
+          "cwd": 4,
+          "tool_path": 0,
+          "previous_event": 0,
+          "unassigned": 0
+        },
+        "evidence_tokens": {
+          "cwd": 340,
+          "tool_path": 0,
+          "previous_event": 0,
+          "unassigned": 0
+        },
+        "share": 1.0,
+        "measurement": "observed",
+        "fallback_share": 0.0
+      },
+      {
+        "bucket": "unassigned",
+        "project_key": null,
+        "rule": null,
+        "sessions": 0,
+        "events": 0,
+        "tokens": 0,
+        "tokens_by_kind": {
+          "new_input": null,
+          "cache_write": null,
+          "cache_read": null,
+          "output": null,
+          "reasoning_output": null
+        },
+        "evidence_counts": {
+          "cwd": 0,
+          "tool_path": 0,
+          "previous_event": 0,
+          "unassigned": 0
+        },
+        "evidence_tokens": {
+          "cwd": 0,
+          "tool_path": 0,
+          "previous_event": 0,
+          "unassigned": 0
+        },
+        "share": 0.0,
+        "measurement": "observed",
+        "fallback_share": 0.0
+      }
+    ],
+    "unattributed_share": 0.0,
+    "unassigned_share": 0.0,
+    "evidence_counts": {
+      "cwd": 4,
+      "tool_path": 0,
+      "previous_event": 0,
+      "unassigned": 0
+    },
+    "evidence_tokens": {
+      "cwd": 340,
+      "tool_path": 0,
+      "previous_event": 0,
+      "unassigned": 0
+    },
+    "evidence_shares": {
+      "cwd": 1.0,
+      "tool_path": 0.0,
+      "previous_event": 0.0,
+      "unassigned": 0.0
+    },
+    "spend_basis": "reported_tokens",
+    "verdict": "not_evaluated"
+  },
+  "sessions": [
+    {
+      "id": "session_76eb20bb68f2e2a16e7fa740",
+      "parent_id": "session_76adbe992952c2c7b488f1be",
+      "agent": "sumbi-events:agent_9e260e54ae0e8fd149c80532",
+      "project": {
+        "project_key": "project_e3db46d1b932ef2c778ba7cc",
+        "rule": null,
+        "evidence": "git_origin_candidate",
+        "bucket": "project",
+        "links": [
+          {
+            "project_key": "project_e3db46d1b932ef2c778ba7cc",
+            "rule": null,
+            "evidence": "git_origin_candidate",
+            "bucket": "project"
+          }
+        ]
+      },
+      "allocations": [
+        {
+          "project_key": "project_e3db46d1b932ef2c778ba7cc",
+          "rule": null,
+          "evidence": "git_origin_candidate",
+          "bucket": "project",
+          "events": 1,
+          "tokens": {
+            "new_input": 100,
+            "cache_write": 0,
+            "cache_read": 20,
+            "output": 10,
+            "reasoning_output": 2,
+            "total": 130,
+            "not_reported_events": {
+              "new_input": 0,
+              "cache_write": 0,
+              "cache_read": 0,
+              "output": 0,
+              "reasoning_output": 0
+            },
+            "evidence_incomplete": false,
+            "complete_total": 130
+          },
+          "evidence_counts": {
+            "cwd": 1,
+            "tool_path": 0,
+            "previous_event": 0,
+            "unassigned": 0
+          },
+          "evidence_tokens": {
+            "cwd": 130,
+            "tool_path": 0,
+            "previous_event": 0,
+            "unassigned": 0
+          },
+          "fallback_share": 0.0
+        }
+      ],
+      "spend_allocation": "events",
+      "models": [
+        "model_99051c601e033380bf6cd425"
+      ],
+      "efforts": [
+        "effort_79ae4a0c1a7a14f3fbe5b7aa"
+      ],
+      "cli_versions": [
+        "version_951ecbfab63ab4a551bcdd71"
+      ],
+      "tokens": {
+        "new_input": 100,
+        "cache_write": 0,
+        "cache_read": 20,
+        "output": 10,
+        "reasoning_output": 2,
+        "total": 130,
+        "measurement": "observed",
+        "total_basis": "reported_components_excluding_reasoning_subset",
+        "not_reported_events": {
+          "new_input": 0,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 0,
+          "reasoning_output": 0
+        },
+        "evidence_incomplete": false,
+        "complete_total": 130
+      },
+      "counts": {
+        "compactions": 0,
+        "tool_calls": 1,
+        "tool_results": 1,
+        "tool_errors": 0,
+        "api_errors": 0,
+        "user_input_requests": 0,
+        "counter_resets": 0
+      },
+      "time": {
+        "wall_span": {
+          "measurement": "observed",
+          "seconds": 6.0
+        },
+        "active": {
+          "measurement": "estimated",
+          "idle_minutes": 5.0,
+          "seconds": 6.0,
+          "sensitivity_seconds": {
+            "2": 6.0,
+            "5": 6.0,
+            "10": 6.0
+          }
+        },
+        "durations": {
+          "tool": {
+            "measurement": "observed",
+            "seconds": 1.0,
+            "paired_intervals": 1,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          },
+          "request": {
+            "measurement": "observed",
+            "seconds": 0,
+            "paired_intervals": 0,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "session_d44acaa7b2346dd0f370478e",
+      "parent_id": "session_f176352aa2bc1aeb178d930e",
+      "agent": "sumbi-events:agent_9e260e54ae0e8fd149c80532",
+      "project": {
+        "project_key": "project_e3db46d1b932ef2c778ba7cc",
+        "rule": null,
+        "evidence": "git_origin_candidate",
+        "bucket": "project",
+        "links": [
+          {
+            "project_key": "project_e3db46d1b932ef2c778ba7cc",
+            "rule": null,
+            "evidence": "git_origin_candidate",
+            "bucket": "project"
+          }
+        ]
+      },
+      "allocations": [
+        {
+          "project_key": "project_e3db46d1b932ef2c778ba7cc",
+          "rule": null,
+          "evidence": "git_origin_candidate",
+          "bucket": "project",
+          "events": 1,
+          "tokens": {
+            "new_input": 100,
+            "cache_write": 0,
+            "cache_read": 20,
+            "output": 10,
+            "reasoning_output": 2,
+            "total": 130,
+            "not_reported_events": {
+              "new_input": 0,
+              "cache_write": 0,
+              "cache_read": 0,
+              "output": 0,
+              "reasoning_output": 0
+            },
+            "evidence_incomplete": false,
+            "complete_total": 130
+          },
+          "evidence_counts": {
+            "cwd": 1,
+            "tool_path": 0,
+            "previous_event": 0,
+            "unassigned": 0
+          },
+          "evidence_tokens": {
+            "cwd": 130,
+            "tool_path": 0,
+            "previous_event": 0,
+            "unassigned": 0
+          },
+          "fallback_share": 0.0
+        }
+      ],
+      "spend_allocation": "events",
+      "models": [
+        "model_99051c601e033380bf6cd425"
+      ],
+      "efforts": [
+        "effort_79ae4a0c1a7a14f3fbe5b7aa"
+      ],
+      "cli_versions": [
+        "version_951ecbfab63ab4a551bcdd71"
+      ],
+      "tokens": {
+        "new_input": 100,
+        "cache_write": 0,
+        "cache_read": 20,
+        "output": 10,
+        "reasoning_output": 2,
+        "total": 130,
+        "measurement": "observed",
+        "total_basis": "reported_components_excluding_reasoning_subset",
+        "not_reported_events": {
+          "new_input": 0,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 0,
+          "reasoning_output": 0
+        },
+        "evidence_incomplete": false,
+        "complete_total": 130
+      },
+      "counts": {
+        "compactions": 0,
+        "tool_calls": 1,
+        "tool_results": 1,
+        "tool_errors": 0,
+        "api_errors": 0,
+        "user_input_requests": 0,
+        "counter_resets": 0
+      },
+      "time": {
+        "wall_span": {
+          "measurement": "observed",
+          "seconds": 6.0
+        },
+        "active": {
+          "measurement": "estimated",
+          "idle_minutes": 5.0,
+          "seconds": 6.0,
+          "sensitivity_seconds": {
+            "2": 6.0,
+            "5": 6.0,
+            "10": 6.0
+          }
+        },
+        "durations": {
+          "tool": {
+            "measurement": "observed",
+            "seconds": 1.0,
+            "paired_intervals": 1,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          },
+          "request": {
+            "measurement": "observed",
+            "seconds": 0,
+            "paired_intervals": 0,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "session_76adbe992952c2c7b488f1be",
+      "parent_id": null,
+      "agent": "sumbi-events:agent_dafcddd422574acb5f48fb2b",
+      "project": {
+        "project_key": "project_e3db46d1b932ef2c778ba7cc",
+        "rule": null,
+        "evidence": "git_origin_candidate",
+        "bucket": "project",
+        "links": [
+          {
+            "project_key": "project_e3db46d1b932ef2c778ba7cc",
+            "rule": null,
+            "evidence": "git_origin_candidate",
+            "bucket": "project"
+          }
+        ]
+      },
+      "allocations": [
+        {
+          "project_key": "project_e3db46d1b932ef2c778ba7cc",
+          "rule": null,
+          "evidence": "git_origin_candidate",
+          "bucket": "project",
+          "events": 1,
+          "tokens": {
+            "new_input": 30,
+            "cache_write": 0,
+            "cache_read": 0,
+            "output": 10,
+            "reasoning_output": null,
+            "total": 40,
+            "not_reported_events": {
+              "new_input": 0,
+              "cache_write": 0,
+              "cache_read": 0,
+              "output": 0,
+              "reasoning_output": 1
+            },
+            "evidence_incomplete": false,
+            "complete_total": 40
+          },
+          "evidence_counts": {
+            "cwd": 1,
+            "tool_path": 0,
+            "previous_event": 0,
+            "unassigned": 0
+          },
+          "evidence_tokens": {
+            "cwd": 40,
+            "tool_path": 0,
+            "previous_event": 0,
+            "unassigned": 0
+          },
+          "fallback_share": 0.0
+        }
+      ],
+      "spend_allocation": "events",
+      "models": [],
+      "efforts": [],
+      "cli_versions": [],
+      "tokens": {
+        "new_input": 30,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 40,
+        "measurement": "observed",
+        "total_basis": "reported_components_excluding_reasoning_subset",
+        "not_reported_events": {
+          "new_input": 0,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 0,
+          "reasoning_output": 1
+        },
+        "evidence_incomplete": false,
+        "complete_total": 40
+      },
+      "counts": {
+        "compactions": 0,
+        "tool_calls": 0,
+        "tool_results": 0,
+        "tool_errors": 0,
+        "api_errors": 0,
+        "user_input_requests": 0,
+        "counter_resets": 0
+      },
+      "time": {
+        "wall_span": {
+          "measurement": "observed",
+          "seconds": 2.0
+        },
+        "active": {
+          "measurement": "estimated",
+          "idle_minutes": 5.0,
+          "seconds": 2.0,
+          "sensitivity_seconds": {
+            "2": 2.0,
+            "5": 2.0,
+            "10": 2.0
+          }
+        },
+        "durations": {
+          "tool": {
+            "measurement": "observed",
+            "seconds": 0,
+            "paired_intervals": 0,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          },
+          "request": {
+            "measurement": "observed",
+            "seconds": 0,
+            "paired_intervals": 0,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "session_f176352aa2bc1aeb178d930e",
+      "parent_id": null,
+      "agent": "sumbi-events:agent_dafcddd422574acb5f48fb2b",
+      "project": {
+        "project_key": "project_e3db46d1b932ef2c778ba7cc",
+        "rule": null,
+        "evidence": "git_origin_candidate",
+        "bucket": "project",
+        "links": [
+          {
+            "project_key": "project_e3db46d1b932ef2c778ba7cc",
+            "rule": null,
+            "evidence": "git_origin_candidate",
+            "bucket": "project"
+          }
+        ]
+      },
+      "allocations": [
+        {
+          "project_key": "project_e3db46d1b932ef2c778ba7cc",
+          "rule": null,
+          "evidence": "git_origin_candidate",
+          "bucket": "project",
+          "events": 1,
+          "tokens": {
+            "new_input": 30,
+            "cache_write": 0,
+            "cache_read": 0,
+            "output": 10,
+            "reasoning_output": null,
+            "total": 40,
+            "not_reported_events": {
+              "new_input": 0,
+              "cache_write": 0,
+              "cache_read": 0,
+              "output": 0,
+              "reasoning_output": 1
+            },
+            "evidence_incomplete": false,
+            "complete_total": 40
+          },
+          "evidence_counts": {
+            "cwd": 1,
+            "tool_path": 0,
+            "previous_event": 0,
+            "unassigned": 0
+          },
+          "evidence_tokens": {
+            "cwd": 40,
+            "tool_path": 0,
+            "previous_event": 0,
+            "unassigned": 0
+          },
+          "fallback_share": 0.0
+        }
+      ],
+      "spend_allocation": "events",
+      "models": [],
+      "efforts": [],
+      "cli_versions": [],
+      "tokens": {
+        "new_input": 30,
+        "cache_write": 0,
+        "cache_read": 0,
+        "output": 10,
+        "reasoning_output": null,
+        "total": 40,
+        "measurement": "observed",
+        "total_basis": "reported_components_excluding_reasoning_subset",
+        "not_reported_events": {
+          "new_input": 0,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 0,
+          "reasoning_output": 1
+        },
+        "evidence_incomplete": false,
+        "complete_total": 40
+      },
+      "counts": {
+        "compactions": 0,
+        "tool_calls": 0,
+        "tool_results": 0,
+        "tool_errors": 0,
+        "api_errors": 0,
+        "user_input_requests": 0,
+        "counter_resets": 0
+      },
+      "time": {
+        "wall_span": {
+          "measurement": "observed",
+          "seconds": 2.0
+        },
+        "active": {
+          "measurement": "estimated",
+          "idle_minutes": 5.0,
+          "seconds": 2.0,
+          "sensitivity_seconds": {
+            "2": 2.0,
+            "5": 2.0,
+            "10": 2.0
+          }
+        },
+        "durations": {
+          "tool": {
+            "measurement": "observed",
+            "seconds": 0,
+            "paired_intervals": 0,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          },
+          "request": {
+            "measurement": "observed",
+            "seconds": 0,
+            "paired_intervals": 0,
+            "unpaired_starts": 0,
+            "unpaired_ends": 0
+          }
+        }
+      }
+    }
+  ]
+}

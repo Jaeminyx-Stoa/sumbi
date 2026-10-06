@@ -1,0 +1,28 @@
+sumbi compare local verification
+Outcome source: local-verify
+Verdict proposal: withhold
+Reasons: not_comparable, after_excluded_or_mixed, agent_mix_shift, no_change_share_shift
+Exposure gap: 3601 seconds; actual write later than planned
+Cost proposal scope: retained worker sessions only
+Excluded dispatch overhead: 1 sessions; observed tokens 10
+Sample per arm: registered 1; needed 16; actual {'before': 2, 'after': 0}
+before success: 1/2; Wilson 95% [0.09453120573423074, 0.9054687942657693]
+before candidate states: success 1; failed 1; unverified 0; in_progress 0; no_change 0
+before worker total per success: 200/1 = 200.0; bootstrap 95% None
+before worker time per success: 12.0/1 = 12.0; bootstrap 95% None
+after success: 0/0; Wilson 95% None
+after candidate states: success 1; failed 0; unverified 2; in_progress 0; no_change 1
+after worker total per success: None/0 = None; bootstrap 95% None
+after worker time per success: None/0 = None; bootstrap 95% None
+After - before success: None; Newcombe 95% None; inconclusive; margin 50 percentage points
+Worker total after/before: None/200.0 = None; bootstrap 95% None; uncertain
+Worker time after/before: None/12.0 = None; bootstrap 95% None; uncertain
+Bootstrap: seed 1729; resamples 5000
+before excluded: 0/2; counts {}
+after excluded: 4/4; counts {'exposure_gap': 4}
+Flag after_excluded_or_mixed: blocking
+Flag agent_mix_shift: blocking
+Flag volume_shift: informational
+Flag no_change_share_shift: blocking
+Flag dispatch_overhead_excluded: informational
+Command coverage: matched 3; unknown_execution_cwd 0; unknown_execution_start 0; unknown_exit_code 0

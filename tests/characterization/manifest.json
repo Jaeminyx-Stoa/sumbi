@@ -1,0 +1,1501 @@
+{
+  "version": 1,
+  "salt": "synthetic-characterization-key-v1",
+  "cases": [
+    {
+      "name": "help",
+      "command": "root",
+      "setup": "empty",
+      "argv": [
+        "--help"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "version",
+      "command": "root",
+      "setup": "empty",
+      "argv": [
+        "--version"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "missing-command",
+      "command": "root",
+      "setup": "empty",
+      "argv": [],
+      "expected_exit": 2
+    },
+    {
+      "name": "collect-help",
+      "command": "collect",
+      "setup": "empty",
+      "argv": [
+        "collect",
+        "--help"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-help",
+      "command": "deliver",
+      "setup": "empty",
+      "argv": [
+        "deliver",
+        "--help"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-help",
+      "command": "compare",
+      "setup": "empty",
+      "argv": [
+        "compare",
+        "--help"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-help",
+      "command": "install",
+      "setup": "empty",
+      "argv": [
+        "install",
+        "--help"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "collect-native-text",
+      "command": "collect",
+      "setup": "native",
+      "argv": [
+        "collect",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-01T00:10:00Z",
+        "--home",
+        "{home}",
+        "--project",
+        "sample",
+        "--match-origin",
+        "https://example.test/corpus/sample"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "collect-native-text-review",
+      "command": "collect",
+      "setup": "native",
+      "argv": [
+        "collect",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-01T00:10:00Z",
+        "--home",
+        "{home}",
+        "--project",
+        "sample",
+        "--match-origin",
+        "https://example.test/corpus/sample",
+        "--local-review",
+        "review.txt"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "collect-native-json",
+      "command": "collect",
+      "setup": "native",
+      "argv": [
+        "collect",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-01T00:10:00Z",
+        "--home",
+        "{home}",
+        "--project",
+        "sample",
+        "--match-origin",
+        "https://example.test/corpus/sample",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "collect-native-json-review",
+      "command": "collect",
+      "setup": "native",
+      "argv": [
+        "collect",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-01T00:10:00Z",
+        "--home",
+        "{home}",
+        "--project",
+        "sample",
+        "--match-origin",
+        "https://example.test/corpus/sample",
+        "--json",
+        "-",
+        "--local-review",
+        "review.txt"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "collect-events-text",
+      "command": "collect",
+      "setup": "events",
+      "argv": [
+        "collect",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-03T00:00:00Z",
+        "--home",
+        "{home}",
+        "--agents",
+        "sumbi-events"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "collect-events-json",
+      "command": "collect",
+      "setup": "events",
+      "argv": [
+        "collect",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-03T00:00:00Z",
+        "--home",
+        "{home}",
+        "--agents",
+        "sumbi-events",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "collect-invalid-agents",
+      "command": "collect",
+      "setup": "empty",
+      "argv": [
+        "collect",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-01T00:10:00Z",
+        "--home",
+        "{home}",
+        "--agents",
+        "unknown"
+      ],
+      "expected_exit": 2
+    },
+    {
+      "name": "collect-invalid-window",
+      "command": "collect",
+      "setup": "empty",
+      "argv": [
+        "collect",
+        "--since",
+        "2030-01-02T00:00:00Z",
+        "--until",
+        "2030-01-01T00:00:00Z",
+        "--home",
+        "{home}"
+      ],
+      "expected_exit": 2
+    },
+    {
+      "name": "collect-source-output",
+      "command": "collect",
+      "setup": "native",
+      "argv": [
+        "collect",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-01T00:10:00Z",
+        "--home",
+        "{home}",
+        "--project",
+        "sample",
+        "--match-origin",
+        "https://example.test/corpus/sample",
+        "--json",
+        "{home}/.codex/sessions/blocked.json"
+      ],
+      "expected_exit": 2
+    },
+    {
+      "name": "collect-empty-salt",
+      "command": "collect",
+      "setup": "native",
+      "argv": [
+        "collect",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-01T00:10:00Z",
+        "--home",
+        "{home}",
+        "--project",
+        "sample",
+        "--match-origin",
+        "https://example.test/corpus/sample",
+        "--salt-file",
+        "empty-salt"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "deliver-recorded-text",
+      "command": "deliver",
+      "setup": "deliver",
+      "argv": [
+        "deliver",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-10T00:00:00Z",
+        "--home",
+        "{home}",
+        "--ledger",
+        "{fixture}/deliverables.csv",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--project",
+        "sample",
+        "--match-path",
+        "/synthetic/sample*"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-recorded-text",
+      "command": "compare",
+      "setup": "compare",
+      "argv": [
+        "compare",
+        "--home",
+        "{home}",
+        "--registration",
+        "{fixture}/registration.json",
+        "--ledger",
+        "{fixture}/deliverables.csv",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--agents",
+        "codex",
+        "--project",
+        "sample",
+        "--match-path",
+        "Z:/synthetic/sample*"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-recorded-json",
+      "command": "deliver",
+      "setup": "deliver",
+      "argv": [
+        "deliver",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-10T00:00:00Z",
+        "--home",
+        "{home}",
+        "--ledger",
+        "{fixture}/deliverables.csv",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--project",
+        "sample",
+        "--match-path",
+        "/synthetic/sample*",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-recorded-json",
+      "command": "compare",
+      "setup": "compare",
+      "argv": [
+        "compare",
+        "--home",
+        "{home}",
+        "--registration",
+        "{fixture}/registration.json",
+        "--ledger",
+        "{fixture}/deliverables.csv",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--agents",
+        "codex",
+        "--project",
+        "sample",
+        "--match-path",
+        "Z:/synthetic/sample*",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-local-native-text",
+      "command": "deliver",
+      "setup": "local-native",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-03T00:00:00Z"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-local-native-json",
+      "command": "deliver",
+      "setup": "local-native",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-03T00:00:00Z",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-local-native-text",
+      "command": "compare",
+      "setup": "local-native",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--registration",
+        "{registration}"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-local-native-json",
+      "command": "compare",
+      "setup": "local-native",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--registration",
+        "{registration}",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-events-text",
+      "command": "deliver",
+      "setup": "events",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-03T00:00:00Z",
+        "--agents",
+        "sumbi-events"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-events-json",
+      "command": "deliver",
+      "setup": "events",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-03T00:00:00Z",
+        "--agents",
+        "sumbi-events",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-events-text",
+      "command": "compare",
+      "setup": "events",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--registration",
+        "{registration}",
+        "--agents",
+        "sumbi-events"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-events-json",
+      "command": "compare",
+      "setup": "events",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--registration",
+        "{registration}",
+        "--agents",
+        "sumbi-events",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-missing-ledger",
+      "command": "deliver",
+      "setup": "empty",
+      "argv": [
+        "deliver",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-01T00:10:00Z",
+        "--home",
+        "{home}"
+      ],
+      "expected_exit": 2
+    },
+    {
+      "name": "deliver-invalid-ledger",
+      "command": "deliver",
+      "setup": "deliver",
+      "argv": [
+        "deliver",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-10T00:00:00Z",
+        "--home",
+        "{home}",
+        "--ledger",
+        "invalid-ledger.csv",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--project",
+        "sample",
+        "--match-path",
+        "/synthetic/sample*"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "deliver-local-missing-repository",
+      "command": "deliver",
+      "setup": "empty",
+      "argv": [
+        "deliver",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-01T00:10:00Z",
+        "--home",
+        "{home}",
+        "--outcome-source",
+        "local-verify"
+      ],
+      "expected_exit": 2
+    },
+    {
+      "name": "deliver-local-invalid-verify",
+      "command": "deliver",
+      "setup": "local-native",
+      "argv": [
+        "deliver",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-01T00:10:00Z",
+        "--home",
+        "{home}",
+        "--outcome-source",
+        "local-verify",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "../escape.sh"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "compare-invalid-registration",
+      "command": "compare",
+      "setup": "empty",
+      "argv": [
+        "compare",
+        "--home",
+        "{home}",
+        "--registration",
+        "invalid-registration.json"
+      ],
+      "expected_exit": 2
+    },
+    {
+      "name": "compare-local-source-mismatch",
+      "command": "compare",
+      "setup": "local-native",
+      "argv": [
+        "compare",
+        "--home",
+        "{home}",
+        "--registration",
+        "{registration}",
+        "--outcome-source",
+        "github"
+      ],
+      "expected_exit": 2
+    },
+    {
+      "name": "compare-local-invalid-verify",
+      "command": "compare",
+      "setup": "local-native",
+      "argv": [
+        "compare",
+        "--home",
+        "{home}",
+        "--registration",
+        "{registration}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "../escape.sh"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "install-empty-dry-text",
+      "command": "install",
+      "setup": "install:empty",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-empty-dry-json",
+      "command": "install",
+      "setup": "install:empty",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run",
+        "--json",
+        "plan.json"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-empty-apply-revert",
+      "command": "install",
+      "setup": "install:empty",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--apply"
+      ],
+      "expected_exit": 0,
+      "lifecycle": true
+    },
+    {
+      "name": "install-claude-only-dry-text",
+      "command": "install",
+      "setup": "install:claude-only",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-claude-only-dry-json",
+      "command": "install",
+      "setup": "install:claude-only",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run",
+        "--json",
+        "plan.json"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-claude-only-apply-revert",
+      "command": "install",
+      "setup": "install:claude-only",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--apply"
+      ],
+      "expected_exit": 0,
+      "lifecycle": true
+    },
+    {
+      "name": "install-codex-only-dry-text",
+      "command": "install",
+      "setup": "install:codex-only",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-codex-only-dry-json",
+      "command": "install",
+      "setup": "install:codex-only",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run",
+        "--json",
+        "plan.json"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-codex-only-apply-revert",
+      "command": "install",
+      "setup": "install:codex-only",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--apply"
+      ],
+      "expected_exit": 0,
+      "lifecycle": true
+    },
+    {
+      "name": "install-both-dry-text",
+      "command": "install",
+      "setup": "install:both",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-both-dry-json",
+      "command": "install",
+      "setup": "install:both",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run",
+        "--json",
+        "plan.json"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-both-apply-revert",
+      "command": "install",
+      "setup": "install:both",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--apply"
+      ],
+      "expected_exit": 0,
+      "lifecycle": true
+    },
+    {
+      "name": "install-configured-dry-text",
+      "command": "install",
+      "setup": "install:configured",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-configured-dry-json",
+      "command": "install",
+      "setup": "install:configured",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--dry-run",
+        "--json",
+        "plan.json"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "install-configured-apply-revert",
+      "command": "install",
+      "setup": "install:configured",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--apply"
+      ],
+      "expected_exit": 0,
+      "lifecycle": true
+    },
+    {
+      "name": "install-invalid-selection",
+      "command": "install",
+      "setup": "install:empty",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--select",
+        "unknown-practice"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "install-protected-json",
+      "command": "install",
+      "setup": "install:empty",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--json",
+        ".sumbi/plan.json"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "install-invalid-revert",
+      "command": "install",
+      "setup": "install:empty",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--revert",
+        "invalid"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "install-missing-root",
+      "command": "install",
+      "setup": "empty",
+      "argv": [
+        "install",
+        "--root",
+        "missing-repository",
+        "--home",
+        "{home}"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "register-help",
+      "command": "register",
+      "setup": "empty",
+      "argv": [
+        "register",
+        "--help"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "register-local",
+      "command": "register",
+      "setup": "empty",
+      "argv": [
+        "register",
+        "--json",
+        "published-registration.json",
+        "--intervention-id",
+        "synthetic-local-round",
+        "--outcome-source",
+        "local-verify",
+        "--margin-pp",
+        "5",
+        "--sample-size-per-arm",
+        "12",
+        "--follow-up-days",
+        "7",
+        "--window-days",
+        "14",
+        "--applied-at",
+        "2030-01-15T00:00:00Z",
+        "--practice",
+        "handoff",
+        "--practice",
+        "test-and-verify"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "register-github",
+      "command": "register",
+      "setup": "empty",
+      "argv": [
+        "register",
+        "--json",
+        "published-registration.json",
+        "--intervention-id",
+        "synthetic-local-round",
+        "--outcome-source",
+        "github",
+        "--margin-pp",
+        "5",
+        "--sample-size-per-arm",
+        "12",
+        "--follow-up-days",
+        "7",
+        "--window-days",
+        "14",
+        "--applied-at",
+        "2030-01-15T00:00:00Z",
+        "--practice",
+        "handoff",
+        "--practice",
+        "test-and-verify"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "register-late",
+      "command": "register",
+      "setup": "empty",
+      "argv": [
+        "register",
+        "--json",
+        "published-registration.json",
+        "--intervention-id",
+        "synthetic-local-round",
+        "--outcome-source",
+        "local-verify",
+        "--margin-pp",
+        "5",
+        "--sample-size-per-arm",
+        "12",
+        "--follow-up-days",
+        "7",
+        "--window-days",
+        "14",
+        "--applied-at",
+        "2020-01-15T00:00:00Z",
+        "--practice",
+        "handoff",
+        "--practice",
+        "test-and-verify"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "register-existing",
+      "command": "register",
+      "setup": "register-existing",
+      "argv": [
+        "register",
+        "--json",
+        "published-registration.json",
+        "--intervention-id",
+        "synthetic-local-round",
+        "--outcome-source",
+        "local-verify",
+        "--margin-pp",
+        "5",
+        "--sample-size-per-arm",
+        "12",
+        "--follow-up-days",
+        "7",
+        "--window-days",
+        "14",
+        "--applied-at",
+        "2030-01-15T00:00:00Z",
+        "--practice",
+        "handoff",
+        "--practice",
+        "test-and-verify"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "register-invalid-practice",
+      "command": "register",
+      "setup": "empty",
+      "argv": [
+        "register",
+        "--json",
+        "published-registration.json",
+        "--intervention-id",
+        "synthetic-local-round",
+        "--outcome-source",
+        "local-verify",
+        "--margin-pp",
+        "5",
+        "--sample-size-per-arm",
+        "12",
+        "--follow-up-days",
+        "7",
+        "--window-days",
+        "14",
+        "--applied-at",
+        "2030-01-15T00:00:00Z",
+        "--practice",
+        "unknown-practice",
+        "--practice",
+        "test-and-verify"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "register-invalid-margin",
+      "command": "register",
+      "setup": "empty",
+      "argv": [
+        "register",
+        "--json",
+        "published-registration.json",
+        "--intervention-id",
+        "synthetic-local-round",
+        "--outcome-source",
+        "local-verify",
+        "--margin-pp",
+        "0",
+        "--sample-size-per-arm",
+        "12",
+        "--follow-up-days",
+        "7",
+        "--window-days",
+        "14",
+        "--applied-at",
+        "2030-01-15T00:00:00Z",
+        "--practice",
+        "handoff",
+        "--practice",
+        "test-and-verify"
+      ],
+      "expected_exit": 1
+    },
+    {
+      "name": "register-missing-arguments",
+      "command": "register",
+      "setup": "empty",
+      "argv": [
+        "register",
+        "--json",
+        "published-registration.json"
+      ],
+      "expected_exit": 2
+    },
+    {
+      "name": "compare-recorded-exposure-text",
+      "command": "compare",
+      "setup": "compare",
+      "argv": [
+        "compare",
+        "--home",
+        "{home}",
+        "--registration",
+        "{fixture}/registration.json",
+        "--ledger",
+        "{fixture}/deliverables.csv",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--agents",
+        "codex",
+        "--project",
+        "sample",
+        "--match-path",
+        "Z:/synthetic/sample*",
+        "--interventions",
+        "{fixture}/interventions.jsonl"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-recorded-exposure-json",
+      "command": "compare",
+      "setup": "compare",
+      "argv": [
+        "compare",
+        "--home",
+        "{home}",
+        "--registration",
+        "{fixture}/registration.json",
+        "--ledger",
+        "{fixture}/deliverables.csv",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--agents",
+        "codex",
+        "--project",
+        "sample",
+        "--match-path",
+        "Z:/synthetic/sample*",
+        "--json",
+        "-",
+        "--interventions",
+        "{fixture}/interventions.jsonl"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-local-failed-verifier-text",
+      "command": "deliver",
+      "setup": "local-native-failed-verifier",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-03T00:00:00Z"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-local-claude-text",
+      "command": "deliver",
+      "setup": "local-native-claude",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-03T00:00:00Z"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-local-failed-verifier-json",
+      "command": "deliver",
+      "setup": "local-native-failed-verifier",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-03T00:00:00Z",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "deliver-local-claude-json",
+      "command": "deliver",
+      "setup": "local-native-claude",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-03T00:00:00Z",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-local-native-exposure-text",
+      "command": "compare",
+      "setup": "local-native",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--registration",
+        "{registration}",
+        "--interventions",
+        "{fixture}/interventions.jsonl"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-local-failed-verifier-text",
+      "command": "compare",
+      "setup": "local-native-failed-verifier",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--registration",
+        "{registration}"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-local-claude-text",
+      "command": "compare",
+      "setup": "local-native-claude",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--registration",
+        "{registration}"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-local-native-exposure-json",
+      "command": "compare",
+      "setup": "local-native",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--registration",
+        "{registration}",
+        "--json",
+        "-",
+        "--interventions",
+        "{fixture}/interventions.jsonl"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-local-failed-verifier-json",
+      "command": "compare",
+      "setup": "local-native-failed-verifier",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--registration",
+        "{registration}",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-local-claude-json",
+      "command": "compare",
+      "setup": "local-native-claude",
+      "argv": [
+        "compare",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-04T00:00:00Z",
+        "--registration",
+        "{registration}",
+        "--json",
+        "-"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "compare-missing-interventions",
+      "command": "compare",
+      "setup": "compare",
+      "argv": [
+        "compare",
+        "--home",
+        "{home}",
+        "--registration",
+        "{fixture}/registration.json",
+        "--ledger",
+        "{fixture}/deliverables.csv",
+        "--outcomes",
+        "{fixture}/outcomes",
+        "--agents",
+        "codex",
+        "--project",
+        "sample",
+        "--match-path",
+        "Z:/synthetic/sample*",
+        "--intervention-id",
+        "round-01"
+      ],
+      "expected_exit": 2
+    },
+    {
+      "name": "install-intervention-apply-revert",
+      "command": "install",
+      "setup": "install:empty",
+      "argv": [
+        "install",
+        "--root",
+        "{repository}",
+        "--home",
+        "{home}",
+        "--apply",
+        "--select",
+        "handoff",
+        "--intervention-id",
+        "synthetic-local-round"
+      ],
+      "expected_exit": 0,
+      "lifecycle": true
+    },
+    {
+      "name": "deliver-local-fresh-worker",
+      "command": "deliver",
+      "setup": "local-native",
+      "argv": [
+        "deliver",
+        "--outcome-source",
+        "local-verify",
+        "--home",
+        "{home}",
+        "--repository",
+        "{repository}",
+        "--verify",
+        "scripts/check.sh",
+        "--scan-until",
+        "2030-01-02T01:03:00Z",
+        "--since",
+        "2030-01-01T00:00:00Z",
+        "--until",
+        "2030-01-02T01:02:00Z"
+      ],
+      "expected_exit": 0
+    }
+  ]
+}

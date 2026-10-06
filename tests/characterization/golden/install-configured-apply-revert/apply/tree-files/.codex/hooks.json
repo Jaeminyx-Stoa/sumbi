@@ -1,0 +1,5 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [{"hooks": [{"type": "prompt", "prompt": "SYNTHETIC_PRIVATE_PROMPT"}]}]
+  }
+}

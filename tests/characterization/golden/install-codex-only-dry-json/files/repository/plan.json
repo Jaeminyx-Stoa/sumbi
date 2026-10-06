@@ -1,0 +1,487 @@
+{
+  "catalog_version": "0.1.0",
+  "inventory": {
+    "exclusions": {
+      "count": 0,
+      "gitignore_count": 0,
+      "patterns": [
+        {
+          "pattern": "**/.git",
+          "count": 0
+        },
+        {
+          "pattern": "**/.sumbi",
+          "count": 0
+        },
+        {
+          "pattern": "**/node_modules",
+          "count": 0
+        },
+        {
+          "pattern": "**/vendor",
+          "count": 0
+        },
+        {
+          "pattern": "**/.venv",
+          "count": 0
+        },
+        {
+          "pattern": "**/venv",
+          "count": 0
+        },
+        {
+          "pattern": "**/dist",
+          "count": 0
+        },
+        {
+          "pattern": "**/build",
+          "count": 0
+        },
+        {
+          "pattern": "**/__pycache__",
+          "count": 0
+        },
+        {
+          "pattern": "**/.tmp",
+          "count": 0
+        },
+        {
+          "pattern": "**/test/**/fixtures",
+          "count": 0
+        },
+        {
+          "pattern": "**/test/**/testdata",
+          "count": 0
+        },
+        {
+          "pattern": "**/tests/**/fixtures",
+          "count": 0
+        },
+        {
+          "pattern": "**/tests/**/testdata",
+          "count": 0
+        }
+      ]
+    },
+    "versioning": {
+      "root_versioned": false,
+      "nested_repositories": {
+        "count": 0,
+        "paths": []
+      }
+    },
+    "instructions": {
+      "agents": {
+        "count": 1,
+        "paths": [
+          "AGENTS.md"
+        ]
+      },
+      "claude": {
+        "count": 0,
+        "paths": []
+      },
+      "claude_rules": {
+        "count": 0,
+        "paths": []
+      },
+      "gemini": {
+        "count": 0,
+        "paths": []
+      },
+      "copilot": {
+        "count": 0,
+        "paths": []
+      },
+      "cursor_rules": {
+        "count": 0,
+        "paths": []
+      }
+    },
+    "claude_imports": [],
+    "capabilities": {
+      "claude_skills": {
+        "count": 0,
+        "paths": [],
+        "file_count": 0
+      },
+      "agent_skills": {
+        "count": 0,
+        "paths": [],
+        "file_count": 0
+      },
+      "commands": {
+        "count": 0,
+        "paths": [],
+        "file_count": 0
+      },
+      "agents": {
+        "count": 0,
+        "paths": [],
+        "file_count": 0
+      }
+    },
+    "configurations": [],
+    "enforcement": {
+      "workflows": [],
+      "codeowners": {
+        "count": 0,
+        "paths": []
+      },
+      "pr_templates": {
+        "count": 0,
+        "paths": []
+      },
+      "git_hooks": {
+        "count": 0,
+        "paths": []
+      },
+      "lint": {
+        "count": 0,
+        "paths": []
+      },
+      "format": {
+        "count": 0,
+        "paths": []
+      },
+      "type_check": {
+        "count": 0,
+        "paths": []
+      },
+      "test_sources": [
+        {
+          "path": "AGENTS.md",
+          "kind": "documented-command"
+        }
+      ],
+      "required_checks": "unknown (offline)",
+      "rulesets": "unknown (offline)"
+    },
+    "cost": {
+      "estimate_rule": "script-aware-v1: ceil(other_characters / 4) + Hangul/Han/Hiragana/Katakana characters",
+      "budget": 2000,
+      "instructions": {
+        "codex": {
+          "paths": [
+            "AGENTS.md"
+          ],
+          "characters": 92,
+          "estimated_tokens": 23,
+          "root_estimated_tokens": 23
+        },
+        "claude": {
+          "paths": [],
+          "characters": 0,
+          "estimated_tokens": 0,
+          "root_estimated_tokens": 0
+        },
+        "gemini": {
+          "paths": [],
+          "characters": 0,
+          "estimated_tokens": 0,
+          "root_estimated_tokens": 0
+        },
+        "copilot": {
+          "paths": [],
+          "characters": 0,
+          "estimated_tokens": 0,
+          "root_estimated_tokens": 0
+        },
+        "cursor": {
+          "paths": [],
+          "characters": 0,
+          "estimated_tokens": 0,
+          "root_estimated_tokens": 0
+        }
+      },
+      "conditional_instructions": {
+        "claude": {
+          "paths": [],
+          "characters": 0,
+          "estimated_tokens": 0
+        }
+      },
+      "skill_descriptions": [],
+      "every_prompt_hooks": []
+    },
+    "conventions": {
+      "review_gate": {
+        "status": "absent",
+        "evidence": []
+      },
+      "handoff": {
+        "status": "absent",
+        "evidence": []
+      },
+      "friction_line": {
+        "status": "absent",
+        "evidence": []
+      },
+      "parallel_worktree": {
+        "status": "absent",
+        "evidence": []
+      },
+      "plan_approval": {
+        "status": "absent",
+        "evidence": []
+      }
+    },
+    "convention_lexicon_version": 1,
+    "convention_search_paths": [
+      "AGENTS.md"
+    ],
+    "warnings": [
+      {
+        "kind": "root-not-versioned"
+      }
+    ],
+    "observed_starts": {
+      "status": "no-starts-found",
+      "sessions": 0,
+      "placement_sessions": 0,
+      "start_evidence": {},
+      "roles": {
+        "top-level": 0,
+        "worker": 0
+      },
+      "agents": [],
+      "paths": [],
+      "coverage": {},
+      "window": {
+        "since": "<START_WINDOW_SINCE>",
+        "until": "<START_WINDOW_UNTIL>"
+      },
+      "adapter_coverage": {
+        "claude-code": {
+          "files_scanned": 0,
+          "lines_read": 0,
+          "broken_lines": 0,
+          "duplicate_events": 0,
+          "unreadable_files": 0,
+          "invalid_timestamps": 0,
+          "invalid_token_records": 0,
+          "inherited_session_meta": 0,
+          "unknown_record_types": {}
+        },
+        "codex": {
+          "files_scanned": 0,
+          "lines_read": 0,
+          "broken_lines": 0,
+          "duplicate_events": 0,
+          "unreadable_files": 0,
+          "invalid_timestamps": 0,
+          "invalid_token_records": 0,
+          "inherited_session_meta": 0,
+          "unknown_record_types": {}
+        }
+      }
+    },
+    "load_rules_version": 1,
+    "load_rules_revision": 2
+  },
+  "gaps": [
+    {
+      "id": "missing-risk-review",
+      "evidence": {
+        "paths": [],
+        "searched_paths": [
+          "AGENTS.md"
+        ]
+      },
+      "candidates": [
+        "review-gates"
+      ]
+    },
+    {
+      "id": "missing-handoff",
+      "evidence": {
+        "paths": [],
+        "searched_paths": [
+          "AGENTS.md"
+        ]
+      },
+      "candidates": [
+        "handoff"
+      ]
+    },
+    {
+      "id": "missing-friction-line",
+      "evidence": {
+        "paths": [],
+        "searched_paths": [
+          "AGENTS.md"
+        ]
+      },
+      "candidates": [
+        "friction-line"
+      ]
+    },
+    {
+      "id": "missing-worktree-rule",
+      "evidence": {
+        "paths": [],
+        "searched_paths": [
+          "AGENTS.md"
+        ]
+      },
+      "candidates": [
+        "parallel-worktrees"
+      ]
+    },
+    {
+      "id": "missing-plan-approval",
+      "evidence": {
+        "paths": [],
+        "searched_paths": [
+          "AGENTS.md"
+        ]
+      },
+      "candidates": [
+        "plan-and-approval"
+      ]
+    }
+  ],
+  "practices": [
+    {
+      "id": "review-gates",
+      "risk": "medium",
+      "files": [
+        "AGENTS.md",
+        "docs/sumbi/review.md"
+      ],
+      "content_hash": "979fa8f0c66a74df173489ddd23f9ef9097ec9c61fa5807faba3bd5e6dea6719",
+      "prediction": {
+        "metric": "risk_related_followups_per_deliverable",
+        "direction": "decrease",
+        "rough_size_percent": 15,
+        "condition": "Owner assigns paths and reviewers; required gates are actually observed."
+      },
+      "judgment": "Audit review evidence and risk-related fixes by matched risk class; never accept a cost saving obtained by weakening a gate.",
+      "provenance": [
+        "gstack",
+        "lab",
+        "superpowers"
+      ]
+    },
+    {
+      "id": "plan-and-approval",
+      "risk": "low",
+      "files": [
+        "AGENTS.md",
+        "docs/sumbi/planning.md"
+      ],
+      "content_hash": "99034c48bdab87dda2faf0b52f93c020873e184fdf8b500e78d9863f897d52c3",
+      "prediction": {
+        "metric": "rework_time_per_success",
+        "direction": "decrease",
+        "rough_size_percent": 10,
+        "condition": "Planning resolves real uncertainty without adding repeated approvals."
+      },
+      "judgment": "Compare rework and total elapsed time for similarly sized tasks, including planning and owner waiting time.",
+      "provenance": [
+        "gajae-code",
+        "superpowers"
+      ]
+    },
+    {
+      "id": "handoff",
+      "risk": "low",
+      "files": [
+        "AGENTS.md",
+        "docs/sumbi/handoff.md"
+      ],
+      "content_hash": "e578a73303c340dba8f2fa76bfdd6b3cc6860f6943d24f47ae42f77a3f66dbcc",
+      "prediction": {
+        "metric": "restart_time_per_success",
+        "direction": "decrease",
+        "rough_size_percent": 15,
+        "condition": "A successor uses the handoff instead of repeating investigation."
+      },
+      "judgment": "Compare resumed deliverables with similar scope; include time spent writing and reading the handoff.",
+      "provenance": [
+        "lab"
+      ]
+    },
+    {
+      "id": "friction-line",
+      "risk": "low",
+      "files": [
+        "AGENTS.md",
+        "docs/sumbi/friction.md"
+      ],
+      "content_hash": "03bbb326e73a6500be8233a3af219d144c41ed535a6dc184898d93744da1e14f",
+      "prediction": {
+        "metric": "unclassified_harness_obstacles",
+        "direction": "decrease",
+        "rough_size_percent": 20,
+        "condition": "Reports use the convention and an owner reviews recurring obstacles."
+      },
+      "judgment": "Compare obstacle classification coverage first, then matched success and cost after a separate corrective intervention.",
+      "provenance": [
+        "lab"
+      ]
+    },
+    {
+      "id": "parallel-worktrees",
+      "risk": "low",
+      "files": [
+        "AGENTS.md",
+        "docs/sumbi/parallel.md"
+      ],
+      "content_hash": "7e0ceb8b6b99f59034824d6281ebd8c687af6e70d276cd4eb20ec93a6f520423",
+      "prediction": {
+        "metric": "conflict_recovery_time_per_success",
+        "direction": "decrease",
+        "rough_size_percent": 20,
+        "condition": "Parallel work has non-overlapping ownership and reviewed integration."
+      },
+      "judgment": "Compare parallel deliverables of similar size; include integration and conflict recovery time, not just worker elapsed time.",
+      "provenance": [
+        "superpowers",
+        "lab"
+      ]
+    }
+  ],
+  "changes": [
+    {
+      "path": "AGENTS.md",
+      "before_hash": "339e4998a66bae33fb0b234a558468fa68896a10fb1484b8b30d0188600d28ea",
+      "after_hash": "b54046bd1783b7eccd4da57721d5fd1eab6d5a6b537f75e87c7a3248dc154bd7",
+      "diff": "--- a/AGENTS.md\n+++ b/AGENTS.md\n@@ -3,0 +4,20 @@\n+\n+<!-- sumbi:begin review-gates -->\n+Risky paths need review before release. Preserve existing approvals and require independent review for security, permissions and money paths. See [review levels](docs/sumbi/review.md).\n+<!-- sumbi:end review-gates -->\n+\n+<!-- sumbi:begin plan-and-approval -->\n+For substantial changes, resolve missing requirements, write a plan with acceptance criteria, and critique it before implementation. Follow the existing approval policy. See [planning](docs/sumbi/planning.md).\n+<!-- sumbi:end plan-and-approval -->\n+\n+<!-- sumbi:begin handoff -->\n+Leave a handoff document when work changes hands: acceptance criteria, evidence, remaining work and the next action. See [handoffs](docs/sumbi/handoff.md).\n+<!-- sumbi:end handoff -->\n+\n+<!-- sumbi:begin friction-line -->\n+End a work report with `Harness friction: none` or one short description of the harness obstacle. Keep sensitive details in local notes. See [friction feedback](docs/sumbi/friction.md).\n+<!-- sumbi:end friction-line -->\n+\n+<!-- sumbi:begin parallel-worktrees -->\n+Parallel agents use separate worktrees and explicit file ownership. Do not edit another agent's working copy. See [parallel work](docs/sumbi/parallel.md).\n+<!-- sumbi:end parallel-worktrees -->\n"
+    },
+    {
+      "path": "docs/sumbi/friction.md",
+      "before_hash": null,
+      "after_hash": "33558badff64908923744f9d5206922bb5b8a2d04a19f0909b820edc2bf0fb6d",
+      "diff": "--- /dev/null\n+++ b/docs/sumbi/friction.md\n@@ -0,0 +1,7 @@\n+<!-- sumbi:begin friction-line -->\n+# Friction feedback\n+\n+Use the final friction line to identify an instruction, tool or check that blocked or repeated work. Describe the failing layer and its consequence briefly; do not include prompts, transcripts, secrets or machine identifiers in shared output.\n+\n+Review repeated obstacles before adding more instructions. Prefer a reliable check or a simpler workflow when it addresses the cause. A report is evidence to investigate, not proof that the proposed fix saves cost.\n+<!-- sumbi:end friction-line -->\n"
+    },
+    {
+      "path": "docs/sumbi/handoff.md",
+      "before_hash": null,
+      "after_hash": "7845fe459774e1333ab979d520f95d50babbf211e6ed6e14b1de227d49cb2fb9",
+      "diff": "--- /dev/null\n+++ b/docs/sumbi/handoff.md\n@@ -0,0 +1,7 @@\n+<!-- sumbi:begin handoff -->\n+# Handoff convention\n+\n+Keep each live handoff in a local location approved by the repository owner. Do not commit session transcripts, secrets or machine paths.\n+\n+Record the deliverable ID and acceptance criteria, current state, files changed, checks actually run, unresolved risks, and the next action. Separate observations from assumptions. A successor should be able to resume without repeating the investigation.\n+<!-- sumbi:end handoff -->\n"
+    },
+    {
+      "path": "docs/sumbi/parallel.md",
+      "before_hash": null,
+      "after_hash": "f58517416393de88d6367ae97af415d759e60de346b28fc9d821809aba756574",
+      "diff": "--- /dev/null\n+++ b/docs/sumbi/parallel.md\n@@ -0,0 +1,7 @@\n+<!-- sumbi:begin parallel-worktrees -->\n+# Parallel work\n+\n+Assign each parallel agent a separate branch and worktree, plus an explicit set of files it owns. Agree on shared interfaces before editing. Check the working copy and branch before making changes.\n+\n+Integrate through reviewed changes. Preserve another agent's uncommitted work, and resolve overlaps with its owner. Never remove a worktree or branch merely because a task appears finished.\n+<!-- sumbi:end parallel-worktrees -->\n"
+    },
+    {
+      "path": "docs/sumbi/planning.md",
+      "before_hash": null,
+      "after_hash": "60ee5b15d770cad489de0c968b22a41e02f03776d52f14f60b927516607e65a8",
+      "diff": "--- /dev/null\n+++ b/docs/sumbi/planning.md\n@@ -0,0 +1,7 @@\n+<!-- sumbi:begin plan-and-approval -->\n+# Planning\n+\n+Ask only for information that blocks a correct implementation. Record the deliverable, acceptance criteria, constraints and likely failure cases. Critique the plan against those criteria before making a substantial change. Keep small reversible edits proportionate.\n+\n+Prepare a concrete reviewable result before requesting a final approval. Existing approvals still govern destructive or external actions. Do not treat silence as approval, and do not ask again when the requested scope is already authorized.\n+<!-- sumbi:end plan-and-approval -->\n"
+    },
+    {
+      "path": "docs/sumbi/review.md",
+      "before_hash": null,
+      "after_hash": "39de9b9619e1f4344953ea5be649c0350b38cacf79b162042579c95420b7f77f",
+      "diff": "--- /dev/null\n+++ b/docs/sumbi/review.md\n@@ -0,0 +1,11 @@\n+<!-- sumbi:begin review-gates -->\n+# Review levels\n+\n+| Work size or risk | Evidence and review |\n+| --- | --- |\n+| Small wording or local configuration | Read the resulting change and check the affected behavior. |\n+| Behavior across several components | Ask an independent engineering reviewer; include targeted test evidence. |\n+| Security, permissions, money, or irreversible operations | Require owner approval and a reviewer from a different model family; include the applicable security and release checks. |\n+\n+The owner must map risky repository paths to these roles. A role is a review responsibility, not a claim that a tool enforces it. Existing stronger gates remain in force. If review is unavailable, leave the risky action pending.\n+<!-- sumbi:end review-gates -->\n"
+    }
+  ],
+  "notes": [],
+  "baseline": {
+    "status": "available (runs before apply)"
+  }
+}

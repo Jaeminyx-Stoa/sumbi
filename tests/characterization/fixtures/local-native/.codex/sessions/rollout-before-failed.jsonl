@@ -1,0 +1,6 @@
+{"type": "session_meta", "timestamp": "2030-01-01T01:00:00Z", "payload": {"id": "before-failed", "cwd": "fixture-repository", "cli_version": "1.0", "source": {"subagent": {"thread_spawn": {"parent_thread_id": "coordinator"}}}}}
+{"type": "turn_context", "timestamp": "2030-01-01T01:00:01Z", "payload": {"cwd": "fixture-repository", "model": "synthetic-model", "effort": "high"}}
+{"type": "response_item", "timestamp": "2030-01-01T01:00:02Z", "payload": {"type": "custom_tool_call", "name": "apply_patch", "call_id": "edit-1", "input": "synthetic patch"}}
+{"type": "event_msg", "timestamp": "2030-01-01T01:00:04Z", "payload": {"type": "item_completed", "started_at_ms": 1893459603000, "item": {"type": "CommandExecution", "id": "check-1", "command": ["bash", "scripts/check.sh"], "cwd": "fixture-repository", "exit_code": 3}}}
+{"type": "event_msg", "timestamp": "2030-01-01T01:00:05Z", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 100, "cached_input_tokens": 0, "output_tokens": 0}}}}
+{"type": "event_msg", "timestamp": "2030-01-01T01:00:06Z", "payload": {"type": "task_complete", "turn_id": "turn-1"}}

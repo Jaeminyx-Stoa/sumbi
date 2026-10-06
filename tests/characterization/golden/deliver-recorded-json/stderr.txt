@@ -1,0 +1,32 @@
+sumbi deliver
+States: success 3; failed 2; in_progress 0; immature 1
+Checks bases (deliverables): historical 5; current_policy 0; all_visible 0; unknown 1
+success_rate: 3/6; Wilson 95% [0.187616, 0.812384]
+first_pass_success_rate: 2/6; Wilson 95% [0.096771, 0.700007]
+operational: 180 reported tokens / 3 successes; 60 tokens per success
+  new_input 30; cache_write 6; cache_read 9; output 15; reasoning_output not reported
+operational_linked: 160 reported tokens / 3 successes; 53.3333 tokens per success
+  new_input 26.6667; cache_write 5.33333; cache_read 8; output 13.3333; reasoning_output not reported
+cohort: 180 reported tokens / 3 successes; 60 tokens per success
+  new_input 30; cache_write 6; cache_read 9; output 15; reasoning_output not reported
+Period linked: 160 reported tokens
+Period unallocated: 20 reported tokens
+Period unassigned: 20 reported tokens
+Period other: 20 reported tokens
+Lifetime scan linked: 180 reported tokens
+Lifetime scan unallocated: 20 reported tokens
+Lifetime scan unassigned: 20 reported tokens
+Lifetime scan other: 20 reported tokens
+Deliverable D1: success; accepted; task type not reported; checks basis historical; elapsed seconds 86400.0; tokens 40
+Deliverable Dfail: failed; abandoned; task type not reported; checks basis unknown; elapsed seconds 86400.0; tokens 20
+Deliverable Drev: failed; reverted; task type not reported; checks basis historical; elapsed seconds 86400.0; tokens 20
+Deliverable Dimm: immature; window_open; task type not reported; checks basis historical; elapsed seconds 2332800.0; tokens 20
+Deliverable Dsplit: success; accepted; task type not reported; checks basis historical; elapsed seconds 86400.0; tokens 40
+Deliverable Dfollow: success; accepted; task type not reported; checks basis historical; elapsed seconds 345600.0; tokens 40
+Link evidence events: deliverable_id 9; tool_reference 0; project_time_weak 0; ambiguous 1; unallocated 0; unassigned 1; other 1
+Coverage claude-code: files 11; sessions read 11; broken lines 0; duplicates 0; unreadable files 0; invalid tokens 0
+Coverage codex: files 0; sessions read 0; broken lines 0; duplicates 0; unreadable files 0; invalid tokens 0
+Coverage outcomes: ledger rows 6; files read 1; missing PRs 0
+Unattributed period token share: 0.272727
+Pseudonym keys: salted (HMAC-SHA256)
+Savings verdict: not evaluated; costs are reported tokens, not currency.

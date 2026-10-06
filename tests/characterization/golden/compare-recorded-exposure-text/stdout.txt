@@ -1,0 +1,53 @@
+sumbi compare
+Verdict proposal: withhold
+Reasons: not_comparable, after_excluded_or_unlinked, agent_mix_shift
+Exposure gap: 60 seconds; actual write later than planned
+Sample per arm: registered 20; needed 11; actual before 20, after 0
+before success: 16/20; Wilson 95% [0.583983, 0.919342]
+before merged-attempt checks bases: historical 16
+before new_input per success: 1200/16 = 75; bootstrap 95% [63.1579, 100]
+before cache_write per success: not reported/16 = not reported; bootstrap 95% not reported
+before cache_read per success: 400/16 = 25; bootstrap 95% [21.0526, 33.3333]
+before output per success: 400/16 = 25; bootstrap 95% [21.0526, 33.3333]
+before reasoning_output per success: 100/16 = 6.25; bootstrap 95% [5.26316, 8.33333]
+before total per success: 2000/16 = 125; bootstrap 95% [105.263, 166.667]
+before time per success: 2000/16 = 125; bootstrap 95% [105.263, 166.667]
+after success: 0/0; Wilson 95% not reported
+after merged-attempt checks bases: 
+after new_input per success: not reported/0 = not reported; bootstrap 95% not reported
+after cache_write per success: not reported/0 = not reported; bootstrap 95% not reported
+after cache_read per success: not reported/0 = not reported; bootstrap 95% not reported
+after output per success: not reported/0 = not reported; bootstrap 95% not reported
+after reasoning_output per success: not reported/0 = not reported; bootstrap 95% not reported
+after total per success: not reported/0 = not reported; bootstrap 95% not reported
+after time per success: not reported/0 = not reported; bootstrap 95% not reported
+After - before success: not reported; Newcombe 95% not reported; inconclusive; margin 50 percentage points
+new_input after/before: not reported/75 = not reported; bootstrap 95% not reported; uncertain
+cache_write after/before: not reported/not reported = not reported; bootstrap 95% not reported; uncertain
+cache_read after/before: not reported/25 = not reported; bootstrap 95% not reported; uncertain
+output after/before: not reported/25 = not reported; bootstrap 95% not reported; uncertain
+reasoning_output after/before: not reported/6.25 = not reported; bootstrap 95% not reported; uncertain
+total after/before: not reported/125 = not reported; bootstrap 95% not reported; uncertain
+time after/before: not reported/125 = not reported; bootstrap 95% not reported; uncertain
+Bootstrap: seed 1729; resamples 5000
+before excluded or unlinked: 0/20; 
+after excluded or unlinked: 20/20; exposure_gap 20
+Flag after_excluded_or_unlinked: blocking
+Flag agent_mix_shift: blocking
+Flag volume_shift: informational
+model mix total variation: not reported
+  before: synthetic-model 20/20 = 1
+  after: 
+effort mix total variation: not reported
+  before: high 20/20 = 1
+  after: 
+cli_version mix total variation: not reported
+  before: 1.0 20/20 = 1
+  after: 
+task_type mix total variation: not reported
+  before: feature 20/20 = 1
+  after: 
+Task type feature (descriptive only): before 16/20; Wilson 95% [0.583983, 0.919342]; after 0/0; Wilson 95% not reported
+Unattributed lifetime tokens: 0/2800; share 0
+Other-project lifetime tokens (context): 0
+Coverage codex: sessions 40; files 40; broken lines 0; unreadable files 0

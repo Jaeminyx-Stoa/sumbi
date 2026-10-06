@@ -5,7 +5,7 @@ from datetime import timedelta
 import io
 import json
 from pathlib import Path
-import tempfile
+from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -86,7 +86,7 @@ class CommandTests(unittest.TestCase):
                 self.assertIsNone(execution_cwd(value))
 
     def test_config_and_cli_declarations(self):
-        with tempfile.TemporaryDirectory() as temporary:
+        with IsolatedTemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / ".sumbi").mkdir()
             (root / ".sumbi/config.toml").write_text('verify = ["./scripts/check.sh"]', encoding="utf-8")
@@ -110,7 +110,7 @@ class CommandTests(unittest.TestCase):
 
 class UnitTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory()
+        self.temporary = IsolatedTemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.home = Path(self.temporary.name) / "home"
         self.repo = (Path(self.temporary.name) / "repo").resolve()

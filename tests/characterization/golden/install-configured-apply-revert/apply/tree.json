@@ -1,0 +1,206 @@
+[
+  {
+    "path": ".agents",
+    "kind": "directory"
+  },
+  {
+    "path": ".agents/skills",
+    "kind": "directory"
+  },
+  {
+    "path": ".agents/skills/check",
+    "kind": "directory"
+  },
+  {
+    "path": ".agents/skills/check/SKILL.md",
+    "kind": "file"
+  },
+  {
+    "path": ".claude",
+    "kind": "directory"
+  },
+  {
+    "path": ".claude/agents",
+    "kind": "directory"
+  },
+  {
+    "path": ".claude/agents/reviewer.md",
+    "kind": "file"
+  },
+  {
+    "path": ".claude/commands",
+    "kind": "directory"
+  },
+  {
+    "path": ".claude/commands/check.md",
+    "kind": "file"
+  },
+  {
+    "path": ".claude/rules",
+    "kind": "directory"
+  },
+  {
+    "path": ".claude/rules/checks.md",
+    "kind": "file"
+  },
+  {
+    "path": ".claude/settings.json",
+    "kind": "file"
+  },
+  {
+    "path": ".claude/skills",
+    "kind": "directory"
+  },
+  {
+    "path": ".claude/skills/check",
+    "kind": "directory"
+  },
+  {
+    "path": ".claude/skills/check/references",
+    "kind": "directory"
+  },
+  {
+    "path": ".claude/skills/check/references/note.md",
+    "kind": "file"
+  },
+  {
+    "path": ".claude/skills/check/SKILL.md",
+    "kind": "file"
+  },
+  {
+    "path": ".codex",
+    "kind": "directory"
+  },
+  {
+    "path": ".codex/config.toml",
+    "kind": "file"
+  },
+  {
+    "path": ".codex/hooks.json",
+    "kind": "file"
+  },
+  {
+    "path": ".cursor",
+    "kind": "directory"
+  },
+  {
+    "path": ".cursor/rules",
+    "kind": "directory"
+  },
+  {
+    "path": ".cursor/rules/checks.mdc",
+    "kind": "file"
+  },
+  {
+    "path": ".eslintrc.json",
+    "kind": "file"
+  },
+  {
+    "path": ".githooks",
+    "kind": "directory"
+  },
+  {
+    "path": ".githooks/pre-commit",
+    "kind": "file"
+  },
+  {
+    "path": ".github",
+    "kind": "directory"
+  },
+  {
+    "path": ".github/CODEOWNERS",
+    "kind": "file"
+  },
+  {
+    "path": ".github/copilot-instructions.md",
+    "kind": "file"
+  },
+  {
+    "path": ".github/pull_request_template.md",
+    "kind": "file"
+  },
+  {
+    "path": ".github/workflows",
+    "kind": "directory"
+  },
+  {
+    "path": ".github/workflows/checks.yml",
+    "kind": "file"
+  },
+  {
+    "path": ".husky",
+    "kind": "directory"
+  },
+  {
+    "path": ".husky/pre-commit",
+    "kind": "file"
+  },
+  {
+    "path": ".mcp.json",
+    "kind": "file"
+  },
+  {
+    "path": ".pre-commit-config.yaml",
+    "kind": "file"
+  },
+  {
+    "path": ".prettierrc.json",
+    "kind": "file"
+  },
+  {
+    "path": "AGENTS.md",
+    "kind": "file"
+  },
+  {
+    "path": "CLAUDE.md",
+    "kind": "file"
+  },
+  {
+    "path": "docs",
+    "kind": "directory"
+  },
+  {
+    "path": "docs/extra.md",
+    "kind": "file"
+  },
+  {
+    "path": "GEMINI.md",
+    "kind": "file"
+  },
+  {
+    "path": "lefthook.yml",
+    "kind": "file"
+  },
+  {
+    "path": "Makefile",
+    "kind": "file"
+  },
+  {
+    "path": "mypy.ini",
+    "kind": "file"
+  },
+  {
+    "path": "noxfile.py",
+    "kind": "file"
+  },
+  {
+    "path": "package.json",
+    "kind": "file"
+  },
+  {
+    "path": "pyproject.toml",
+    "kind": "file"
+  },
+  {
+    "path": "src",
+    "kind": "directory"
+  },
+  {
+    "path": "src/AGENTS.md",
+    "kind": "file"
+  },
+  {
+    "path": "tox.ini",
+    "kind": "file"
+  }
+]

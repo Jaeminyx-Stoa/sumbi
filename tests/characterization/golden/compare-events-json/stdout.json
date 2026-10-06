@@ -1,0 +1,739 @@
+{
+  "schema_version": "local-compare-1.0",
+  "outcome_source": "local-verify",
+  "verification": {
+    "completed": 2,
+    "passed": 2,
+    "exit_code_counts": {
+      "0": 2
+    },
+    "arms": {
+      "before": {
+        "completed": 1,
+        "passed": 1,
+        "exit_code_counts": {
+          "0": 1
+        }
+      },
+      "after": {
+        "completed": 1,
+        "passed": 1,
+        "exit_code_counts": {
+          "0": 1
+        }
+      }
+    }
+  },
+  "signals": [],
+  "registration": {
+    "outcome_source": "local-verify",
+    "intervention_id": "intervention_05573134be99472b9fcbacf7",
+    "applied_at": "2030-01-02T00:00:00+00:00",
+    "registered_at": "2029-12-31T00:00:00+00:00",
+    "preregistered": true,
+    "predictions": [
+      {
+        "metric": "tokens_per_success",
+        "direction": "decrease",
+        "rough_size_percent": 50
+      }
+    ],
+    "non_inferiority_margin_pp": 50,
+    "windows": {
+      "before": {
+        "since": "2030-01-01T00:00:00+00:00",
+        "until": "2030-01-02T00:00:00+00:00",
+        "bounds": "[since,until)"
+      },
+      "after": {
+        "since": "2030-01-02T00:00:00+00:00",
+        "until": "2030-01-03T00:00:00+00:00",
+        "bounds": "[since,until)"
+      }
+    }
+  },
+  "sample_size": {
+    "registered_per_arm": 1,
+    "needed_per_arm": 0,
+    "actual": {
+      "before": 1,
+      "after": 1
+    }
+  },
+  "bootstrap": {
+    "seed": 1729,
+    "resamples": 5000,
+    "unit": "worker_session"
+  },
+  "arms": {
+    "before": {
+      "n": 1,
+      "success_rate": {
+        "numerator": 1,
+        "denominator": 1,
+        "rate": 1.0,
+        "wilson_95": [
+          0.20654931437723745,
+          1.0
+        ]
+      },
+      "cost": {
+        "new_input": {
+          "numerator": 100,
+          "denominator": 1,
+          "value": 100.0,
+          "interval_95": [
+            100.0,
+            100.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "cache_write": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "interval_95": [
+            0.0,
+            0.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "cache_read": {
+          "numerator": 20,
+          "denominator": 1,
+          "value": 20.0,
+          "interval_95": [
+            20.0,
+            20.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "output": {
+          "numerator": 10,
+          "denominator": 1,
+          "value": 10.0,
+          "interval_95": [
+            10.0,
+            10.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "reasoning_output": {
+          "numerator": 2,
+          "denominator": 1,
+          "value": 2.0,
+          "interval_95": [
+            2.0,
+            2.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "total": {
+          "numerator": 130,
+          "denominator": 1,
+          "value": 130.0,
+          "interval_95": [
+            130.0,
+            130.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "time": {
+          "numerator": 6.0,
+          "denominator": 1,
+          "value": 6.0,
+          "interval_95": [
+            6.0,
+            6.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        }
+      },
+      "candidate_states": {
+        "success": 1,
+        "failed": 0,
+        "unverified": 0,
+        "in_progress": 0,
+        "no_change": 0
+      },
+      "units": [
+        {
+          "id": "session_76eb20bb68f2e2a16e7fa740",
+          "agent": "sumbi-events:agent_9e260e54ae0e8fd149c80532",
+          "parent_id": "session_76adbe992952c2c7b488f1be",
+          "dispatched_at": "2030-01-01T01:00:00+00:00",
+          "last_at": "2030-01-01T01:00:06+00:00",
+          "start_scope": "repository_root",
+          "state": "success",
+          "reason": "last_check_passed",
+          "task_type": null,
+          "tokens": {
+            "new_input": 100,
+            "cache_write": 0,
+            "cache_read": 20,
+            "output": 10,
+            "reasoning_output": 2,
+            "total": 130,
+            "evidence_incomplete": false
+          },
+          "tokens_complete": true,
+          "observed_total": 130,
+          "elapsed_seconds": 6.0,
+          "model": [
+            "model_99051c601e033380bf6cd425"
+          ],
+          "effort": [
+            "effort_79ae4a0c1a7a14f3fbe5b7aa"
+          ],
+          "cli_version": [
+            "version_951ecbfab63ab4a551bcdd71"
+          ],
+          "command_coverage": {
+            "matched": 1,
+            "unknown_execution_cwd": 0,
+            "unknown_execution_start": 0,
+            "unknown_exit_code": 0
+          },
+          "metadata_incomplete": {
+            "model": false,
+            "effort": false,
+            "cli_version": false
+          }
+        }
+      ]
+    },
+    "after": {
+      "n": 1,
+      "success_rate": {
+        "numerator": 1,
+        "denominator": 1,
+        "rate": 1.0,
+        "wilson_95": [
+          0.20654931437723745,
+          1.0
+        ]
+      },
+      "cost": {
+        "new_input": {
+          "numerator": 100,
+          "denominator": 1,
+          "value": 100.0,
+          "interval_95": [
+            100.0,
+            100.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "cache_write": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "interval_95": [
+            0.0,
+            0.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "cache_read": {
+          "numerator": 20,
+          "denominator": 1,
+          "value": 20.0,
+          "interval_95": [
+            20.0,
+            20.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "output": {
+          "numerator": 10,
+          "denominator": 1,
+          "value": 10.0,
+          "interval_95": [
+            10.0,
+            10.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "reasoning_output": {
+          "numerator": 2,
+          "denominator": 1,
+          "value": 2.0,
+          "interval_95": [
+            2.0,
+            2.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "total": {
+          "numerator": 130,
+          "denominator": 1,
+          "value": 130.0,
+          "interval_95": [
+            130.0,
+            130.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        },
+        "time": {
+          "numerator": 6.0,
+          "denominator": 1,
+          "value": 6.0,
+          "interval_95": [
+            6.0,
+            6.0
+          ],
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 5000
+        }
+      },
+      "candidate_states": {
+        "success": 1,
+        "failed": 0,
+        "unverified": 0,
+        "in_progress": 0,
+        "no_change": 0
+      },
+      "units": [
+        {
+          "id": "session_d44acaa7b2346dd0f370478e",
+          "agent": "sumbi-events:agent_9e260e54ae0e8fd149c80532",
+          "parent_id": "session_f176352aa2bc1aeb178d930e",
+          "dispatched_at": "2030-01-02T01:00:00+00:00",
+          "last_at": "2030-01-02T01:00:06+00:00",
+          "start_scope": "repository_root",
+          "state": "success",
+          "reason": "last_check_passed",
+          "task_type": null,
+          "tokens": {
+            "new_input": 100,
+            "cache_write": 0,
+            "cache_read": 20,
+            "output": 10,
+            "reasoning_output": 2,
+            "total": 130,
+            "evidence_incomplete": false
+          },
+          "tokens_complete": true,
+          "observed_total": 130,
+          "elapsed_seconds": 6.0,
+          "model": [
+            "model_99051c601e033380bf6cd425"
+          ],
+          "effort": [
+            "effort_79ae4a0c1a7a14f3fbe5b7aa"
+          ],
+          "cli_version": [
+            "version_951ecbfab63ab4a551bcdd71"
+          ],
+          "command_coverage": {
+            "matched": 1,
+            "unknown_execution_cwd": 0,
+            "unknown_execution_start": 0,
+            "unknown_exit_code": 0
+          },
+          "metadata_incomplete": {
+            "model": false,
+            "effort": false,
+            "cli_version": false
+          }
+        }
+      ]
+    }
+  },
+  "success_difference": {
+    "before": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0,
+      "wilson_95": [
+        0.20654931437723745,
+        1.0
+      ]
+    },
+    "after": {
+      "numerator": 1,
+      "denominator": 1,
+      "rate": 1.0,
+      "wilson_95": [
+        0.20654931437723745,
+        1.0
+      ]
+    },
+    "difference": 0.0,
+    "interval_95": [
+      -0.7934506856227626,
+      0.7934506856227626
+    ],
+    "interval_method": "newcombe_method_10",
+    "non_inferiority": "inconclusive"
+  },
+  "ratios": {
+    "new_input": {
+      "numerator": 100.0,
+      "denominator": 100.0,
+      "value": 1.0,
+      "interval_95": [
+        1.0,
+        1.0
+      ],
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 5000,
+      "classification": "uncertain"
+    },
+    "cache_write": {
+      "numerator": 0.0,
+      "denominator": 0.0,
+      "value": null,
+      "interval_95": null,
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 0,
+      "classification": "uncertain"
+    },
+    "cache_read": {
+      "numerator": 20.0,
+      "denominator": 20.0,
+      "value": 1.0,
+      "interval_95": [
+        1.0,
+        1.0
+      ],
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 5000,
+      "classification": "uncertain"
+    },
+    "output": {
+      "numerator": 10.0,
+      "denominator": 10.0,
+      "value": 1.0,
+      "interval_95": [
+        1.0,
+        1.0
+      ],
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 5000,
+      "classification": "uncertain"
+    },
+    "reasoning_output": {
+      "numerator": 2.0,
+      "denominator": 2.0,
+      "value": 1.0,
+      "interval_95": [
+        1.0,
+        1.0
+      ],
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 5000,
+      "classification": "uncertain"
+    },
+    "total": {
+      "numerator": 130.0,
+      "denominator": 130.0,
+      "value": 1.0,
+      "interval_95": [
+        1.0,
+        1.0
+      ],
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 5000,
+      "classification": "uncertain"
+    },
+    "time": {
+      "numerator": 6.0,
+      "denominator": 6.0,
+      "value": 1.0,
+      "interval_95": [
+        1.0,
+        1.0
+      ],
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 5000,
+      "classification": "uncertain"
+    }
+  },
+  "exclusions": {
+    "before": {
+      "share": {
+        "numerator": 0,
+        "denominator": 1,
+        "value": 0.0,
+        "interval_95": null,
+        "interval_method": "not_applicable_census"
+      },
+      "risky_share": {
+        "numerator": 0,
+        "denominator": 1,
+        "value": 0.0,
+        "interval_95": null,
+        "interval_method": "not_applicable_census"
+      },
+      "counts": {},
+      "units": []
+    },
+    "after": {
+      "share": {
+        "numerator": 0,
+        "denominator": 1,
+        "value": 0.0,
+        "interval_95": null,
+        "interval_method": "not_applicable_census"
+      },
+      "risky_share": {
+        "numerator": 0,
+        "denominator": 1,
+        "value": 0.0,
+        "interval_95": null,
+        "interval_method": "not_applicable_census"
+      },
+      "counts": {},
+      "units": []
+    }
+  },
+  "mixes": {
+    "agent": {
+      "before": {
+        "values": {
+          "sumbi-events:agent_9e260e54ae0e8fd149c80532": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "sumbi-events:agent_9e260e54ae0e8fd149c80532"
+        ]
+      },
+      "after": {
+        "values": {
+          "sumbi-events:agent_9e260e54ae0e8fd149c80532": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "sumbi-events:agent_9e260e54ae0e8fd149c80532"
+        ]
+      },
+      "total_variation_distance": 0.0,
+      "dominant_changed": false
+    },
+    "model": {
+      "before": {
+        "values": {
+          "model_99051c601e033380bf6cd425": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "model_99051c601e033380bf6cd425"
+        ]
+      },
+      "after": {
+        "values": {
+          "model_99051c601e033380bf6cd425": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "model_99051c601e033380bf6cd425"
+        ]
+      },
+      "total_variation_distance": 0.0,
+      "dominant_changed": false
+    },
+    "effort": {
+      "before": {
+        "values": {
+          "effort_79ae4a0c1a7a14f3fbe5b7aa": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "effort_79ae4a0c1a7a14f3fbe5b7aa"
+        ]
+      },
+      "after": {
+        "values": {
+          "effort_79ae4a0c1a7a14f3fbe5b7aa": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "effort_79ae4a0c1a7a14f3fbe5b7aa"
+        ]
+      },
+      "total_variation_distance": 0.0,
+      "dominant_changed": false
+    },
+    "cli_version": {
+      "before": {
+        "values": {
+          "version_951ecbfab63ab4a551bcdd71": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "version_951ecbfab63ab4a551bcdd71"
+        ]
+      },
+      "after": {
+        "values": {
+          "version_951ecbfab63ab4a551bcdd71": {
+            "numerator": 1,
+            "denominator": 1,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "version_951ecbfab63ab4a551bcdd71"
+        ]
+      },
+      "total_variation_distance": 0.0,
+      "dominant_changed": false
+    }
+  },
+  "flags": [
+    {
+      "name": "dispatch_overhead_excluded",
+      "blocking": false,
+      "evidence": {
+        "sessions": 2,
+        "observed_total": 80
+      }
+    }
+  ],
+  "coverage": {
+    "adapters": {
+      "sumbi-events": {
+        "files_scanned": 3,
+        "lines_read": 22,
+        "broken_lines": 0,
+        "duplicate_events": 2,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 4
+      }
+    },
+    "commands": {
+      "matched": 2,
+      "unknown_execution_cwd": 0,
+      "unknown_execution_start": 0,
+      "unknown_exit_code": 0
+    },
+    "start_scope_counts": {
+      "repository_root": 2
+    },
+    "excluded_scope": {},
+    "incomplete_reasons": []
+  },
+  "dispatch_overhead": {
+    "sessions": 2,
+    "rows": [
+      {
+        "id": "session_f176352aa2bc1aeb178d930e",
+        "agent": "sumbi-events:agent_dafcddd422574acb5f48fb2b",
+        "tokens": {
+          "new_input": 30,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 10,
+          "reasoning_output": null,
+          "total": 40,
+          "evidence_incomplete": false
+        },
+        "tokens_complete": true,
+        "observed_total": 40
+      },
+      {
+        "id": "session_76adbe992952c2c7b488f1be",
+        "agent": "sumbi-events:agent_dafcddd422574acb5f48fb2b",
+        "tokens": {
+          "new_input": 30,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 10,
+          "reasoning_output": null,
+          "total": 40,
+          "evidence_incomplete": false
+        },
+        "tokens_complete": true,
+        "observed_total": 40
+      }
+    ],
+    "observed_total": 80
+  },
+  "excluded_worker_spend": {
+    "observed_total": 0
+  },
+  "cost_basis": "retained_worker_lifetime_only",
+  "scan_until": "2030-01-04T00:00:00+00:00",
+  "pseudonyms": {
+    "method": "hmac_sha256",
+    "salted": true,
+    "local_only": true
+  },
+  "active_minutes": 5.0,
+  "limitations": [
+    "agent_triggered_machine_check",
+    "no_human_acceptance_or_revert_window",
+    "shell_edits_invisible",
+    "worker_costs_exclude_dispatch_overhead",
+    "last_observed_time_is_not_acceptance",
+    "deleted_logs_undetectable"
+  ],
+  "decision_order": [
+    "coverage",
+    "comparability",
+    "success_non_inferiority",
+    "time_and_tokens"
+  ],
+  "verdict": {
+    "label": "proposal",
+    "proposal": "withhold",
+    "reasons": [
+      "inconclusive_success"
+    ]
+  }
+}

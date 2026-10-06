@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import tempfile
+from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -19,7 +19,7 @@ WINDOW = Window(START, START + timedelta(minutes=30))
 
 class EventAttributionTests(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
+        temporary = IsolatedTemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.home = Path(temporary.name)
         self.a, self.b = self.home / "alpha", self.home / "beta"

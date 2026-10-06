@@ -1,0 +1,25 @@
+usage: sumbi register [-h] --json OUT --intervention-id INTERVENTION_ID
+                      --outcome-source {github,local-verify} --margin-pp
+                      MARGIN_PP --sample-size-per-arm SAMPLE_SIZE_PER_ARM
+                      --follow-up-days FOLLOW_UP_DAYS --window-days
+                      WINDOW_DAYS --applied-at APPLIED_AT --practice ID
+
+options:
+  -h, --help            show this help message and exit
+  --json OUT            New local registration JSON file
+  --intervention-id INTERVENTION_ID
+                        Public-safe intervention ID
+  --outcome-source {github,local-verify}
+  --margin-pp MARGIN_PP, --non-inferiority-margin-pp MARGIN_PP
+                        Acceptable success-rate drop in absolute percentage
+                        points (0 < margin < 100)
+  --sample-size-per-arm SAMPLE_SIZE_PER_ARM
+                        Positive registered sample per arm
+  --follow-up-days FOLLOW_UP_DAYS
+                        Positive outcome follow-up days
+  --window-days WINDOW_DAYS
+                        Equal adjacent dispatch windows around planned
+                        application
+  --applied-at APPLIED_AT
+                        Planned UTC application time; registered_at is now
+  --practice ID         Catalog prediction practice ID; repeatable

@@ -11,7 +11,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tarfile
-import tempfile
+from support import IsolatedTemporaryDirectory
 import tomllib
 import unittest
 from unittest.mock import patch
@@ -22,7 +22,7 @@ import sumbi_build
 
 class BuildTests(unittest.TestCase):
     def test_wheel_metadata_entry_point_and_file_integrity(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with IsolatedTemporaryDirectory() as directory:
             name = sumbi_build.build_wheel(directory)
             with zipfile.ZipFile(Path(directory) / name) as archive:
                 metadata = archive.read(sumbi_build.INFO + "/METADATA").decode()
@@ -53,7 +53,7 @@ class BuildTests(unittest.TestCase):
                         self.assertEqual(int(size), len(data))
 
     def test_sdist_can_rebuild_wheel_without_external_backend(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with IsolatedTemporaryDirectory() as directory:
             root = Path(directory)
             name = sumbi_build.build_sdist(root)
             with tarfile.open(root / name) as archive:
@@ -67,11 +67,15 @@ class BuildTests(unittest.TestCase):
                 self.assertIsNone(fields["Dynamic"])
                 self.assertIn(sumbi_build.STEM + "/docs/deliverables.template.csv", archive.getnames())
                 fixtures = {p.relative_to(sumbi_build.ROOT).as_posix()
-                            for parent in ("tests/fixtures", "tests/install/fixtures")
+                            for parent in ("tests/fixtures", "tests/install/fixtures",
+                                           "tests/characterization/fixtures", "tests/characterization/golden")
                             for p in (sumbi_build.ROOT / parent).rglob("*") if p.is_file()}
                 self.assertTrue({sumbi_build.STEM + "/" + p for p in fixtures} <= set(archive.getnames()))
                 self.assertEqual(len(archive.getnames()), len(set(archive.getnames())))
-                self.assertFalse(any("/local/" in p or "/out/" in p or "__pycache__" in p
+                # Reviewed golden paths include files/out/*.json. Only the
+                # checkout-root private artifacts must be excluded.
+                self.assertFalse(any(p.startswith(sumbi_build.STEM + "/local/")
+                                     or p.startswith(sumbi_build.STEM + "/out/") or "__pycache__" in p
                                      for p in archive.getnames()))
                 self.assertTrue(all(p.name.startswith(sumbi_build.STEM + "/") for p in archive.getmembers()))
                 # The archive was authored above from allow-listed relative source files.
@@ -109,7 +113,7 @@ class BuildTests(unittest.TestCase):
                     sumbi_build.metadata()
 
     def test_distribution_sources_do_not_follow_links(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with IsolatedTemporaryDirectory() as directory:
             root = Path(directory)
             (root / "sumbi").mkdir()
             outside = root / "synthetic-private.json"

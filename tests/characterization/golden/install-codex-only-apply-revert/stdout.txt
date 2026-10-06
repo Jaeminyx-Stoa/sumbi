@@ -1,0 +1,130 @@
+Inventory (offline; paths and parsed labels only):
+  excluded roots: 0
+  git-ignored roots: 0
+  nested git repositories: 0
+  observed starts: {"adapter_coverage": {"claude-code": {"broken_lines": 0, "duplicate_events": 0, "files_scanned": 0, "inherited_session_meta": 0, "invalid_timestamps": 0, "invalid_token_records": 0, "lines_read": 0, "unknown_record_types": {}, "unreadable_files": 0}, "codex": {"broken_lines": 0, "duplicate_events": 0, "files_scanned": 0, "inherited_session_meta": 0, "invalid_timestamps": 0, "invalid_token_records": 0, "lines_read": 0, "unknown_record_types": {}, "unreadable_files": 0}}, "agents": [], "coverage": {}, "paths": [], "placement_sessions": 0, "roles": {"top-level": 0, "worker": 0}, "sessions": 0, "start_evidence": {}, "status": "no-starts-found", "window": {"since": "<START_WINDOW_SINCE>", "until": "<START_WINDOW_UNTIL>"}}
+  exclude **/.git: 0
+  exclude **/.sumbi: 0
+  exclude **/node_modules: 0
+  exclude **/vendor: 0
+  exclude **/.venv: 0
+  exclude **/venv: 0
+  exclude **/dist: 0
+  exclude **/build: 0
+  exclude **/__pycache__: 0
+  exclude **/.tmp: 0
+  exclude **/test/**/fixtures: 0
+  exclude **/test/**/testdata: 0
+  exclude **/tests/**/fixtures: 0
+  exclude **/tests/**/testdata: 0
+  agents: 1 (AGENTS.md)
+  capabilities: claude_skills=0, agent_skills=0, commands=0, agents=0
+  workflows=0, codeowners=0, test_sources=1
+  codeowners: 0
+  pr_templates: 0
+  git_hooks: 0
+  lint: 0
+  format: 0
+  type_check: 0
+  test source AGENTS.md: documented-command
+  required checks: unknown (offline); rulesets: unknown (offline)
+  estimate: script-aware-v1: ceil(other_characters / 4) + Hangul/Han/Hiragana/Katakana characters
+  instruction tokens (root/largest scope): codex=23/23, claude=0/0, gemini=0/0, copilot=0/0, cursor=0/0
+  conditional instruction tokens claude: 0 (0 rules)
+  convention review_gate: absent []
+  convention handoff: absent []
+  convention friction_line: absent []
+  convention parallel_worktree: absent []
+  convention plan_approval: absent []
+  budget=2000; warnings=1
+  warning: {"kind": "root-not-versioned"}
+Gaps: missing-risk-review, missing-handoff, missing-friction-line, missing-worktree-rule, missing-plan-approval
+  missing-risk-review: {"paths": [], "searched_paths": ["AGENTS.md"]}; candidates=review-gates
+  missing-handoff: {"paths": [], "searched_paths": ["AGENTS.md"]}; candidates=handoff
+  missing-friction-line: {"paths": [], "searched_paths": ["AGENTS.md"]}; candidates=friction-line
+  missing-worktree-rule: {"paths": [], "searched_paths": ["AGENTS.md"]}; candidates=parallel-worktrees
+  missing-plan-approval: {"paths": [], "searched_paths": ["AGENTS.md"]}; candidates=plan-and-approval
+Practices: review-gates, plan-and-approval, handoff, friction-line, parallel-worktrees
+baseline: available (runs before apply)
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -3,0 +4,20 @@
++
++<!-- sumbi:begin review-gates -->
++Risky paths need review before release. Preserve existing approvals and require independent review for security, permissions and money paths. See [review levels](docs/sumbi/review.md).
++<!-- sumbi:end review-gates -->
++
++<!-- sumbi:begin plan-and-approval -->
++For substantial changes, resolve missing requirements, write a plan with acceptance criteria, and critique it before implementation. Follow the existing approval policy. See [planning](docs/sumbi/planning.md).
++<!-- sumbi:end plan-and-approval -->
++
++<!-- sumbi:begin handoff -->
++Leave a handoff document when work changes hands: acceptance criteria, evidence, remaining work and the next action. See [handoffs](docs/sumbi/handoff.md).
++<!-- sumbi:end handoff -->
++
++<!-- sumbi:begin friction-line -->
++End a work report with `Harness friction: none` or one short description of the harness obstacle. Keep sensitive details in local notes. See [friction feedback](docs/sumbi/friction.md).
++<!-- sumbi:end friction-line -->
++
++<!-- sumbi:begin parallel-worktrees -->
++Parallel agents use separate worktrees and explicit file ownership. Do not edit another agent's working copy. See [parallel work](docs/sumbi/parallel.md).
++<!-- sumbi:end parallel-worktrees -->
+--- /dev/null
++++ b/docs/sumbi/friction.md
+@@ -0,0 +1,7 @@
++<!-- sumbi:begin friction-line -->
++# Friction feedback
++
++Use the final friction line to identify an instruction, tool or check that blocked or repeated work. Describe the failing layer and its consequence briefly; do not include prompts, transcripts, secrets or machine identifiers in shared output.
++
++Review repeated obstacles before adding more instructions. Prefer a reliable check or a simpler workflow when it addresses the cause. A report is evidence to investigate, not proof that the proposed fix saves cost.
++<!-- sumbi:end friction-line -->
+--- /dev/null
++++ b/docs/sumbi/handoff.md
+@@ -0,0 +1,7 @@
++<!-- sumbi:begin handoff -->
++# Handoff convention
++
++Keep each live handoff in a local location approved by the repository owner. Do not commit session transcripts, secrets or machine paths.
++
++Record the deliverable ID and acceptance criteria, current state, files changed, checks actually run, unresolved risks, and the next action. Separate observations from assumptions. A successor should be able to resume without repeating the investigation.
++<!-- sumbi:end handoff -->
+--- /dev/null
++++ b/docs/sumbi/parallel.md
+@@ -0,0 +1,7 @@
++<!-- sumbi:begin parallel-worktrees -->
++# Parallel work
++
++Assign each parallel agent a separate branch and worktree, plus an explicit set of files it owns. Agree on shared interfaces before editing. Check the working copy and branch before making changes.
++
++Integrate through reviewed changes. Preserve another agent's uncommitted work, and resolve overlaps with its owner. Never remove a worktree or branch merely because a task appears finished.
++<!-- sumbi:end parallel-worktrees -->
+--- /dev/null
++++ b/docs/sumbi/planning.md
+@@ -0,0 +1,7 @@
++<!-- sumbi:begin plan-and-approval -->
++# Planning
++
++Ask only for information that blocks a correct implementation. Record the deliverable, acceptance criteria, constraints and likely failure cases. Critique the plan against those criteria before making a substantial change. Keep small reversible edits proportionate.
++
++Prepare a concrete reviewable result before requesting a final approval. Existing approvals still govern destructive or external actions. Do not treat silence as approval, and do not ask again when the requested scope is already authorized.
++<!-- sumbi:end plan-and-approval -->
+--- /dev/null
++++ b/docs/sumbi/review.md
+@@ -0,0 +1,11 @@
++<!-- sumbi:begin review-gates -->
++# Review levels
++
++| Work size or risk | Evidence and review |
++| --- | --- |
++| Small wording or local configuration | Read the resulting change and check the affected behavior. |
++| Behavior across several components | Ask an independent engineering reviewer; include targeted test evidence. |
++| Security, permissions, money, or irreversible operations | Require owner approval and a reviewer from a different model family; include the applicable security and release checks. |
++
++The owner must map risky repository paths to these roles. A role is a review responsibility, not a claim that a tool enforces it. Existing stronger gates remain in force. If review is unavailable, leave the risky action pending.
++<!-- sumbi:end review-gates -->
+Applied: review-gates, plan-and-approval, handoff, friction-line, parallel-worktrees
+baseline: no sessions found
+Baseline file: .sumbi/baseline/__BASELINE_ID__.json
+Backup: .sumbi/backups/__BACKUP_ID__
+Backup ID: __BACKUP_ID__

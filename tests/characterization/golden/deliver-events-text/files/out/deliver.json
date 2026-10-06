@@ -1,0 +1,256 @@
+{
+  "schema_version": "local-deliver-1.0",
+  "outcome_source": "local-verify",
+  "verification": {
+    "completed": 2,
+    "passed": 2,
+    "exit_code_counts": {
+      "0": 2
+    }
+  },
+  "signals": [],
+  "unit": "worker_session",
+  "dispatch_window": {
+    "since": "2030-01-01T00:00:00+00:00",
+    "until": "2030-01-03T00:00:00+00:00",
+    "bounds": "[since,until)"
+  },
+  "scan_until": "2030-01-04T00:00:00+00:00",
+  "active_minutes": 5.0,
+  "pseudonyms": {
+    "method": "hmac_sha256",
+    "salted": true,
+    "local_only": true
+  },
+  "states": {
+    "success": 2,
+    "failed": 0,
+    "unverified": 0,
+    "in_progress": 0,
+    "no_change": 0
+  },
+  "units": [
+    {
+      "id": "session_76eb20bb68f2e2a16e7fa740",
+      "agent": "sumbi-events:agent_9e260e54ae0e8fd149c80532",
+      "parent_id": "session_76adbe992952c2c7b488f1be",
+      "dispatched_at": "2030-01-01T01:00:00+00:00",
+      "last_at": "2030-01-01T01:00:06+00:00",
+      "start_scope": "repository_root",
+      "state": "success",
+      "reason": "last_check_passed",
+      "task_type": null,
+      "tokens": {
+        "new_input": 100,
+        "cache_write": 0,
+        "cache_read": 20,
+        "output": 10,
+        "reasoning_output": 2,
+        "total": 130,
+        "evidence_incomplete": false
+      },
+      "tokens_complete": true,
+      "observed_total": 130,
+      "elapsed_seconds": 6.0,
+      "model": [
+        "model_99051c601e033380bf6cd425"
+      ],
+      "effort": [
+        "effort_79ae4a0c1a7a14f3fbe5b7aa"
+      ],
+      "cli_version": [
+        "version_951ecbfab63ab4a551bcdd71"
+      ],
+      "command_coverage": {
+        "matched": 1,
+        "unknown_execution_cwd": 0,
+        "unknown_execution_start": 0,
+        "unknown_exit_code": 0
+      },
+      "metadata_incomplete": {
+        "model": false,
+        "effort": false,
+        "cli_version": false
+      }
+    },
+    {
+      "id": "session_d44acaa7b2346dd0f370478e",
+      "agent": "sumbi-events:agent_9e260e54ae0e8fd149c80532",
+      "parent_id": "session_f176352aa2bc1aeb178d930e",
+      "dispatched_at": "2030-01-02T01:00:00+00:00",
+      "last_at": "2030-01-02T01:00:06+00:00",
+      "start_scope": "repository_root",
+      "state": "success",
+      "reason": "last_check_passed",
+      "task_type": null,
+      "tokens": {
+        "new_input": 100,
+        "cache_write": 0,
+        "cache_read": 20,
+        "output": 10,
+        "reasoning_output": 2,
+        "total": 130,
+        "evidence_incomplete": false
+      },
+      "tokens_complete": true,
+      "observed_total": 130,
+      "elapsed_seconds": 6.0,
+      "model": [
+        "model_99051c601e033380bf6cd425"
+      ],
+      "effort": [
+        "effort_79ae4a0c1a7a14f3fbe5b7aa"
+      ],
+      "cli_version": [
+        "version_951ecbfab63ab4a551bcdd71"
+      ],
+      "command_coverage": {
+        "matched": 1,
+        "unknown_execution_cwd": 0,
+        "unknown_execution_start": 0,
+        "unknown_exit_code": 0
+      },
+      "metadata_incomplete": {
+        "model": false,
+        "effort": false,
+        "cli_version": false
+      }
+    }
+  ],
+  "success_rate": {
+    "numerator": 2,
+    "denominator": 2,
+    "rate": 1.0,
+    "wilson_95": [
+      0.34238022750665303,
+      1.0
+    ]
+  },
+  "cost": {
+    "basis": "retained_worker_lifetime_only",
+    "per_success": {
+      "new_input": {
+        "numerator": 200,
+        "denominator": 2,
+        "value": 100.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "cache_write": {
+        "numerator": 0,
+        "denominator": 2,
+        "value": 0.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "cache_read": {
+        "numerator": 40,
+        "denominator": 2,
+        "value": 20.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "output": {
+        "numerator": 20,
+        "denominator": 2,
+        "value": 10.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "reasoning_output": {
+        "numerator": 4,
+        "denominator": 2,
+        "value": 2.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "total": {
+        "numerator": 260,
+        "denominator": 2,
+        "value": 130.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      },
+      "time": {
+        "numerator": 12.0,
+        "denominator": 2,
+        "value": 6.0,
+        "interval_95": null,
+        "interval_method": "not_estimated_descriptive"
+      }
+    }
+  },
+  "dispatch_overhead": {
+    "sessions": 2,
+    "rows": [
+      {
+        "id": "session_f176352aa2bc1aeb178d930e",
+        "agent": "sumbi-events:agent_dafcddd422574acb5f48fb2b",
+        "tokens": {
+          "new_input": 30,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 10,
+          "reasoning_output": null,
+          "total": 40,
+          "evidence_incomplete": false
+        },
+        "tokens_complete": true,
+        "observed_total": 40
+      },
+      {
+        "id": "session_76adbe992952c2c7b488f1be",
+        "agent": "sumbi-events:agent_dafcddd422574acb5f48fb2b",
+        "tokens": {
+          "new_input": 30,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 10,
+          "reasoning_output": null,
+          "total": 40,
+          "evidence_incomplete": false
+        },
+        "tokens_complete": true,
+        "observed_total": 40
+      }
+    ],
+    "observed_total": 80
+  },
+  "excluded_worker_spend": {
+    "observed_total": 0
+  },
+  "coverage": {
+    "adapters": {
+      "sumbi-events": {
+        "files_scanned": 3,
+        "lines_read": 22,
+        "broken_lines": 0,
+        "duplicate_events": 2,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 4
+      }
+    },
+    "commands": {
+      "matched": 2,
+      "unknown_execution_cwd": 0,
+      "unknown_execution_start": 0,
+      "unknown_exit_code": 0
+    },
+    "start_scope_counts": {
+      "repository_root": 2
+    },
+    "excluded_scope": {}
+  },
+  "limitations": [
+    "agent_triggered_machine_check",
+    "no_human_acceptance_or_revert_window",
+    "shell_edits_invisible",
+    "worker_costs_exclude_dispatch_overhead",
+    "last_observed_time_is_not_acceptance",
+    "deleted_logs_undetectable"
+  ]
+}

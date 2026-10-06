@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import tempfile
+from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -28,7 +28,7 @@ WINDOW = Window(NOW - timedelta(days=14), NOW)
 
 class IntegrationTests(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
+        temporary = IsolatedTemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.home = self.root / "home"

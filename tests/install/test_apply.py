@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import stat
 from unittest.mock import patch
+from support import require_file_modes
 
 from sumbi.catalog import VERSION, load_catalog
 from sumbi.install import apply_plan, build_plan
@@ -270,6 +271,7 @@ class ApplyTests(OfflineTest):
         if os.name == "nt":
             self.skipTest("POSIX mode bits are not enforced on Windows.")
         root = self.copy_fixture("codex-only")
+        require_file_modes(self, root, (0o640,))
         (root / "AGENTS.md").chmod(0o640)
         apply_plan(build_plan(root, select=["handoff"]))
         self.assertEqual(stat.S_IMODE((root / "AGENTS.md").stat().st_mode), 0o640)

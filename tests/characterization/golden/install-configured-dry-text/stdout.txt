@@ -1,0 +1,69 @@
+Inventory (offline; paths and parsed labels only):
+  excluded roots: 0
+  git-ignored roots: 0
+  nested git repositories: 0
+  observed starts: {"adapter_coverage": {"claude-code": {"broken_lines": 0, "duplicate_events": 0, "files_scanned": 0, "inherited_session_meta": 0, "invalid_timestamps": 0, "invalid_token_records": 0, "lines_read": 0, "unknown_record_types": {}, "unreadable_files": 0}, "codex": {"broken_lines": 0, "duplicate_events": 0, "files_scanned": 0, "inherited_session_meta": 0, "invalid_timestamps": 0, "invalid_token_records": 0, "lines_read": 0, "unknown_record_types": {}, "unreadable_files": 0}}, "agents": [], "coverage": {}, "paths": [], "placement_sessions": 0, "roles": {"top-level": 0, "worker": 0}, "sessions": 0, "start_evidence": {}, "status": "no-starts-found", "window": {"since": "<START_WINDOW_SINCE>", "until": "<START_WINDOW_UNTIL>"}}
+  exclude **/.git: 0
+  exclude **/.sumbi: 0
+  exclude **/node_modules: 0
+  exclude **/vendor: 0
+  exclude **/.venv: 0
+  exclude **/venv: 0
+  exclude **/dist: 0
+  exclude **/build: 0
+  exclude **/__pycache__: 0
+  exclude **/.tmp: 0
+  exclude **/test/**/fixtures: 0
+  exclude **/test/**/testdata: 0
+  exclude **/tests/**/fixtures: 0
+  exclude **/tests/**/testdata: 0
+  agents: 2 (AGENTS.md, src/AGENTS.md)
+  claude: 1 (CLAUDE.md)
+  claude_rules: 1 (.claude/rules/checks.md)
+  gemini: 1 (GEMINI.md)
+  copilot: 1 (.github/copilot-instructions.md)
+  cursor_rules: 1 (.cursor/rules/checks.mdc)
+  capabilities: claude_skills=1, agent_skills=1, commands=1, agents=1
+  claude_skills paths: .claude/skills/check/SKILL.md
+  agent_skills paths: .agents/skills/check/SKILL.md
+  commands paths: .claude/commands/check.md
+  agents paths: .claude/agents/reviewer.md
+  config .claude/settings.json: hooks=2, permissions=2, mcp=0, approval_policy=False, sandbox_mode=False
+  config .codex/config.toml: hooks=0, permissions=0, mcp=1, approval_policy=True, sandbox_mode=True
+  config .codex/hooks.json: hooks=1, permissions=0, mcp=0, approval_policy=False, sandbox_mode=False
+  config .mcp.json: hooks=0, permissions=0, mcp=1, approval_policy=False, sandbox_mode=False
+  import CLAUDE.md -> AGENTS.md: resolved
+  import CLAUDE.md -> docs/extra.md: resolved
+  workflows=1, codeowners=1, test_sources=6
+  workflow .github/workflows/checks.yml: Verify (verify), Lint (lint)
+  codeowners: 1 (.github/CODEOWNERS)
+  pr_templates: 1 (.github/pull_request_template.md)
+  git_hooks: 4 (.githooks/pre-commit, .husky/pre-commit, .pre-commit-config.yaml, lefthook.yml)
+  lint: 3 (.eslintrc.json, package.json, pyproject.toml)
+  format: 3 (.prettierrc.json, package.json, pyproject.toml)
+  type_check: 3 (mypy.ini, package.json, pyproject.toml)
+  test source AGENTS.md: documented-command
+  test source Makefile: make-target
+  test source noxfile.py: nox-command
+  test source package.json: package-script
+  test source pyproject.toml: pytest-config
+  test source tox.ini: tox-command
+  required checks: unknown (offline); rulesets: unknown (offline)
+  estimate: script-aware-v1: ceil(other_characters / 4) + Hangul/Han/Hiragana/Katakana characters
+  instruction tokens (root/largest scope): codex=109/120, claude=137/137, gemini=8/8, copilot=8/8, cursor=14/14
+  conditional instruction tokens claude: 0 (0 rules)
+  convention review_gate: present [{"kind": "mentioned", "path": ".claude/agents/reviewer.md"}, {"kind": "directive", "path": "AGENTS.md"}]
+  convention handoff: present [{"kind": "directive", "path": "AGENTS.md"}]
+  convention friction_line: present [{"kind": "directive", "path": "AGENTS.md"}]
+  convention parallel_worktree: present [{"kind": "directive", "path": "AGENTS.md"}]
+  convention plan_approval: present [{"kind": "directive", "path": "AGENTS.md"}]
+  budget=2000; warnings=1
+  skill description .agents/skills/check/SKILL.md: characters=41, tokens=11
+  skill description .claude/skills/check/SKILL.md: characters=20, tokens=5
+  every-prompt hooks .claude/settings.json: 1
+  every-prompt hooks .codex/hooks.json: 1
+  warning: {"kind": "root-not-versioned"}
+Gaps: none
+Practices: none
+baseline: available (runs before apply)
+No changes proposed.

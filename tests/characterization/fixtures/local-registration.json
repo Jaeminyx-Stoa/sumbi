@@ -1,0 +1,25 @@
+{
+  "intervention_id": "synthetic-local-round",
+  "outcome_source": "local-verify",
+  "registered_at": "2029-12-31T00:00:00Z",
+  "applied_at": "2030-01-02T00:00:00Z",
+  "predictions": [
+    {
+      "metric": "tokens_per_success",
+      "direction": "decrease",
+      "rough_size_percent": 50
+    }
+  ],
+  "non_inferiority_margin_pp": 50,
+  "sample_size_per_arm": 1,
+  "follow_up_days": 7,
+  "before": {
+    "since": "2030-01-01T00:00:00Z",
+    "until": "2030-01-02T00:00:00Z"
+  },
+  "after": {
+    "since": "2030-01-02T00:00:00Z",
+    "until": "2030-01-03T00:00:00Z"
+  },
+  "confounders": []
+}

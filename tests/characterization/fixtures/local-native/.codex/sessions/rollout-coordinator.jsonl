@@ -1,0 +1,4 @@
+{"type": "session_meta", "timestamp": "2030-01-01T01:00:00Z", "payload": {"id": "coordinator", "cwd": "fixture-repository", "cli_version": "1.0"}}
+{"type": "turn_context", "timestamp": "2030-01-01T01:00:01Z", "payload": {"cwd": "fixture-repository", "model": "synthetic-model", "effort": "high"}}
+{"type": "event_msg", "timestamp": "2030-01-01T01:00:05Z", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 10, "cached_input_tokens": 0, "output_tokens": 0}}}}
+{"type": "event_msg", "timestamp": "2030-01-01T01:00:06Z", "payload": {"type": "task_complete", "turn_id": "turn-1"}}

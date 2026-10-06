@@ -9,7 +9,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
-import tempfile
+from support import IsolatedTemporaryDirectory, isolate_github_destinations
 import unittest
 from unittest.mock import patch
 import urllib.error
@@ -28,9 +28,10 @@ FIXTURE = Path(__file__).parent / "fixtures/github/responses.json"
 
 class GitHubTests(unittest.TestCase):
     def setUp(self):
-        directory = tempfile.TemporaryDirectory()
+        directory = IsolatedTemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
+        isolate_github_destinations(self)
         self.routes = json.loads(FIXTURE.read_text(encoding="utf-8"))
         self.calls = []
         self.env = patch.dict(os.environ, {"GITHUB_TOKEN": "synthetic-token-canary", "GH_TOKEN": "synthetic-secondary"})
@@ -207,7 +208,7 @@ class GitHubTests(unittest.TestCase):
     def test_check_runs_and_statuses_green_red_and_missing(self):
         for conclusion, state, expected in (("success", "success", "green"), ("failure", "success", "red"), ("success", "failure", "red")):
             with self.subTest(conclusion=conclusion, state=state):
-                with tempfile.TemporaryDirectory() as cache:
+                with IsolatedTemporaryDirectory() as cache:
                     path = "/repos/example/sample/commits/" + f"{101:040x}"
                     self.routes[path + "/check-runs"]["check_runs"][0]["conclusion"] = conclusion
                     self.routes[path + "/statuses"] = [{"context": "test", "updated_at": time(2), "state": state}]
@@ -268,7 +269,7 @@ class GitHubTests(unittest.TestCase):
     def test_wrong_repo_number_or_window_does_not_match(self):
         for text in ("Fix #10", "Fix example/other#1", "Fix https://github.com/example/other/pull/1", "Fix #1abc", "Fix #1_suffix"):
             self.routes["/repos/example/sample/pulls"][1]["title"] = text
-            with tempfile.TemporaryDirectory() as cache:
+            with IsolatedTemporaryDirectory() as cache:
                 adapter = GitHubOutcomes(self.ledger(), cache=Path(cache))
                 self.assertEqual(adapter.disturbances(adapter.pull(REPO + "#1"), 7)[0], [])
         self.routes["/repos/example/sample/pulls"][1].update(title="Fix #1", created_at=time(9), merged_at=time(10), closed_at=time(10))
@@ -637,7 +638,7 @@ class GitHubTests(unittest.TestCase):
 
 class RoleTests(unittest.TestCase):
     def setUp(self):
-        root = tempfile.TemporaryDirectory()
+        root = IsolatedTemporaryDirectory()
         self.addCleanup(root.cleanup)
         self.root = Path(root.name)
 

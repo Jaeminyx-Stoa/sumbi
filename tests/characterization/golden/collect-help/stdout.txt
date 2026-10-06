@@ -1,0 +1,20 @@
+usage: sumbi collect [-h] --since SINCE --until UNTIL [--home HOME]
+                     [--agents AGENTS] [--project PROJECT]
+                     [--match-origin MATCH_ORIGIN] [--match-path MATCH_PATH]
+                     [--idle-minutes IDLE_MINUTES] [--json OUT]
+                     [--local-review OUT] [--salt-file SALT_FILE]
+
+options:
+  -h, --help            show this help message and exit
+  --since SINCE
+  --until UNTIL
+  --home HOME
+  --agents AGENTS
+  --project PROJECT
+  --match-origin MATCH_ORIGIN
+  --match-path MATCH_PATH
+  --idle-minutes IDLE_MINUTES
+  --json OUT
+  --local-review OUT
+  --salt-file SALT_FILE
+                        Local pseudonym key file (overrides SUMBI_SALT)

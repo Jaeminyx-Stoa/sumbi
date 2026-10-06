@@ -1,0 +1,10 @@
+sumbi local verification
+Outcome source: local-verify
+States: success 2; failed 1; unverified 1; in_progress 1; no_change 1
+Retained success: 2/4; Wilson 95% [0.15003898915214947, 0.8499610108478506]
+Dispatch overhead sessions: 1; observed tokens 10
+Cost scope: retained worker sessions only
+Unit start scopes: repository_root 6
+Worker total per success: 300/2 = 150.0; descriptive only
+Worker time per success: 24.0/2 = 12.0; descriptive only
+Command coverage: matched 3; unknown_execution_cwd 0; unknown_execution_start 0; unknown_exit_code 0

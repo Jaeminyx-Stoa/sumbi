@@ -1,0 +1,6 @@
+usage: sumbi register [-h] --json OUT --intervention-id INTERVENTION_ID
+                      --outcome-source {github,local-verify} --margin-pp
+                      MARGIN_PP --sample-size-per-arm SAMPLE_SIZE_PER_ARM
+                      --follow-up-days FOLLOW_UP_DAYS --window-days
+                      WINDOW_DAYS --applied-at APPLIED_AT --practice ID
+sumbi register: error: the following arguments are required: --intervention-id, --outcome-source, --margin-pp/--non-inferiority-margin-pp, --sample-size-per-arm, --follow-up-days, --window-days, --applied-at, --practice

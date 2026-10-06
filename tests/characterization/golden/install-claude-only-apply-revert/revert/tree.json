@@ -1,0 +1,54 @@
+[
+  {
+    "path": ".sumbi",
+    "kind": "directory"
+  },
+  {
+    "path": ".sumbi/.gitignore",
+    "kind": "file"
+  },
+  {
+    "path": ".sumbi/backups",
+    "kind": "directory"
+  },
+  {
+    "path": ".sumbi/backups/__BACKUP_ID__",
+    "kind": "directory"
+  },
+  {
+    "path": ".sumbi/backups/__BACKUP_ID__/files",
+    "kind": "directory"
+  },
+  {
+    "path": ".sumbi/backups/__BACKUP_ID__/files/CLAUDE.md",
+    "kind": "file"
+  },
+  {
+    "path": ".sumbi/backups/__BACKUP_ID__/manifest.json",
+    "kind": "file"
+  },
+  {
+    "path": ".sumbi/baseline",
+    "kind": "directory"
+  },
+  {
+    "path": ".sumbi/baseline/__BASELINE_ID__.json",
+    "kind": "file"
+  },
+  {
+    "path": ".sumbi/interventions.jsonl",
+    "kind": "file"
+  },
+  {
+    "path": "CLAUDE.md",
+    "kind": "file"
+  },
+  {
+    "path": "docs",
+    "kind": "directory"
+  },
+  {
+    "path": "docs/sumbi",
+    "kind": "directory"
+  }
+]

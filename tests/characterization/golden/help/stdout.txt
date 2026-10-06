@@ -1,0 +1,15 @@
+usage: sumbi [-h] [--version] {register,install,collect,deliver,compare} ...
+
+positional arguments:
+  {register,install,collect,deliver,compare}
+    register            Create a validated catalog pre-registration; never
+                        overwrite
+    install             Inventory and seed repository practices offline
+    collect             Measure local session logs without transcripts
+    deliver             Measure GitHub deliverables or local worker
+                        verification
+    compare             Propose a verdict for one pre-registered intervention
+
+options:
+  -h, --help            show this help message and exit
+  --version             show program's version number and exit
