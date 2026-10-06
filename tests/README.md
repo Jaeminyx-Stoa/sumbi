@@ -56,6 +56,12 @@ TMPDIR="$PWD/local/test-tmp" TEMP="$PWD/local/test-tmp" TMP="$PWD/local/test-tmp
   python3 -m unittest discover -s tests
 ```
 
+POSIX permission tests probe the selected temporary filesystem before asserting
+mode preservation. They skip on a filesystem that cannot represent those modes,
+including WSL Windows-drive mounts without Linux metadata support. They still
+run on a filesystem that supports the modes. Windows retains its existing
+platform and symlink capability skips.
+
 ## Characterization corpus
 
 `characterization/manifest.json` declares each case's real CLI arguments, input
@@ -71,6 +77,10 @@ local verification, every install fixture's dry-run and JSON plan, and each
 fixture's apply/revert lifecycle. The fully configured install fixture has an
 empty plan: its attempted revert pins the missing-backup diagnostic too.
 Root help, version and the missing-command error are also pinned.
+The merged measurement commands add catalog pre-registration (both outcome
+sources, late registration and refusal/error paths), verifier-never-passed
+signals, actual apply-time exposure, named installation interventions, native
+Claude worker verification, and freshness-based in-progress workers.
 
 Inputs are private copies of `tests/fixtures` and `tests/install/fixtures`.
 Native local-verification streams in `characterization/fixtures` are newly
@@ -91,6 +101,8 @@ Private recovery manifests are listed in the trees, but their contents are not
 CLI output and include filesystem-specific permission modes. Existing apply and
 revert unit tests exercise those manifests and permissions separately. File
 trees do not contain filesystem timestamps, owners or other host metadata.
+The test-authored tree listings sort case-folded relative path components on
+both platforms. This fixes the test's own ordering; CLI ordering is untouched.
 Captured `.gitignore` contents use a `.gitignore.txt` storage filename so they
 cannot accidentally hide sibling golden files from Git. Tree listings retain
 the actual `.gitignore` name. Golden attributes preserve LF and allow the CLI's
@@ -115,6 +127,8 @@ from specific generated fields. It does not reserialize JSON or sort output.
   `window.since/until` become named baseline-window tokens.
 - The generated backup ID becomes `__BACKUP_ID__` in paths and revert output.
 - Intervention `utc_time` fields become `<APPLY_TIME>` or `<REVERT_TIME>`.
+- Newly published registration `registered_at` becomes `<REGISTERED_AT>`;
+  its planned application and dispatch window timestamps remain unchanged.
 
 Logged measurement timestamps, counts, durations, labels, IDs, pseudonyms,
 ordering, hashes, floating-point values and all other numbers remain unchanged.

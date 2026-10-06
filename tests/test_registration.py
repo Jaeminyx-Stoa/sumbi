@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import io
 import json
 from pathlib import Path
-import tempfile
+from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
@@ -17,7 +17,7 @@ from sumbi.registration import read_registration
 
 class RegistrationCommandTests(unittest.TestCase):
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
+        temporary = IsolatedTemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.path = self.root / "registration.json"

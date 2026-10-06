@@ -2,8 +2,23 @@
 
 import os
 from pathlib import Path
+import stat
 import tempfile
 from unittest.mock import patch
+
+
+def require_file_modes(test, root, modes):
+    """Skip POSIX mode assertions if this temporary filesystem lacks them."""
+    descriptor, name = tempfile.mkstemp(prefix="mode-probe-", dir=root)
+    os.close(descriptor)
+    path = Path(name)
+    try:
+        for mode in modes:
+            path.chmod(mode)
+            if stat.S_IMODE(path.stat().st_mode) != mode:
+                test.skipTest("The temporary filesystem does not preserve POSIX file modes.")
+    finally:
+        path.unlink()
 
 
 class IsolatedTemporaryDirectory(tempfile.TemporaryDirectory):

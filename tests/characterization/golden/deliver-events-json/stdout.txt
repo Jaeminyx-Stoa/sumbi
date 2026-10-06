@@ -1,6 +1,14 @@
 {
   "schema_version": "local-deliver-1.0",
   "outcome_source": "local-verify",
+  "verification": {
+    "completed": 2,
+    "passed": 2,
+    "exit_code_counts": {
+      "0": 2
+    }
+  },
+  "signals": [],
   "unit": "worker_session",
   "dispatch_window": {
     "since": "2030-01-01T00:00:00+00:00",

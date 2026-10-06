@@ -1,6 +1,30 @@
 {
   "schema_version": "local-compare-1.0",
   "outcome_source": "local-verify",
+  "verification": {
+    "completed": 2,
+    "passed": 2,
+    "exit_code_counts": {
+      "0": 2
+    },
+    "arms": {
+      "before": {
+        "completed": 1,
+        "passed": 1,
+        "exit_code_counts": {
+          "0": 1
+        }
+      },
+      "after": {
+        "completed": 1,
+        "passed": 1,
+        "exit_code_counts": {
+          "0": 1
+        }
+      }
+    }
+  },
+  "signals": [],
   "registration": {
     "outcome_source": "local-verify",
     "intervention_id": "intervention_05573134be99472b9fcbacf7",

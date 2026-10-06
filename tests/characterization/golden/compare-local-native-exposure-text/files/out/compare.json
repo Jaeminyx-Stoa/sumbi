@@ -1,0 +1,696 @@
+{
+  "schema_version": "local-compare-1.0",
+  "outcome_source": "local-verify",
+  "verification": {
+    "completed": 3,
+    "passed": 2,
+    "exit_code_counts": {
+      "0": 2,
+      "3": 1
+    },
+    "arms": {
+      "before": {
+        "completed": 2,
+        "passed": 1,
+        "exit_code_counts": {
+          "0": 1,
+          "3": 1
+        }
+      },
+      "after": {
+        "completed": 1,
+        "passed": 1,
+        "exit_code_counts": {
+          "0": 1
+        }
+      }
+    }
+  },
+  "signals": [],
+  "exposure_gap": {
+    "actual_write_at": "2030-01-02T01:00:01+00:00",
+    "since": "2030-01-02T00:00:00+00:00",
+    "until": "2030-01-02T01:00:01+00:00",
+    "bounds": "[since,until)",
+    "seconds": 3601.0,
+    "direction": "later"
+  },
+  "registration": {
+    "outcome_source": "local-verify",
+    "intervention_id": "intervention_05573134be99472b9fcbacf7",
+    "applied_at": "2030-01-02T00:00:00+00:00",
+    "registered_at": "2029-12-31T00:00:00+00:00",
+    "preregistered": true,
+    "predictions": [
+      {
+        "metric": "tokens_per_success",
+        "direction": "decrease",
+        "rough_size_percent": 50
+      }
+    ],
+    "non_inferiority_margin_pp": 50,
+    "windows": {
+      "before": {
+        "since": "2030-01-01T00:00:00+00:00",
+        "until": "2030-01-02T00:00:00+00:00",
+        "bounds": "[since,until)"
+      },
+      "after": {
+        "since": "2030-01-02T00:00:00+00:00",
+        "until": "2030-01-03T00:00:00+00:00",
+        "bounds": "[since,until)"
+      }
+    }
+  },
+  "sample_size": {
+    "registered_per_arm": 1,
+    "needed_per_arm": 16,
+    "actual": {
+      "before": 2,
+      "after": 0
+    }
+  },
+  "bootstrap": {
+    "seed": 1729,
+    "resamples": 5000,
+    "unit": "worker_session"
+  },
+  "arms": {
+    "before": {
+      "n": 2,
+      "success_rate": {
+        "numerator": 1,
+        "denominator": 2,
+        "rate": 0.5,
+        "wilson_95": [
+          0.09453120573423074,
+          0.9054687942657693
+        ]
+      },
+      "cost": {
+        "new_input": {
+          "numerator": 200,
+          "denominator": 1,
+          "value": 200.0,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 3751
+        },
+        "cache_write": {
+          "numerator": null,
+          "denominator": 1,
+          "value": null,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 0
+        },
+        "cache_read": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 3751
+        },
+        "output": {
+          "numerator": 0,
+          "denominator": 1,
+          "value": 0.0,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 3751
+        },
+        "reasoning_output": {
+          "numerator": null,
+          "denominator": 1,
+          "value": null,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 0
+        },
+        "total": {
+          "numerator": 200,
+          "denominator": 1,
+          "value": 200.0,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 3751
+        },
+        "time": {
+          "numerator": 12.0,
+          "denominator": 1,
+          "value": 12.0,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 3751
+        }
+      },
+      "candidate_states": {
+        "success": 1,
+        "failed": 1,
+        "unverified": 0,
+        "in_progress": 0,
+        "no_change": 0
+      },
+      "units": [
+        {
+          "id": "session_7a73194a2c318d20cd3eab11",
+          "agent": "codex",
+          "parent_id": "session_2939c3e6d1b7042207fea642",
+          "dispatched_at": "2030-01-01T01:00:00+00:00",
+          "last_at": "2030-01-01T01:00:06+00:00",
+          "start_scope": "repository_root",
+          "state": "failed",
+          "reason": "last_check_failed",
+          "task_type": null,
+          "tokens": {
+            "new_input": 100,
+            "cache_write": null,
+            "cache_read": 0,
+            "output": 0,
+            "reasoning_output": null,
+            "total": 100
+          },
+          "tokens_complete": true,
+          "observed_total": 100,
+          "elapsed_seconds": 6.0,
+          "model": [
+            "synthetic-model"
+          ],
+          "effort": [
+            "high"
+          ],
+          "cli_version": [
+            "1.0"
+          ],
+          "command_coverage": {
+            "matched": 1,
+            "unknown_execution_cwd": 0,
+            "unknown_execution_start": 0,
+            "unknown_exit_code": 0
+          }
+        },
+        {
+          "id": "session_fccfe0b7a0e1e65b7867eb86",
+          "agent": "codex",
+          "parent_id": "session_2939c3e6d1b7042207fea642",
+          "dispatched_at": "2030-01-01T01:00:00+00:00",
+          "last_at": "2030-01-01T01:00:06+00:00",
+          "start_scope": "repository_root",
+          "state": "success",
+          "reason": "last_check_passed",
+          "task_type": null,
+          "tokens": {
+            "new_input": 100,
+            "cache_write": null,
+            "cache_read": 0,
+            "output": 0,
+            "reasoning_output": null,
+            "total": 100
+          },
+          "tokens_complete": true,
+          "observed_total": 100,
+          "elapsed_seconds": 6.0,
+          "model": [
+            "synthetic-model"
+          ],
+          "effort": [
+            "high"
+          ],
+          "cli_version": [
+            "1.0"
+          ],
+          "command_coverage": {
+            "matched": 1,
+            "unknown_execution_cwd": 0,
+            "unknown_execution_start": 0,
+            "unknown_exit_code": 0
+          }
+        }
+      ]
+    },
+    "after": {
+      "n": 0,
+      "success_rate": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null,
+        "wilson_95": null
+      },
+      "cost": {
+        "new_input": {
+          "numerator": null,
+          "denominator": 0,
+          "value": null,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 0
+        },
+        "cache_write": {
+          "numerator": null,
+          "denominator": 0,
+          "value": null,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 0
+        },
+        "cache_read": {
+          "numerator": null,
+          "denominator": 0,
+          "value": null,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 0
+        },
+        "output": {
+          "numerator": null,
+          "denominator": 0,
+          "value": null,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 0
+        },
+        "reasoning_output": {
+          "numerator": null,
+          "denominator": 0,
+          "value": null,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 0
+        },
+        "total": {
+          "numerator": null,
+          "denominator": 0,
+          "value": null,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 0
+        },
+        "time": {
+          "numerator": null,
+          "denominator": 0,
+          "value": null,
+          "interval_95": null,
+          "interval_method": "percentile_bootstrap",
+          "defined_resamples": 0
+        }
+      },
+      "candidate_states": {
+        "success": 1,
+        "failed": 0,
+        "unverified": 2,
+        "in_progress": 0,
+        "no_change": 1
+      },
+      "units": []
+    }
+  },
+  "success_difference": {
+    "before": {
+      "numerator": 1,
+      "denominator": 2,
+      "rate": 0.5,
+      "wilson_95": [
+        0.09453120573423074,
+        0.9054687942657693
+      ]
+    },
+    "after": {
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null,
+      "wilson_95": null
+    },
+    "difference": null,
+    "interval_95": null,
+    "interval_method": "newcombe_method_10",
+    "non_inferiority": "inconclusive"
+  },
+  "ratios": {
+    "new_input": {
+      "numerator": null,
+      "denominator": 200.0,
+      "value": null,
+      "interval_95": null,
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 0,
+      "classification": "uncertain"
+    },
+    "cache_write": {
+      "numerator": null,
+      "denominator": null,
+      "value": null,
+      "interval_95": null,
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 0,
+      "classification": "uncertain"
+    },
+    "cache_read": {
+      "numerator": null,
+      "denominator": 0.0,
+      "value": null,
+      "interval_95": null,
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 0,
+      "classification": "uncertain"
+    },
+    "output": {
+      "numerator": null,
+      "denominator": 0.0,
+      "value": null,
+      "interval_95": null,
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 0,
+      "classification": "uncertain"
+    },
+    "reasoning_output": {
+      "numerator": null,
+      "denominator": null,
+      "value": null,
+      "interval_95": null,
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 0,
+      "classification": "uncertain"
+    },
+    "total": {
+      "numerator": null,
+      "denominator": 200.0,
+      "value": null,
+      "interval_95": null,
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 0,
+      "classification": "uncertain"
+    },
+    "time": {
+      "numerator": null,
+      "denominator": 12.0,
+      "value": null,
+      "interval_95": null,
+      "interval_method": "percentile_bootstrap",
+      "defined_resamples": 0,
+      "classification": "uncertain"
+    }
+  },
+  "exclusions": {
+    "before": {
+      "share": {
+        "numerator": 0,
+        "denominator": 2,
+        "value": 0.0,
+        "interval_95": null,
+        "interval_method": "not_applicable_census"
+      },
+      "risky_share": {
+        "numerator": 0,
+        "denominator": 2,
+        "value": 0.0,
+        "interval_95": null,
+        "interval_method": "not_applicable_census"
+      },
+      "counts": {},
+      "units": []
+    },
+    "after": {
+      "share": {
+        "numerator": 4,
+        "denominator": 4,
+        "value": 1.0,
+        "interval_95": null,
+        "interval_method": "not_applicable_census"
+      },
+      "risky_share": {
+        "numerator": 4,
+        "denominator": 4,
+        "value": 1.0,
+        "interval_95": null,
+        "interval_method": "not_applicable_census"
+      },
+      "counts": {
+        "exposure_gap": 4
+      },
+      "units": [
+        {
+          "id": "session_0a3faeda8fd7a41d037aebd4",
+          "reason": "exposure_gap"
+        },
+        {
+          "id": "session_5a21b4f9b6ef95fc201022ff",
+          "reason": "exposure_gap"
+        },
+        {
+          "id": "session_7f0ee122b7bd8c48ebe445c7",
+          "reason": "exposure_gap"
+        },
+        {
+          "id": "session_cb9adfc5e3febd28a16a0ec8",
+          "reason": "exposure_gap"
+        }
+      ]
+    }
+  },
+  "mixes": {
+    "agent": {
+      "before": {
+        "values": {
+          "codex": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "codex"
+        ]
+      },
+      "after": {
+        "values": {},
+        "dominant": []
+      },
+      "total_variation_distance": null,
+      "dominant_changed": false
+    },
+    "model": {
+      "before": {
+        "values": {
+          "synthetic-model": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "synthetic-model"
+        ]
+      },
+      "after": {
+        "values": {},
+        "dominant": []
+      },
+      "total_variation_distance": null,
+      "dominant_changed": false
+    },
+    "effort": {
+      "before": {
+        "values": {
+          "high": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "high"
+        ]
+      },
+      "after": {
+        "values": {},
+        "dominant": []
+      },
+      "total_variation_distance": null,
+      "dominant_changed": false
+    },
+    "cli_version": {
+      "before": {
+        "values": {
+          "1.0": {
+            "numerator": 2,
+            "denominator": 2,
+            "value": 1.0,
+            "interval_95": null,
+            "interval_method": "not_applicable_census"
+          }
+        },
+        "dominant": [
+          "1.0"
+        ]
+      },
+      "after": {
+        "values": {},
+        "dominant": []
+      },
+      "total_variation_distance": null,
+      "dominant_changed": false
+    }
+  },
+  "flags": [
+    {
+      "name": "after_excluded_or_mixed",
+      "blocking": true,
+      "evidence": {
+        "numerator": 4,
+        "denominator": 4,
+        "value": 1.0,
+        "interval_95": null,
+        "interval_method": "not_applicable_census"
+      }
+    },
+    {
+      "name": "agent_mix_shift",
+      "blocking": true,
+      "evidence": {
+        "agents": [
+          "codex"
+        ]
+      }
+    },
+    {
+      "name": "volume_shift",
+      "blocking": false,
+      "evidence": {
+        "numerator": 2,
+        "denominator": 0,
+        "value": null,
+        "interval_95": null,
+        "interval_method": "not_applicable_census"
+      }
+    },
+    {
+      "name": "no_change_share_shift",
+      "blocking": true,
+      "evidence": {
+        "before": {
+          "numerator": 0,
+          "denominator": 2,
+          "value": 0.0,
+          "interval_95": null,
+          "interval_method": "not_applicable_census"
+        },
+        "after": {
+          "numerator": 1,
+          "denominator": 4,
+          "value": 0.25,
+          "interval_95": null,
+          "interval_method": "not_applicable_census"
+        }
+      }
+    },
+    {
+      "name": "dispatch_overhead_excluded",
+      "blocking": false,
+      "evidence": {
+        "sessions": 1,
+        "observed_total": 10
+      }
+    }
+  ],
+  "coverage": {
+    "adapters": {
+      "claude-code": {
+        "files_scanned": 0,
+        "lines_read": 0,
+        "broken_lines": 0,
+        "duplicate_events": 0,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 0
+      },
+      "codex": {
+        "files_scanned": 7,
+        "lines_read": 35,
+        "broken_lines": 0,
+        "duplicate_events": 0,
+        "unreadable_files": 0,
+        "invalid_timestamps": 0,
+        "invalid_token_records": 0,
+        "inherited_session_meta": 0,
+        "unknown_record_types": {},
+        "sessions_read": 7
+      }
+    },
+    "commands": {
+      "matched": 3,
+      "unknown_execution_cwd": 0,
+      "unknown_execution_start": 0,
+      "unknown_exit_code": 0
+    },
+    "start_scope_counts": {
+      "repository_root": 6
+    },
+    "excluded_scope": {},
+    "incomplete_reasons": []
+  },
+  "dispatch_overhead": {
+    "sessions": 1,
+    "rows": [
+      {
+        "id": "session_2939c3e6d1b7042207fea642",
+        "agent": "codex",
+        "tokens": {
+          "new_input": 10,
+          "cache_write": null,
+          "cache_read": 0,
+          "output": 0,
+          "reasoning_output": null,
+          "total": 10
+        },
+        "tokens_complete": true,
+        "observed_total": 10
+      }
+    ],
+    "observed_total": 10
+  },
+  "excluded_worker_spend": {
+    "observed_total": 0
+  },
+  "cost_basis": "retained_worker_lifetime_only",
+  "scan_until": "2030-01-04T00:00:00+00:00",
+  "pseudonyms": {
+    "method": "hmac_sha256",
+    "salted": true,
+    "local_only": true
+  },
+  "active_minutes": 5.0,
+  "limitations": [
+    "agent_triggered_machine_check",
+    "no_human_acceptance_or_revert_window",
+    "shell_edits_invisible",
+    "worker_costs_exclude_dispatch_overhead",
+    "last_observed_time_is_not_acceptance",
+    "deleted_logs_undetectable"
+  ],
+  "decision_order": [
+    "coverage",
+    "comparability",
+    "success_non_inferiority",
+    "time_and_tokens"
+  ],
+  "verdict": {
+    "label": "proposal",
+    "proposal": "withhold",
+    "reasons": [
+      "not_comparable",
+      "after_excluded_or_mixed",
+      "agent_mix_shift",
+      "no_change_share_shift"
+    ]
+  }
+}

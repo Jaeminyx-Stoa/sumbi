@@ -1,0 +1,24 @@
+sumbi compare local verification
+Outcome source: local-verify
+Verdict proposal: withhold
+Reasons: inconclusive_success
+Cost proposal scope: retained worker sessions only
+Excluded dispatch overhead: 1 sessions; observed tokens 10
+Sample per arm: registered 1; needed 14; actual {'before': 3, 'after': 4}
+before success: 2/3; Wilson 95% [0.2076596008020477, 0.9385080552796037]
+before candidate states: success 2; failed 1; unverified 0; in_progress 0; no_change 0
+before worker total per success: 244/2 = 122.0; bootstrap 95% None
+before worker time per success: 14.0/2 = 7.0; bootstrap 95% None
+after success: 2/4; Wilson 95% [0.15003898915214947, 0.8499610108478506]
+after candidate states: success 2; failed 0; unverified 2; in_progress 0; no_change 1
+after worker total per success: 194/2 = 97.0; bootstrap 95% None
+after worker time per success: 19.0/2 = 9.5; bootstrap 95% None
+After - before success: -0.16666666666666663; Newcombe 95% [-0.6098037218501158, 0.41053364139570436]; inconclusive; margin 50 percentage points
+Worker total after/before: 97.0/122.0 = 0.7950819672131147; bootstrap 95% None; uncertain
+Worker time after/before: 9.5/7.0 = 1.3571428571428572; bootstrap 95% None; uncertain
+Bootstrap: seed 1729; resamples 5000
+before excluded: 0/3; counts {}
+after excluded: 1/5; counts {'no_change': 1}
+Flag effort_unobservable: informational
+Flag dispatch_overhead_excluded: informational
+Command coverage: matched 5; unknown_execution_cwd 0; unknown_execution_start 0; unknown_exit_code 0

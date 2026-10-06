@@ -1,0 +1,26 @@
+sumbi compare local verification
+before verifier_never_passed: matched completed verifications; exit 9: 2; after verifier_never_passed: matched completed verifications; exit 9: 1
+Outcome source: local-verify
+Verdict proposal: withhold
+Reasons: not_comparable, no_change_share_shift, verifier_never_passed
+Cost proposal scope: retained worker sessions only
+Excluded dispatch overhead: 1 sessions; observed tokens 10
+Sample per arm: registered 1; needed 0; actual {'before': 2, 'after': 3}
+before success: 0/2; Wilson 95% [0.0, 0.6576197724933469]
+before candidate states: success 0; failed 2; unverified 0; in_progress 0; no_change 0
+before worker total per success: 200/0 = None; bootstrap 95% None
+before worker time per success: 12.0/0 = None; bootstrap 95% None
+after success: 0/3; Wilson 95% [5.551115123125783e-17, 0.5614970317550454]
+after candidate states: success 0; failed 1; unverified 2; in_progress 0; no_change 1
+after worker total per success: 150/0 = None; bootstrap 95% None
+after worker time per success: 17.0/0 = None; bootstrap 95% None
+After - before success: 0.0; Newcombe 95% [-0.6576197724933469, 0.5614970317550454]; inconclusive; margin 50 percentage points
+Worker total after/before: None/None = None; bootstrap 95% None; uncertain
+Worker time after/before: None/None = None; bootstrap 95% None; uncertain
+Bootstrap: seed 1729; resamples 5000
+before excluded: 0/2; counts {}
+after excluded: 1/4; counts {'no_change': 1}
+Flag verifier_never_passed: blocking
+Flag no_change_share_shift: blocking
+Flag dispatch_overhead_excluded: informational
+Command coverage: matched 3; unknown_execution_cwd 0; unknown_execution_start 0; unknown_exit_code 0

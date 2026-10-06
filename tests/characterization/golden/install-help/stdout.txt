@@ -1,7 +1,8 @@
 usage: sumbi install [-h] [--root ROOT]
                      [--dry-run | --apply | --revert BACKUP_ID]
-                     [--select SELECT] [--budget BUDGET] [--exclude GLOB]
-                     [--json PATH] [--home HOME] [--salt-file SALT_FILE]
+                     [--select SELECT] [--intervention-id INTERVENTION_ID]
+                     [--budget BUDGET] [--exclude GLOB] [--json PATH]
+                     [--home HOME] [--salt-file SALT_FILE]
 
 options:
   -h, --help            show this help message and exit
@@ -13,6 +14,9 @@ options:
                         backup.
   --select SELECT       Comma-separated catalog IDs; apply only matching gap
                         candidates.
+  --intervention-id INTERVENTION_ID
+                        Public-safe pre-registration ID to attach to all
+                        applied practices
   --budget BUDGET       Instruction token budget (default: 2000).
   --exclude GLOB        Exclude repository-relative paths and descendants;
                         repeatable.

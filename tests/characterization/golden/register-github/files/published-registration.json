@@ -1,0 +1,31 @@
+{
+  "intervention_id": "synthetic-local-round",
+  "outcome_source": "github",
+  "registered_at": "<REGISTERED_AT>",
+  "applied_at": "2030-01-15T00:00:00+00:00",
+  "non_inferiority_margin_pp": 5.0,
+  "sample_size_per_arm": 12,
+  "follow_up_days": 7.0,
+  "before": {
+    "since": "2030-01-01T00:00:00+00:00",
+    "until": "2030-01-15T00:00:00+00:00"
+  },
+  "after": {
+    "since": "2030-01-15T00:00:00+00:00",
+    "until": "2030-01-29T00:00:00+00:00"
+  },
+  "predictions": [
+    {
+      "metric": "restart_time_per_success",
+      "direction": "decrease",
+      "rough_size_percent": 15,
+      "condition": "A successor uses the handoff instead of repeating investigation."
+    },
+    {
+      "metric": "followup_fixes_per_deliverable",
+      "direction": "decrease",
+      "rough_size_percent": 15,
+      "condition": "Owner documents a runnable test command and agents use it."
+    }
+  ]
+}

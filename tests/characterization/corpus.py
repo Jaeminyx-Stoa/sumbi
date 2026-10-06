@@ -61,6 +61,9 @@ def prepare(root, case):
             # Include both native adapters, with the optional Claude fixture
             # exercised by additional manifest cases when explicitly selected.
             copy_text_tree(fixture / "claude", home / ".claude/projects/fixture")
+            save(fixture / "interventions.jsonl", json.dumps({
+                "intervention_id": "round-01", "practice_id": "handoff",
+                "utc_time": "2030-01-08T00:01:00Z"}) + "\n")
     elif setup == "native":
         repository(repo)
         for source, target in (
@@ -71,7 +74,7 @@ def prepare(root, case):
         ):
             text = (TESTS / "fixtures" / source).read_text(encoding="utf-8")
             save(home / target, text.replace("fixture-one", json.dumps(str(repo))[1:-1]))
-    elif setup in ("events", "local-native"):
+    elif setup == "events" or setup.startswith("local-native"):
         repository(repo)
         if setup == "events":
             for name in ("valid.jsonl", "resumed.jsonl"):
@@ -90,11 +93,25 @@ def prepare(root, case):
             save(home / ".sumbi/events/after.jsonl", "".join(json.dumps(r) + "\n" for r in rows))
         else:
             copy_text_tree(DIRECTORY / "fixtures/local-native", home)
+            if setup == "local-native-claude":
+                copy_text_tree(DIRECTORY / "fixtures/local-claude", home)
             for path in home.rglob("*.jsonl"):
                 text = path.read_text(encoding="utf-8")
                 save(path, text.replace("fixture-repository", json.dumps(str(repo))[1:-1]))
+                if setup == "local-native-failed-verifier":
+                    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+                    for row in rows:
+                        item = row.get("payload", {}).get("item", {})
+                        if "exit_code" in item:
+                            item["exit_code"] = 9
+                    save(path, "".join(json.dumps(row) + "\n" for row in rows))
         data = json.loads((DIRECTORY / "fixtures/local-registration.json").read_text(encoding="utf-8"))
         save(registration, json.dumps(data, indent=2) + "\n")
+        save(fixture / "interventions.jsonl", json.dumps({
+            "intervention_id": "synthetic-local-round", "practice_id": "handoff",
+            "utc_time": "2030-01-02T01:00:01Z"}) + "\n")
+    elif setup == "register-existing":
+        save(root / "published-registration.json", '{"existing": "synthetic sentinel"}\n')
     return {"home": str(home), "repository": str(repo), "fixture": str(fixture),
             "registration": str(registration)}
 
@@ -162,6 +179,11 @@ def register_variables(root, streams, normalizer):
     ledger = repo / ".sumbi/interventions.jsonl"
     if ledger.exists():
         normalizer.ledger([json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()])
+    registration = root / "published-registration.json"
+    if registration.exists():
+        data = json.loads(registration.read_text(encoding="utf-8"))
+        if "registered_at" in data:
+            normalizer.add(data["registered_at"], "<REGISTERED_AT>")
 
 
 def capture_artifacts(root, normalizer):
@@ -193,7 +215,9 @@ def snapshot_tree(repo, normalizer):
     applied files, the ledger and baseline JSON are captured separately.
     """
     tree, artifacts = [], {}
-    for path in sorted(repo.rglob("*")):
+    # Define the ordering of this test-authored tree explicitly. Path ordering
+    # itself is case-insensitive on Windows and case-sensitive on POSIX.
+    for path in sorted(repo.rglob("*"), key=lambda p: tuple(part.casefold() for part in p.relative_to(repo).parts)):
         relative = path.relative_to(repo).as_posix()
         if ".git" in path.relative_to(repo).parts:
             continue

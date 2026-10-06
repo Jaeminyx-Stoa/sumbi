@@ -15,6 +15,9 @@ from .regenerate import difference, flatten, golden_files
 class CorpusTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # Tests never mutate goldens. Read the reviewed corpus once rather than
+        # reopening every artifact for every case on mounted filesystems.
+        cls.expected = golden_files()
         cls.observed = run_corpus()
 
     def assert_artifacts_equal(self, expected, actual):
@@ -61,7 +64,7 @@ class CorpusTests(unittest.TestCase):
 def golden_test(case):
     def test(self):
         prefix = case["name"] + "/"
-        expected = {name: value for name, value in golden_files().items() if name.startswith(prefix)}
+        expected = {name: value for name, value in self.expected.items() if name.startswith(prefix)}
         actual = {prefix + name: value for name, value in self.observed[case["name"]].items()}
         self.assert_artifacts_equal(expected, actual)
     return test

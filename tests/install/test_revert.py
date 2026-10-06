@@ -5,6 +5,7 @@ import os
 import stat
 import unittest
 from unittest.mock import patch
+from support import require_file_modes
 
 from sumbi.install import apply_plan, build_plan, revert_install
 from sumbi.install.errors import InstallError
@@ -35,12 +36,14 @@ class RevertTests(OfflineTest):
         ledger = root / ".sumbi/interventions.jsonl"
         if os.name == "nt":
             self.skipTest("POSIX permission bits are not represented on Windows.")
+        require_file_modes(self, root, (0o640,))
         ledger.chmod(0o640)
         revert_install(root, backup_id)
         self.assertEqual(ledger.stat().st_mode & 0o777, 0o640)
 
     @unittest.skipIf(os.name == "nt", "POSIX special permission bits are not represented on Windows.")
     def test_original_permission_bits_and_ledger_mode_survive_apply_revert(self):
+        require_file_modes(self, self.copy_fixture("empty"), (0o640, 0o2640, 0o4640, 0o1640, 0o7640))
         for mode in (0o640, 0o2640, 0o4640, 0o1640, 0o7640):
             with self.subTest(mode=oct(mode)):
                 root = self.copy_fixture("codex-only")

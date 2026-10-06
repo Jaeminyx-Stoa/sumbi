@@ -7,7 +7,9 @@ usage: sumbi compare [-h] [--home HOME] [--agents AGENTS] [--project PROJECT]
                      [--repository REPOSITORY] [--verify VERIFY]
                      [--scan-until SCAN_UNTIL]
                      [--active-minutes ACTIVE_MINUTES] [--cache DIR]
-                     [--record DIR] --registration REGISTRATION [--seed SEED]
+                     [--record DIR] --registration REGISTRATION
+                     [--interventions FILE]
+                     [--intervention-id INTERVENTION_ID] [--seed SEED]
                      [--resamples RESAMPLES]
 
 options:
@@ -22,6 +24,9 @@ options:
   --salt-file SALT_FILE
                         Local pseudonym key file (overrides SUMBI_SALT)
   --outcome-source {github,local-verify}
+                        Local verification reports verifier_never_passed with
+                        exit-code counts; compare blocks before non-
+                        inferiority
   --ledger LEDGER
   --outcomes github|DIR
   --repository REPOSITORY
@@ -33,5 +38,10 @@ options:
   --cache DIR
   --record DIR
   --registration REGISTRATION
+  --interventions FILE  Optional install intervention JSONL; exclude and count
+                        actual apply-time exposure gaps
+  --intervention-id INTERVENTION_ID
+                        Apply record ID (defaults to registration ID; must
+                        match it)
   --seed SEED
   --resamples RESAMPLES

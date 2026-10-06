@@ -228,6 +228,7 @@
       "status": "no-starts-found",
       "sessions": 0,
       "placement_sessions": 0,
+      "start_evidence": {},
       "roles": {
         "top-level": 0,
         "worker": 0
