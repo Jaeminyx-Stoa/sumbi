@@ -44,6 +44,8 @@ class CorpusTests(unittest.TestCase):
             self.assert_artifacts_equal(snapshots[0], snapshots[1])
 
     def test_manifest_covers_help_commands_and_errors(self):
+        self.assertEqual(set(self.expected), set(flatten(self.observed)),
+                         "The complete set of reviewed output artifacts changed")
         actions = [action for action in parser()._actions if getattr(action, "choices", None)]
         commands = set(actions[0].choices)
         covered = {case["command"] for case in CASES} - {"root"}
