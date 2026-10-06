@@ -17,7 +17,10 @@ sumbi collect --since 2030-01-01T00:00Z --until 2030-01-02T00:00Z \
 ```
 
 Use `--home DIR` to read another local home. `--agents` selects a comma-separated
-list of `claude-code` and `codex`; both are enabled by default. Each `--project`
+list of `claude-code`, `codex` and opt-in `sumbi-events`; the two native adapters
+are enabled by default. The [open event contract](EVENTS.md) describes generic
+logs beneath `<home>/.sumbi/events/`, delta tokens, pseudonymous emitter metadata
+and conservative local execution evidence. Each `--project`
 starts a named rule with one or more following `--match-origin` or `--match-path`
 patterns. Repeat the project block for additional rules. Names are configured
 labels, never built-in project names. Patterns use shell-style glob matching,

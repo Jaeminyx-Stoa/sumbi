@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from sumbi.model import Window
-from sumbi.report import collect
+from sumbi.report import collect, log_roots
 
 
 def baseline(*, repository: Path, home: Path | None = None,
@@ -26,7 +26,7 @@ def baseline(*, repository: Path, home: Path | None = None,
     window = Window(until - timedelta(days=14), until)
     relative = ".sumbi/baseline/" + until.strftime("%Y%m%dT%H%M%S.%fZ") + ".json"
     destination = safe_path(repository, relative)
-    sources = [home / ".claude/projects", home / ".codex/sessions"]
+    sources = log_roots(home)
     if any(destination.resolve().is_relative_to(source.resolve()) for source in sources):
         raise ValueError("Baseline must be outside session-log directories")
     report, _ = collect(home, window, repository=repository, salt=salt)

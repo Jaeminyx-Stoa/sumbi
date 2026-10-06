@@ -15,7 +15,7 @@ from sumbi.model import ProjectRule, Window, timestamp
 from sumbi import __version__
 from sumbi.install.__main__ import configure_parser as configure_install, run as run_install
 from sumbi.privacy import read_salt
-from sumbi.report import ADAPTERS, collect, text_summary
+from sumbi.report import ADAPTERS, collect, log_roots, text_summary
 
 
 class RuleAction(argparse.Action):
@@ -136,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         root.error(str(exc))
     agents = args.agents.split(",")
     if not agents or any(agent not in ADAPTERS for agent in agents) or len(set(agents)) != len(agents):
-        root.error("Agents must be a unique comma-separated selection of claude-code,codex")
+        root.error("Agents must be a unique comma-separated selection of " + ",".join(ADAPTERS))
     rules = getattr(args, "rules", [])
     if any(not rule.origins and not rule.paths for rule in rules):
         root.error("Each project rule needs at least one matching pattern")
@@ -146,7 +146,7 @@ def main(argv: list[str] | None = None) -> int:
         root.error("JSON and local review must have distinct destinations")
     if args.salt_file is not None and args.salt_file.resolve() in resolved:
         root.error("Output destinations must not overwrite the pseudonym salt file")
-    sources = [args.home / ".claude" / "projects", args.home / ".codex" / "sessions"]
+    sources = log_roots(args.home)
     if any(p.is_relative_to(source.resolve()) for p in resolved for source in sources):
         root.error("Output destinations must be outside session-log directories")
     if args.command in ("deliver", "compare"):

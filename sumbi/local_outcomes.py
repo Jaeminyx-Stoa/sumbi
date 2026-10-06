@@ -6,7 +6,7 @@ from pathlib import Path
 
 from sumbi.model import Coverage, RepositoryAttributor, TOKEN_KINDS, Window, execution_cwd
 from sumbi.privacy import current_key, pseudonym_key, read_salt
-from sumbi.report import ADAPTERS
+from sumbi.report import ADAPTERS, DEFAULT_AGENTS
 from sumbi.verification import declared_commands, recognize
 
 STATES = ("success", "failed", "unverified", "in_progress", "no_change")
@@ -20,8 +20,10 @@ def token_measurement(session, scan):
     required = ("new_input", "cache_read", "output") if session.agent == "codex" else TOKEN_KINDS[:4]
     tokens = {kind: sum(v[kind] for v in events) if events and all(v.get(kind) is not None for v in events)
               else None for kind in TOKEN_KINDS}
-    complete = bool(events) and all(tokens[k] is not None for k in required)
+    complete = bool(events) and not session.token_evidence_incomplete and all(tokens[k] is not None for k in required)
     tokens["total"] = sum(tokens[k] for k in required) if complete else None
+    if session.agent == "sumbi-events":
+        tokens["evidence_incomplete"] = session.token_evidence_incomplete
     observed = sum(v.get(k) or 0 for v in events for k in TOKEN_KINDS if k != "reasoning_output")
     return tokens, complete, observed
 
@@ -42,7 +44,8 @@ def state(session, scan, declared, active_minutes, repository):
             matches.append(execution)
     times = [t for t in session.times if scan.contains(t)]
     latest = max(times, default=None)
-    if not edits and not session.local_evidence_gaps.get("edit_timestamp_missing"):
+    if not edits and not session.local_evidence_gaps.get("edit_timestamp_missing") and (
+            session.agent != "sumbi-events" or not session.local_evidence_gaps):
         result, reason = "no_change", "no_known_edit"
     elif session.local_evidence_gaps:
         result, reason = "unverified", "incomplete_edit_or_command_timestamps"
@@ -82,7 +85,7 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
         attributor = RepositoryAttributor(repository)
         units, overhead, excluded_scope, start_scopes = [], [], Counter(), Counter()
         adapters, command_coverage = {}, Counter()
-        for agent in agents if agents is not None else ADAPTERS:
+        for agent in agents if agents is not None else DEFAULT_AGENTS:
             measured = Coverage()
             sessions = ADAPTERS[agent].collect(home, scan, measured)
             adapters[agent] = {**measured.as_dict(), "sessions_read": len(sessions)}
@@ -100,7 +103,7 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                 if not session.is_worker:
                     if session.in_window(scan):
                         tokens, complete, observed = token_measurement(session, scan)
-                        overhead.append({"id": session.id(), "agent": agent, "tokens": tokens,
+                        overhead.append({"id": session.id(), "agent": session.public_agent(), "tokens": tokens,
                                          "tokens_complete": complete, "observed_total": observed})
                     continue
                 if not window.contains(session.start_at):
@@ -113,7 +116,7 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                 tokens, complete, observed = token_measurement(session, lifetime)
                 outcome, reason, coverage, latest = state(session, lifetime, declared, active_minutes, repository)
                 command_coverage.update(coverage)
-                units.append({"id": session.id(), "agent": agent, "parent_id":
+                units.append({"id": session.id(), "agent": session.public_agent(), "parent_id":
                     session.as_dict(lifetime, attributor, active_minutes)["parent_id"],
                     "dispatched_at": session.start_at.isoformat(), "last_at": latest.isoformat() if latest else None,
                     "start_scope": start_scope,
@@ -121,7 +124,8 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                     "tokens": tokens, "tokens_complete": complete, "observed_total": observed,
                     "elapsed_seconds": (latest - session.start_at).total_seconds() if latest else None,
                     "model": sorted(session.models), "effort": sorted(session.efforts),
-                    "cli_version": sorted(session.versions), "command_coverage": dict(sorted(coverage.items()))})
+                    "cli_version": sorted(session.versions), "command_coverage": dict(sorted(coverage.items())),
+                    **({"metadata_incomplete": dict(session.metadata_incomplete)} if session.agent == "sumbi-events" else {})})
         units.sort(key=lambda row: row["id"])
         retained = [r for r in units if r["state"] not in ("in_progress", "no_change")]
         from sumbi.deliver import wilson

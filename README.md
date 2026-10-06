@@ -18,6 +18,11 @@ confounder flags and verdict proposals. Propagation remains planned.
 Local verification additionally measures fixed dispatched-worker units using
 declared script exit evidence; its weaker acceptance and worker-only cost scope
 are explicit.
+Any coding agent or wrapper can opt into L1 session measurement and L2 local
+worker outcomes by emitting [sumbi-events JSONL v1](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/docs/EVENTS.md). This does
+not imply a proprietary native integration or instruction-loading support for
+every agent. Select `--agents sumbi-events` and use a private `--home` for its
+logs; the native adapter defaults remain unchanged.
 
 ## Quickstart
 

@@ -161,7 +161,7 @@ Reviewed philosophy from proven harnesses is safer than fresh, unreviewed code. 
 
 | Adapter | First | Later |
 |---|---|---|
-| Sessions | Claude Code (`~/.claude/projects/**.jsonl`, subagents), Codex (`~/.codex/sessions/**/rollout-*.jsonl`) | More agents per the support matrix; OpenTelemetry as a transport |
+| Sessions | Claude Code (`~/.claude/projects/**.jsonl`, subagents), Codex (`~/.codex/sessions/**/rollout-*.jsonl`), opt-in `sumbi-events` JSONL v1 | More native agents per the support matrix; OpenTelemetry as a transport |
 | Outcomes | GitHub Actions and pull requests, tested first against recorded API responses | GitLab; manual entry for outcomes without Git or pull requests |
 | Workers | Plugins for in-house orchestration logs | — |
 | Hosts | Local, then (M3) SSH with a pinned zipapp, allowed hosts and read paths | — |
@@ -204,10 +204,17 @@ Windows are `[start, end)` everywhere. Errors, caps and unsupported fields are r
 | Level | Meaning | First support |
 |---|---|---|
 | L0 manual | Spec for entering deliverables, cost and outcomes by hand | Any repository, any agent |
-| L1 sessions | Tokens, time and friction from logs | Claude Code, Codex |
+| L1 sessions | Tokens, time and friction counts from logs | Claude Code, Codex; any emitter of `sumbi-events` v1 |
 | L2 outcomes | CI, pull requests, reverts | GitHub |
-| L2 local outcomes | Declared script exits after known edits; worker session units | Codex, Claude Code; weaker than external acceptance |
+| L2 local outcomes | Declared script exits after known edits; worker session units | Codex, Claude Code; any emitter of `sumbi-events` v1; weaker than external acceptance |
 | L3 propagation | Notices and rules through hooks, `AGENTS.md`, skills | Claude Code, Codex, agents that read `AGENTS.md` |
+
+The [open event contract](EVENTS.md) is verified against synthetic producer
+fixtures for collection and local verification. It does not claim a native
+integration, instruction-loading behavior or authenticated telemetry for every
+agent. Emitters supply immutable dispatch identity and observed machine events;
+source gaps remain visible and block comparison proposals. This is the route
+to agent-neutral L1/L2-local support without requiring a proprietary adapter.
 
 ## Milestones and acceptance
 

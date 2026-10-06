@@ -62,7 +62,9 @@ def compare_local(home: Path, repository: Path, registration_path: Path, *, agen
                     reported = {arm: [bool(r[kind]) for r in rows if r["agent"] == agent] for arm, rows in arms.items()}
                     if not any(any(v) for v in reported.values()):
                         unobservable.append(agent)
-                    elif any(any(v) and not all(v) for v in reported.values()):
+                    elif any(any(v) and not all(v) for v in reported.values()) or any(
+                            r.get("metadata_incomplete", {}).get(kind) for rows in arms.values()
+                            for r in rows if r["agent"] == agent):
                         partial.append(agent)
                     if any(reported["before"]) != any(reported["after"]):
                         asymmetric.append(agent)

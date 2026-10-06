@@ -5,12 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from sumbi import SCHEMA_VERSION
-from sumbi.adapters import claude_code, codex
+from sumbi.adapters import claude_code, codex, sumbi_events
 from sumbi.model import (Attributor, COUNT_KINDS, Coverage, EVIDENCE_TYPES, ProjectRule,
                          RepositoryAttributor, TOKEN_KINDS, Window)
 from sumbi.privacy import current_key, pseudonym_key, read_salt
 
-ADAPTERS = {"claude-code": claude_code, "codex": codex}
+ADAPTERS = {"claude-code": claude_code, "codex": codex, "sumbi-events": sumbi_events}
+DEFAULT_AGENTS = ("claude-code", "codex")
+
+
+def log_roots(home):
+    return [home / ".claude/projects", home / ".codex/sessions", home / ".sumbi/events"]
 
 
 def totals(sessions: list[dict], idle_minutes: float = 5) -> dict:
@@ -24,6 +29,12 @@ def totals(sessions: list[dict], idle_minutes: float = 5) -> dict:
     tokens.update(total=sum(s["tokens"]["total"] for s in sessions), measurement="observed",
                   not_reported_sessions=missing,
                   total_basis="reported_components_excluding_reasoning_subset")
+    if sessions and all("complete_total" in s["tokens"] for s in sessions):
+        values = [s["tokens"]["complete_total"] for s in sessions]
+        tokens["complete_total"] = sum(values) if all(v is not None for v in values) else None
+        tokens["evidence_incomplete"] = any(s["tokens"]["evidence_incomplete"] for s in sessions)
+        tokens["not_reported_events"] = {kind: sum(s["tokens"]["not_reported_events"][kind]
+            for s in sessions) for kind in TOKEN_KINDS}
     thresholds = sorted({"2", "5", "10", format(idle_minutes, "g")}, key=float)
     sensitivity = {t: sum(s["time"]["active"]["sensitivity_seconds"][t] for s in sessions) for t in thresholds}
     time = {"wall_span_seconds": {"measurement": "observed", "value": sum(
@@ -55,11 +66,12 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
     sessions = []
     coverage = {}
     reviews = []
-    for agent in agents if agents is not None else ADAPTERS:
+    for agent in agents if agents is not None else DEFAULT_AGENTS:
         measured = Coverage()
         found = ADAPTERS[agent].collect(home, window, measured, local_review=local_review)
         included = [s for s in found if s.in_window(window)]
         coverage[agent] = {**measured.as_dict(), "sessions_read": len(found), "sessions_in_window": len(included)}
+        selected_count = 0
         for session in included:
             row = session.as_dict(window, attributor, idle_minutes)
             if repository is not None:
@@ -73,10 +85,16 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
                     for kind in (*TOKEN_KINDS, "total"):
                         reported = [a["tokens"][kind] for a in selected if a["tokens"][kind] is not None]
                         row["tokens"][kind] = sum(reported) if reported else None
+                    if "complete_total" in row["tokens"]:
+                        values = [a["tokens"]["complete_total"] for a in selected]
+                        row["tokens"]["complete_total"] = sum(values) if all(v is not None for v in values) else None
+                        row["tokens"]["not_reported_events"] = {kind: sum(a["tokens"]["not_reported_events"][kind]
+                            for a in selected) for kind in TOKEN_KINDS}
             sessions.append(row)
+            selected_count += 1
             reviews.extend(session.id() + " " + text for text in sorted(session.review))
         if repository is not None:
-            coverage[agent]["sessions_selected"] = sum(s["agent"] == agent for s in sessions)
+            coverage[agent]["sessions_selected"] = selected_count
     sessions.sort(key=lambda s: (s["agent"], s["id"]))
     summary = totals(sessions, idle_minutes)
     spend = {}
@@ -115,7 +133,7 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
               "window": {"since": window.since.isoformat().replace("+00:00", "Z"),
                          "until": window.until.isoformat().replace("+00:00", "Z"), "bounds": "[since,until)"},
               "summary": summary, "by_agent": {agent: totals([s for s in sessions if s["agent"] == agent], idle_minutes)
-                                                for agent in coverage},
+                                                for agent in sorted(set(coverage) - {"sumbi-events"} | {s["agent"] for s in sessions})},
               "coverage": {"adapters": coverage, "sessions_in_window": len(sessions),
                            "spend": sorted(spend.values(), key=lambda r: (r["bucket"], r["project_key"] or "")),
                            "unattributed_share": unattributed / all_tokens if all_tokens else 0.0,
