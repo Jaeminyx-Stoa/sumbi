@@ -7,6 +7,13 @@ import tempfile
 from .errors import InstallError
 
 
+# Recognize Markdown fenced code block openings.
+FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)")
+
+# Find matching inline backtick delimiters.
+BACKTICK_RUN = re.compile(r"`+")
+
+
 MAX_BYTES = 1_048_576
 
 
@@ -59,7 +66,7 @@ def _without_code(text: str, *, inline: bool = True) -> str:
                 fence = None
             lines.append("\n")
             continue
-        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)", line)
+        opening = FENCE_OPEN.match(line)
         if opening:
             fence = (opening[1][0], len(opening[1]))
             lines.append("\n")
@@ -68,7 +75,7 @@ def _without_code(text: str, *, inline: bool = True) -> str:
     text = "".join(lines)
     if not inline:
         return text
-    runs = list(re.finditer(r"`+", text))
+    runs = list(BACKTICK_RUN.finditer(text))
     output, start, index = [], 0, 0
     while index < len(runs):
         opening = runs[index]

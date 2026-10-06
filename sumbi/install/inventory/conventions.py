@@ -6,13 +6,18 @@ from pathlib import Path
 import re
 import tomllib
 
-from .errors import InstallError
-from .text import scripts
-from .files import _without_code, read_bytes, safe_path
+from ..errors import InstallError
+from ..text import scripts
+from ..files import _without_code, read_bytes, safe_path
+from .context import InventoryContext
+
+
+# Remove metadata before directive and script detection.
+FRONT_MATTER = re.compile(r"\A---\s*\n.*?\n---(?:\s*\n|$)", re.S)
 
 
 def load_lexicon() -> dict:
-    return json.loads((Path(__file__).parent.parent / "catalog" / "conventions.v1.json").read_text(encoding="utf-8"))
+    return json.loads((Path(__file__).parents[2] / "catalog" / "conventions.v1.json").read_text(encoding="utf-8"))
 
 
 def detect(root: Path, paths: list[str], content, warnings: list[dict]) -> tuple[dict, int]:
@@ -30,7 +35,7 @@ def detect(root: Path, paths: list[str], content, warnings: list[dict]) -> tuple
     denials = {key: [re.compile(pattern, re.I) for language in languages
                      for pattern in language.get("denials", {}).get(key, [])] for key in conventions}
     for path in paths:
-        guidance = re.sub(r"\A---\s*\n.*?\n---(?:\s*\n|$)", "", content(path), flags=re.S)
+        guidance = FRONT_MATTER.sub("", content(path))
         guidance = _without_code(guidance, inline=False)
         counts.update(scripts(guidance))
         text = "\n".join(line for line in guidance.splitlines()
@@ -79,3 +84,16 @@ def detect(root: Path, paths: list[str], content, warnings: list[dict]) -> tuple
         elif convention["evidence"]:
             convention["status"] = "unknown"
     return conventions, lexicon["version"]
+
+
+def scan(context: InventoryContext) -> dict:
+    instructions, imports = context.instructions, context.imports
+    capabilities = context.capabilities
+    convention_paths = sorted(
+        {p for group in instructions.values() for p in group}
+        | {item["path"] for item in imports if item["status"] == "resolved"}
+        | {p for group in capabilities.values() for p in group["paths"]}
+    )
+    conventions, lexicon_version = detect(context.root, convention_paths, context.content, context.warnings)
+    return {"conventions": conventions, "convention_lexicon_version": lexicon_version,
+            "convention_search_paths": convention_paths}
