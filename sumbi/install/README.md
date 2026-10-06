@@ -39,11 +39,16 @@ paths with a count. Applying at such a root can write files outside any review
 or pull request; the warning does not change `--apply` behavior. Discovery follows
 the same exclusions and link restrictions as the rest of inventory.
 
-An agent started inside a nested repository does not load the enclosing
-workspace's `AGENTS.md`: Codex stops at the nearest git root, and Claude Code
-loads parent `CLAUDE.md` files, not `AGENTS.md`. Put shared instructions inside
-each repository or provide an explicit Claude import. Inherited cost estimates
-are upper bounds, not proof that instructions outside a git boundary are loaded.
+Codex starts inside a nested repository normally stop discovery at its git root.
+Claude Code discovers ancestor `CLAUDE.md` files and can load `AGENTS.md` under
+version/settings-dependent fallback rules. Install reads recent session starts
+through the collect adapter registry and reports `target-not-loaded` with
+recommended entry paths when a planned instruction misses most eligible observed
+session starts. Top-level and worker counts are shown separately. Workers with
+only an inferred first cwd contribute unknown coverage, not recommendation votes.
+Ignored, missing and unsafe cwd paths are withheld from placement output.
+See [load rules and limitations](../../docs/LOAD_RULES.md). Inherited cost
+estimates remain upper bounds, not proof of loaded context.
 
 Instruction size is `ceil(characters / 4)` after normalizing line endings.
 Unique imported files count once
@@ -140,6 +145,8 @@ on inherited ACLs.
 
 Before target writes, `.sumbi/backups/<UTC timestamp>/files/` holds original
 bytes and `manifest.json` records original modes, hashes and absent new files.
+Version 1 manifests also record applied target hashes and change status from
+`prepared` to `applied` only after successful writes.
 The manifest also pre-registers the planned intervention predictions. Successful
 application appends one record per practice to `.sumbi/interventions.jsonl`;
 the existing ledger is backed up too. `content_hash` is SHA-256 of the canonical
@@ -164,6 +171,40 @@ Instruction-budget guidance does not trim existing content. The testing
 practice leaves the exact command to the owner. Those gaps remain visible until
 the owner completes setup, even though the same blocks are not proposed again.
 Review guidance is text only; it does not establish required checks or a ruleset.
+
+## Reverting an installation
+
+```console
+sumbi install --root workspace --revert BACKUP_ID
+```
+
+`BACKUP_ID` is the timestamp directory name printed by apply, beneath
+`.sumbi/backups/`. Revert requires a completed version 1 manifest with applied
+hashes. Old or prepared manifests require manual recovery and fail safely.
+Backed-up original bytes must match their recorded hashes before any mutation.
+Links, hard-linked targets, traversal, duplicate paths, unsafe portable names,
+and repository metadata targets are rejected. Manifests are local recovery
+evidence, not authenticated against deliberate editing by their owner.
+
+For each target, revert restores original bytes and mode, or deletes a file
+that was originally absent, only when its current hash equals the applied hash.
+Modified, missing or unsafe targets are refused individually; other eligible
+files can still be restored. Refusals return a nonzero CLI status. Original
+POSIX permission modes include set-ID and sticky bits where supported; manifest
+modes exclude file-type bits. The ledger retains its current permission mode.
+Revert never restores the old intervention ledger: it appends an `action: revert` record with
+backup ID, UTC time and per-file statuses, retaining earlier and later records.
+If the ledger append fails, reverted files are rolled back without clobbering
+concurrent edits. The shared exclusive install lock also guards revert.
+
+Successful paths are remembered by the audit records. Repeated revert skips
+them even if new owner work or a later installation has changed those paths.
+Unchanged retries add no duplicate record; changed per-file outcomes append one.
+Refused paths can be retried after the owner restores exactly the applied bytes.
+Already-original files without a successful audit record are refused rather
+than guessed to have been reverted. Empty parent directories, backups, baseline
+artifacts and `.sumbi/.gitignore` remain deliberately: backup ignore protection
+must survive while recovery data exists. This command never stages or commits.
 
 ## Baseline integration
 

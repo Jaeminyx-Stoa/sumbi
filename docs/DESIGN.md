@@ -111,9 +111,14 @@ Seeds a sensible first harness in the current repository, starting from what is 
    A root outside a git work tree produces `root-not-versioned` and a count and
    relative paths of discovered nested repositories; application is unchanged.
    Files written outside a repository cannot appear in its review or pull request.
-   Agents started inside nested repositories do not load the workspace root's
-   `AGENTS.md`: Codex stops at the nearest git root; Claude Code loads parent
-   `CLAUDE.md` files rather than `AGENTS.md`.
+   Codex starts inside nested repositories normally stop at the nearest git
+   root. Claude Code loads ancestor `CLAUDE.md` files and has a qualified
+   `AGENTS.md` fallback. A versioned agent-neutral discovery table drives
+   observed-session-start placement warnings and recommended entry paths.
+   Top-level and worker session counts are visible; workers without their own
+   start-header evidence cannot vote in placement recommendations. Ignored,
+   missing and unsafe cwd paths are withheld.
+   See [load rules and limitations](LOAD_RULES.md).
 2. **Gaps.** Rules over the inventory. Examples:
    - no `AGENTS.md`
    - a `CLAUDE.md` that does not import `AGENTS.md`
@@ -128,6 +133,9 @@ Seeds a sensible first harness in the current repository, starting from what is 
    - `--dry-run` (the default) prints the plan as diffs.
    - `--apply` writes it: new files or managed blocks only, never overwriting, with backups.
    - Every applied practice is recorded as an intervention (practice id, version, provenance, prediction) in `.sumbi/interventions.jsonl`.
+   - `--revert BACKUP_ID` restores only unchanged applied files using versioned
+     backup hashes, refuses modified files individually, and appends a revert
+     audit while preserving local backup protection.
 5. **Baseline.** If agent logs exist, `collect` runs over a recent window before anything is applied, so the next round has something to compare against.
 
 **Catalog (the default source).** Curated, vendored and versioned in this repository. Practices are distilled from harnesses with a track record and re-expressed in sumbi's own words, with the sources credited:

@@ -15,6 +15,8 @@ from .errors import InstallError
 from .inventory import safe_path
 from .exclusions import GitIgnore
 from .planner import build_plan
+from .placement import annotate_placement, read_starts
+from .revert import revert_install
 
 
 def configure_parser(parser: argparse.ArgumentParser) -> None:
@@ -22,23 +24,32 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="Print additive unified diffs (the default).")
     mode.add_argument("--apply", action="store_true", help="Apply additions with backups and an intervention ledger.")
+    mode.add_argument("--revert", metavar="BACKUP_ID", help="Restore unchanged applied files from an install backup.")
     parser.add_argument("--select", help="Comma-separated catalog IDs; apply only matching gap candidates.")
     parser.add_argument("--budget", type=int, default=2000, help="Instruction token budget (default: 2000).")
     parser.add_argument("--exclude", action="append", default=[], metavar="GLOB",
                         help="Exclude repository-relative paths and descendants; repeatable.")
     parser.add_argument("--json", metavar="PATH", help="Create a JSON plan at a repository-relative path; never overwrite.")
-    parser.add_argument("--home", type=Path, default=Path.home(), help="Local agent-log home for the baseline.")
+    parser.add_argument("--home", type=Path, default=Path.home(), help="Local agent-log home for start placement and baseline.")
     parser.add_argument("--salt-file", type=Path, help="Local pseudonym key file (overrides SUMBI_SALT).")
 
 
 def run(args: argparse.Namespace) -> int:
     try:
+        if args.revert:
+            if args.select is not None or args.json or args.exclude:
+                raise InstallError("Revert cannot be combined with selection, plan output, or exclusions.")
+            result = revert_install(Path(args.root), args.revert)
+            print("Revert: " + json.dumps(result, sort_keys=True))
+            return 1 if result["refused"] else 0
         try:
             salt = read_salt(args.salt_file)
         except (OSError, ValueError):
             raise InstallError("Cannot read a nonempty pseudonym salt.") from None
         selection = [p.strip() for p in args.select.split(",")] if args.select is not None else None
         plan = build_plan(Path(args.root), budget=args.budget, select=selection, exclude=args.exclude)
+        sessions, window, coverage = read_starts(args.home)
+        annotate_placement(plan, sessions, window, coverage)
         status = baseline(plan.root)
         if args.json:
             if args.json.split("/", 1)[0].lower() in {".git", ".sumbi"}:
@@ -60,6 +71,7 @@ def run(args: argparse.Namespace) -> int:
         print(f"  git-ignored roots: {report['exclusions']['gitignore_count']}")
         nested = report["versioning"]["nested_repositories"]
         print(f"  nested git repositories: {nested['count']}" + (" (" + ", ".join(nested["paths"]) + ")" if nested["paths"] else ""))
+        print("  observed starts: " + json.dumps(report["observed_starts"], sort_keys=True))
         for entry in report["exclusions"]["patterns"]:
             print(f"  exclude {entry['pattern']}: {entry['count']}")
         for name, entry in report["instructions"].items():
@@ -108,6 +120,7 @@ def run(args: argparse.Namespace) -> int:
                 print("Baseline file: " + result["baseline"]["file"])
             if "backup" in result:
                 print("Backup: " + result["backup"])
+                print("Backup ID: " + result["backup_id"])
         elif not plan.changes:
             print("No changes proposed.")
         return 0

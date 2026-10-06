@@ -22,8 +22,8 @@ ESTIMATE_RULE = (
 )
 
 
-def safe_path(root: Path, relative: str) -> Path:
-    """Reject ambiguous paths, links and traversal, including dangling links."""
+def checked_relative(relative: str) -> PurePosixPath:
+    """Validate portable path grammar without consulting the filesystem."""
     part = PurePosixPath(relative)
     components = relative.split("/")
     reserved = {"CON", "PRN", "AUX", "NUL"} | {prefix + str(n) for prefix in ("COM", "LPT") for n in range(1, 10)}
@@ -33,6 +33,12 @@ def safe_path(root: Path, relative: str) -> Path:
                    or any(ord(c) < 32 or c in '<>"|?*' for c in p)
                    for p in components)):
         raise InstallError("Unsafe repository-relative path.")
+    return part
+
+
+def safe_path(root: Path, relative: str) -> Path:
+    """Reject ambiguous paths, links and traversal, including dangling links."""
+    part = checked_relative(relative)
     current = root
     for component in part.parts:
         current = current / component
