@@ -26,6 +26,7 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
     mode.add_argument("--apply", action="store_true", help="Apply additions with backups and an intervention ledger.")
     mode.add_argument("--revert", metavar="BACKUP_ID", help="Restore unchanged applied files from an install backup.")
     parser.add_argument("--select", help="Comma-separated catalog IDs; apply only matching gap candidates.")
+    parser.add_argument("--intervention-id", help="Public-safe pre-registration ID to attach to all applied practices")
     parser.add_argument("--budget", type=int, default=2000, help="Instruction token budget (default: 2000).")
     parser.add_argument("--exclude", action="append", default=[], metavar="GLOB",
                         help="Exclude repository-relative paths and descendants; repeatable.")
@@ -36,6 +37,8 @@ def configure_parser(parser: argparse.ArgumentParser) -> None:
 
 def run(args: argparse.Namespace) -> int:
     try:
+        if args.intervention_id is not None and not args.apply:
+            raise InstallError("Intervention ID requires --apply.")
         if args.revert:
             if args.select is not None or args.json or args.exclude:
                 raise InstallError("Revert cannot be combined with selection, plan output, or exclusions.")
@@ -113,7 +116,7 @@ def run(args: argparse.Namespace) -> int:
         for change in plan.changes:
             sys.stdout.write(change.diff())
         if args.apply:
-            result = apply_plan(plan, home=args.home, salt=salt)
+            result = apply_plan(plan, home=args.home, salt=salt, intervention_id=args.intervention_id)
             print("Applied: " + (", ".join(result["applied"]) or "none"))
             print("baseline: " + result["baseline"]["status"])
             if "file" in result["baseline"]:

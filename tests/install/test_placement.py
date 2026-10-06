@@ -51,9 +51,9 @@ class PlacementTests(OfflineTest):
         annotate_placement(plan, sessions)
         starts = plan.report["observed_starts"]
         self.assertEqual(starts["sessions"], 5)
-        self.assertIn({"agent": "codex", "path": ".", "kind": "workspace-root", "repository": None, "count": 2, "roles": {"top-level": 2, "worker": 0}}, starts["paths"])
-        self.assertIn({"agent": "claude-code", "path": "app-a", "kind": "nested-repository", "repository": "app-a", "count": 1, "roles": {"top-level": 1, "worker": 0}}, starts["paths"])
-        self.assertIn({"agent": "claude-code", "path": "notes", "kind": "subfolder", "repository": None, "count": 1, "roles": {"top-level": 1, "worker": 0}}, starts["paths"])
+        self.assertIn({"agent": "codex", "path": ".", "kind": "workspace-root", "repository": None, "count": 2, "roles": {"top-level": 2, "worker": 0}, "start_evidence": {"first-observed-cwd": 2}}, starts["paths"])
+        self.assertIn({"agent": "claude-code", "path": "app-a", "kind": "nested-repository", "repository": "app-a", "count": 1, "roles": {"top-level": 1, "worker": 0}, "start_evidence": {"first-observed-cwd": 1}}, starts["paths"])
+        self.assertIn({"agent": "claude-code", "path": "notes", "kind": "subfolder", "repository": None, "count": 1, "roles": {"top-level": 1, "worker": 0}, "start_evidence": {"first-observed-cwd": 1}}, starts["paths"])
         warning = next(w for w in plan.report["warnings"] if w["kind"] == "target-not-loaded" and w["agent"] == "codex" and w["target"] == "app-a/CLAUDE.md")
         self.assertEqual(warning["missed_starts"], 3)
         self.assertEqual(warning["recommended_paths"], [{"path": "AGENTS.md", "starts": 2}, {"path": "app-b/AGENTS.md", "starts": 1}])
@@ -268,7 +268,7 @@ class PlacementTests(OfflineTest):
         self.assertIn({"kind": "start-coverage-incomplete"}, plan.report["warnings"])
         self.assertNotIn("private-unknown", json.dumps(plan.as_dict()))
 
-    def test_worker_fanout_is_visible_but_inferred_cwds_do_not_vote(self):
+    def test_worker_fanout_is_visible_but_parent_inferred_cwds_do_not_vote(self):
         root = self.workspace()
         (root / "app-a/CLAUDE.md").write_text("Scoped rules.\n", encoding="utf-8")
         home = Path.home()
@@ -282,11 +282,11 @@ class PlacementTests(OfflineTest):
         sessions, window, _ = read_starts(home, now=NOW)
         sessions.extend([session("claude-code", "nested-a", root / "app-a"),
                          session("claude-code", "nested-b", root / "app-a")])
-        # Newer adapters can fix a child's first observation without proving a header.
+        # Parent-inferred directories are not a child's own cwd observation.
         for value in sessions:
             if value.parent_raw_id:
                 value.start_at, value.start_cwd = NOW - timedelta(days=1), str(root)
-                value.start_evidence = "first-observed-cwd"
+                value.start_evidence = "parent-inferred-cwd"
         plan = build_plan(root, select=["handoff"])
         annotate_placement(plan, sessions, window)
         starts = plan.report["observed_starts"]
@@ -296,6 +296,33 @@ class PlacementTests(OfflineTest):
         self.assertEqual(starts["coverage"]["worker_start_unknown"], 3)
         self.assertFalse(any(w["kind"] == "target-not-loaded" and w["target"] == "app-a/CLAUDE.md"
             for w in plan.report["warnings"]))
+
+    def test_claude_subagents_with_own_repeated_metadata_vote_with_provenance(self):
+        root = self.workspace()
+        home = Path.home()
+        parent = home / ".claude/projects/synthetic/parent.jsonl"
+        parent.parent.mkdir(parents=True)
+        parent.write_text(json.dumps({"type": "user", "sessionId": "parent",
+            "timestamp": "2030-01-14T00:00:00Z", "cwd": str(root / "app-a")}) + "\n", encoding="utf-8")
+        for identity, cwd in (("own", root), ("nested", root / "app-b"), ("missing", None)):
+            child = parent.parent / "parent/subagents" / ("agent-" + identity + ".jsonl")
+            child.parent.mkdir(parents=True, exist_ok=True)
+            events = [{"type": "user", "sessionId": "parent", "agentId": identity,
+                       "isSidechain": True, "timestamp": f"2030-01-14T00:00:0{n}Z",
+                       **({"cwd": str(cwd)} if cwd else {})} for n in (1, 2)]
+            child.write_text("".join(json.dumps(e) + "\n" for e in events), encoding="utf-8")
+        sessions, window, _ = read_starts(home, now=NOW)
+        plan = build_plan(root)
+        starts = observed_starts(root, plan.report, sessions, window)
+        self.assertEqual(starts["placement_sessions"], 3)
+        self.assertEqual(starts["roles"], {"top-level": 1, "worker": 2})
+        self.assertEqual(starts["start_evidence"], {"first-observed-cwd": 3})
+        self.assertNotIn("worker_start_unknown", starts["coverage"])
+        self.assertEqual(starts["coverage"]["missing_or_ambiguous_cwd"], 1)
+        worker_paths = {r["path"] for r in starts["paths"] if r["roles"]["worker"]}
+        self.assertEqual(worker_paths, {".", "app-b"})
+        self.assertTrue(all(r["start_evidence"] == {"first-observed-cwd": 1} for r in starts["paths"]))
+        self.assertNotIn(str(root), json.dumps(starts))
 
     def test_own_header_worker_session_starts_are_counted_and_attributed(self):
         root = self.workspace()
@@ -317,6 +344,7 @@ class PlacementTests(OfflineTest):
         self.assertEqual(starts["roles"], {"top-level": 1, "worker": 4})
         row = next(row for row in starts["paths"] if row["path"] == ".")
         self.assertEqual(row["roles"], {"top-level": 0, "worker": 3})
+        self.assertEqual(row["start_evidence"], {"session-header": 3})
         self.assertEqual(starts["coverage"]["worker_start_unknown"], 1)
         self.assertFalse(any(w["kind"] == "target-not-loaded" and w["target"] == "AGENTS.md"
             for w in plan.report["warnings"]))

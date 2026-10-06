@@ -156,6 +156,37 @@ class AccountingTests(SyntheticHome):
 
 
 class EdgeTests(SyntheticHome):
+    def check_old_layout(self, parent_name):
+        self.fixture("claude-code", "claude/main.jsonl", parent_name)
+        self.fixture("claude-code", "claude/child.jsonl", "agent-child-one.jsonl")
+        sessions = {s.raw_id: s for s in claude_code.collect(self.home, WINDOW, Coverage())}
+        self.assertEqual(set(sessions), {"session-c", "session-c:subagent:child-one"})
+        parent, child = sessions["session-c"], sessions["session-c:subagent:child-one"]
+        self.assertFalse(parent.is_worker)
+        self.assertIsNone(parent.parent_raw_id)
+        self.assertTrue(child.is_worker)
+        self.assertEqual(child.parent_raw_id, parent.raw_id)
+        self.assertEqual(parent.tokens, {"new_input": 13, "cache_write": 25,
+                                        "cache_read": 37, "output": 14, "reasoning_output": None})
+        self.assertEqual(child.tokens, {"new_input": 1, "cache_write": 0,
+                                       "cache_read": 2, "output": 3, "reasoning_output": None})
+
+    def test_old_layout_agent_sorts_before_parent(self):
+        self.check_old_layout("z-parent.jsonl")
+
+    def test_old_layout_agent_sorts_after_parent(self):
+        self.check_old_layout("a-parent.jsonl")
+
+    def test_claude_records_cannot_change_stream_role(self):
+        for name, child in (("parent.jsonl", False), ("parent/subagents/agent-child.jsonl", True)):
+            records = [self.claude_event("2030-01-01T00:01:00Z", identity=name + "first", isSidechain=child),
+                       self.claude_event("2030-01-01T00:02:00Z", identity=name + "last", isSidechain=not child)]
+            self.write("claude-code", name, records)
+        sessions = claude_code.collect(self.home, WINDOW, Coverage())
+        self.assertEqual(len(sessions), 2)
+        for session in sessions:
+            self.assertEqual(session.is_worker, session.parent_raw_id is not None)
+
     def test_nested_claude_subagent_history_is_scanned_and_deduplicated(self):
         event = self.claude_event("2030-01-01T00:01:00Z", agentId="child-one")
         self.write("claude-code", "session-c/subagents/agent-child-one.jsonl", [event])

@@ -580,6 +580,121 @@ class UnitTests(unittest.TestCase):
                   "--until", self.window.until.isoformat(), *arguments[:-2], "--json", str(config)])
         self.assertIn("verify", config.read_text())
 
+    def test_verifier_all_fail_mixed_all_pass_and_no_completed_results(self):
+        from sumbi.local_outcomes import text_summary as deliver_summary
+        from sumbi.local_compare import text_summary as compare_summary
+        for before, after, expected in ((2, 3, True), (2, 0, False), (0, 0, False), (None, None, False)):
+            with self.subTest(codes=(before, after)):
+                self.write_codex("before", code=before)
+                self.write_codex("after", start="2030-01-02T01:00:00Z", code=after)
+                delivered = self.report()
+                compared = compare_local(self.home, self.repo, self.registration(), verify=[SCRIPT], resamples=100)
+                counts = {str(c): (before, after).count(c) for c in (before, after) if c is not None}
+                for report, summary in ((delivered, deliver_summary), (compared, compare_summary)):
+                    self.assertEqual(report["verification"]["exit_code_counts"], counts)
+                    signal_expected = expected if report is delivered else any(c is not None and c != 0 for c in (before, after))
+                    self.assertEqual(bool(report["signals"]), signal_expected)
+                    if expected:
+                        self.assertIn("verifier_never_passed", summary(report).splitlines()[1])
+                        self.assertIn("exit 2: 1", summary(report).splitlines()[1])
+                        self.assertIn("exit 3: 1", summary(report).splitlines()[1])
+                    self.assertNotIn(SCRIPT, json.dumps(report) + summary(report))
+                if expected:
+                    self.assertEqual(compared["verdict"]["proposal"], "withhold")
+                    self.assertIn("verifier_never_passed", compared["verdict"]["reasons"])
+                    self.assertNotIn("inconclusive_success", compared["verdict"]["reasons"])
+                    self.assertTrue(next(f for f in compared["flags"] if f["name"] == "verifier_never_passed")["blocking"])
+
+    def test_compare_verifier_health_per_arm(self):
+        from sumbi.local_compare import text_summary
+        for before, after in ((2, 0), (0, 3), (2, 3), (0, 0)):
+            with self.subTest(codes=(before, after)):
+                self.write_codex("before", code=before)
+                self.write_codex("after", start="2030-01-02T01:00:00Z", code=after)
+                report = compare_local(self.home, self.repo, self.registration(), verify=[SCRIPT], resamples=100)
+                evidence = {arm: {"completed": 1, "passed": int(code == 0), "exit_code_counts": {str(code): 1}}
+                            for arm, code in (("before", before), ("after", after))}
+                self.assertEqual(report["verification"]["arms"], evidence)
+                flags = [f for f in report["flags"] if f["name"] == "verifier_never_passed"]
+                if before or after:
+                    self.assertEqual(report["signals"], [{"name": "verifier_never_passed", "evidence": evidence}])
+                    self.assertEqual(flags, [{"name": "verifier_never_passed", "blocking": True, "evidence": evidence}])
+                    self.assertEqual(report["verdict"]["proposal"], "withhold")
+                    self.assertIn("verifier_never_passed", report["verdict"]["reasons"])
+                    self.assertNotIn("inconclusive_success", report["verdict"]["reasons"])
+                    for arm, code in (("before", before), ("after", after)):
+                        if code:
+                            self.assertIn(arm + " verifier_never_passed", text_summary(report).splitlines()[1])
+                            self.assertIn(f"exit {code}: 1", text_summary(report).splitlines()[1])
+                else:
+                    self.assertEqual(report["signals"], [])
+                    self.assertEqual(flags, [])
+                    self.assertNotIn("verifier_never_passed", report["verdict"]["reasons"])
+
+    def test_verifier_window_excludes_followup_pass_and_includes_no_change_workers(self):
+        self.write_codex("before", code=2, edits=False)
+        self.write_codex("after", start="2030-01-02T01:00:00Z", code=2)
+        self.write_codex("followup", start="2030-01-03T01:00:00Z", code=0)
+        report = self.report(scan_until=timestamp("2030-01-04T00:00:00Z"))
+        self.assertEqual(report["verification"], {"completed": 2, "passed": 0, "exit_code_counts": {"2": 2}})
+        self.assertEqual(report["signals"][0]["name"], "verifier_never_passed")
+
+    def interventions(self, actual):
+        path = Path(self.temporary.name) / "interventions.jsonl"
+        path.write_text(json.dumps({"intervention_id": "round-01", "practice_id": "handoff", "utc_time": actual}) + "\n", encoding="utf-8")
+        return path
+
+    def test_exposure_gap_later_earlier_and_absent(self):
+        for actual, dispatch, excluded_arm in (("2030-01-02T00:10:00Z", "2030-01-02T00:05:00Z", "after"),
+                                               ("2030-01-01T23:50:00Z", "2030-01-01T23:55:00Z", "before")):
+            with self.subTest(actual=actual):
+                self.write_codex("before")
+                self.write_codex("after", start="2030-01-02T01:00:00Z")
+                self.write_codex("gap", start=dispatch)
+                registration = self.registration()
+                unchanged = compare_local(self.home, self.repo, registration, verify=[SCRIPT], resamples=100)
+                self.assertNotIn("exposure_gap", unchanged)
+                self.assertEqual(unchanged["arms"][excluded_arm]["n"], 2)
+                report = compare_local(self.home, self.repo, registration, verify=[SCRIPT], resamples=100,
+                                       interventions_path=self.interventions(actual))
+                self.assertEqual(report["exposure_gap"]["seconds"], 600)
+                self.assertEqual(report["exclusions"][excluded_arm]["counts"], {"exposure_gap": 1})
+                self.assertEqual(report["arms"][excluded_arm]["n"], 1)
+                self.assertIn(excluded_arm + "_excluded_or_mixed", report["verdict"]["reasons"])
+
+    def test_exposure_gap_half_open_boundaries_and_cli(self):
+        self.write_codex("before")
+        self.write_codex("lower", start="2030-01-02T00:00:00Z")
+        self.write_codex("upper", start="2030-01-02T00:10:00Z")
+        registration = self.registration()
+        interventions = self.interventions("2030-01-02T00:10:00Z")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+            result = main(["compare", "--registration", str(registration), "--repository", str(self.repo),
+                           "--home", str(self.home), "--verify", SCRIPT, "--interventions", str(interventions),
+                           "--intervention-id", "round-01", "--resamples", "100", "--json", "-"])
+        self.assertEqual(result, 0)
+        report = json.loads(output.getvalue())
+        self.assertEqual(report["arms"]["after"]["n"], 1)
+        self.assertEqual(report["exclusions"]["after"]["counts"], {"exposure_gap": 1})
+        original = interventions.read_bytes()
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            main(["compare", "--registration", str(registration), "--interventions", str(interventions),
+                  "--home", str(self.home), "--repository", str(self.repo), "--verify", SCRIPT, "--json", str(interventions)])
+        self.assertEqual(interventions.read_bytes(), original)
+
+    def test_agent_only_in_one_arm_is_its_own_blocking_flag(self):
+        for index in range(10):
+            self.write_codex("before" + str(index))
+            self.write_codex("after" + str(index), start="2030-01-02T01:00:00Z")
+        self.write_claude(start="2030-01-02T02:00:00Z")
+        report = compare_local(self.home, self.repo, self.registration(), verify=[SCRIPT], resamples=100)
+        flag = next(f for f in report["flags"] if f["name"] == "agent_mix_shift")
+        self.assertTrue(flag["blocking"])
+        self.assertEqual(flag["evidence"]["agents"], ["claude-code"])
+        self.assertEqual(sum(f["name"] == "agent_mix_shift" for f in report["flags"]), 1)
+        self.assertFalse(any(f["name"].endswith("metadata_asymmetric") for f in report["flags"]))
+
 
 if __name__ == "__main__":
     unittest.main()

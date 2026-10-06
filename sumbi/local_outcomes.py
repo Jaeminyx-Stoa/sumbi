@@ -13,6 +13,21 @@ STATES = ("success", "failed", "unverified", "in_progress", "no_change")
 METRICS = (*TOKEN_KINDS, "total", "time")
 
 
+def verification_report(counts):
+    return {"completed": sum(counts.values()), "passed": counts[0],
+            "exit_code_counts": {str(code): n for code, n in sorted(counts.items())}}
+
+
+def verifier_signals(verification):
+    return ([{"name": "verifier_never_passed", "evidence": verification}]
+            if verification["completed"] and not verification["passed"] else [])
+
+
+def verifier_summary(verification):
+    counts = "; ".join(f"exit {code}: {n}" for code, n in verification["exit_code_counts"].items())
+    return "verifier_never_passed: matched completed verifications; " + counts
+
+
 def token_measurement(session, scan):
     """Partial totals remain null, with observed components retained separately."""
     events = [values for at, _, kind, (values, *_) in session.attribution_events
@@ -75,7 +90,7 @@ def state(session, scan, declared, active_minutes, repository):
 
 
 def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
-                  verify=None, scan_until=None, active_minutes=5, salt=None):
+                  verify=None, scan_until=None, active_minutes=5, salt=None, verification_windows=None):
     """Select units solely from start metadata, before inspecting outcomes."""
     if scan_until is not None and scan_until < window.until:
         raise ValueError("Local outcome scan end must cover the dispatch window")
@@ -85,6 +100,8 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
         attributor = RepositoryAttributor(repository)
         units, overhead, excluded_scope, start_scopes = [], [], Counter(), Counter()
         adapters, command_coverage = {}, Counter()
+        verification_counts = Counter()
+        arm_counts = {arm: Counter() for arm in verification_windows or {}}
         for agent in agents if agents is not None else DEFAULT_AGENTS:
             measured = Coverage()
             sessions = ADAPTERS[agent].collect(home, scan, measured)
@@ -100,6 +117,17 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                     if session.in_window(scan):
                         excluded_scope[link["bucket"]] += 1
                     continue
+                # Gate health concerns all scoped sessions, including no-change
+                # workers and dispatchers. Lifetime follow-up checks outside the
+                # measurement windows cannot conceal a never-passing gate.
+                for execution in session.commands.values():
+                    if (any(w.contains(execution.at) for w in (verification_windows.values() if verification_windows else (window,)))
+                            and recognize(execution.command, declared) == "matched"
+                            and type(execution.exit_code) is int):
+                        verification_counts[execution.exit_code] += 1
+                        for arm, arm_window in (verification_windows or {}).items():
+                            if arm_window.contains(execution.at):
+                                arm_counts[arm][execution.exit_code] += 1
                 if not session.is_worker:
                     if session.in_window(scan):
                         tokens, complete, observed = token_measurement(session, scan)
@@ -130,7 +158,11 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
         retained = [r for r in units if r["state"] not in ("in_progress", "no_change")]
         from sumbi.deliver import wilson
         from sumbi.compare_stats import estimate
+        verification = verification_report(verification_counts)
+        if verification_windows:
+            verification["arms"] = {arm: verification_report(counts) for arm, counts in arm_counts.items()}
         return {"schema_version": "local-deliver-1.0", "outcome_source": "local-verify",
+                "verification": verification, "signals": verifier_signals(verification),
                 "unit": "worker_session", "dispatch_window": {"since": window.since.isoformat(),
                     "until": window.until.isoformat(), "bounds": "[since,until)"},
                 "scan_until": scan.until.isoformat(), "active_minutes": active_minutes,
@@ -152,8 +184,11 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
 
 
 def text_summary(report):
-    lines = ["sumbi local verification", "Outcome source: local-verify", "States: " +
-             "; ".join(f"{s} {n}" for s, n in report["states"].items())]
+    lines = ["sumbi local verification"]
+    if report.get("signals"):
+        lines.append(verifier_summary(report["verification"]))
+    lines.extend(["Outcome source: local-verify", "States: " +
+                  "; ".join(f"{s} {n}" for s, n in report["states"].items())])
     rate = report["success_rate"]
     lines.append(f"Retained success: {rate['numerator']}/{rate['denominator']}; Wilson 95% {rate['wilson_95']}")
     lines.append(f"Dispatch overhead sessions: {report['dispatch_overhead']['sessions']}; observed tokens {report['dispatch_overhead']['observed_total']}")
