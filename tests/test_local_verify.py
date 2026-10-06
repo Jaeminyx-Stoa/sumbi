@@ -9,14 +9,17 @@ from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from sumbi.adapters.claude_code import bash_exit_code, collect as collect_claude
-from sumbi.adapters.codex import collect as collect_codex
+from sumbi.events.adapters.claude_code import bash_exit_code, collect as collect_claude
+from sumbi.events.adapters.codex import collect as collect_codex
 from sumbi.cli import main
-from sumbi.local_compare import compare_local
-from sumbi.local_outcomes import deliver_local
-from sumbi.model import Coverage, Window, execution_cwd, timestamp
-from sumbi.registration import read_registration
-from sumbi.verification import declared_commands, recognize
+from sumbi.judge.compare_local import compare_local
+from sumbi.outcomes.local_verify.workers import deliver_local
+from sumbi.core.records import Coverage
+from sumbi.core.time import Window
+from sumbi.core.paths import execution_cwd
+from sumbi.core.values import timestamp
+from sumbi.judge.registration import read_registration
+from sumbi.outcomes.local_verify.recognizer import declared_commands, recognize
 
 SCRIPT = "scripts/check.sh"
 
@@ -278,8 +281,8 @@ class UnitTests(unittest.TestCase):
         target = "C:/fixture/workspace"
         repository = Path(self.temporary.name) / "standin"
         # Exercise the state gate without making a host-specific fixture tree.
-        from sumbi.local_outcomes import state
-        from sumbi.model import CommandExecution, Session
+        from sumbi.outcomes.local_verify.workers import state
+        from sumbi.sessions.session import CommandExecution, Session
         at = timestamp("2030-01-01T01:00:00Z")
         session = Session("codex", "synthetic")
         session.times.update((at, at + timedelta(seconds=4)))
@@ -348,8 +351,8 @@ class UnitTests(unittest.TestCase):
         self.assertTrue(all(timestamp(row["last_at"]) >= own for row in report["units"]))
 
     def test_activity_and_checks_obey_both_lifetime_bounds(self):
-        from sumbi.local_outcomes import state
-        from sumbi.model import Session
+        from sumbi.outcomes.local_verify.workers import state
+        from sumbi.sessions.session import Session
         start = timestamp("2030-01-02T01:00:00Z")
         lifetime = Window(start, start + timedelta(minutes=1))
         session = Session("codex", "synthetic")
@@ -507,7 +510,7 @@ class UnitTests(unittest.TestCase):
         records = self.write_codex("after", start="2030-01-02T01:00:00Z")
         records[0]["payload"]["cwd"] = str((Path(self.temporary.name) / "other-checkout").resolve())
         self.save(self.codex / "rollout-after.jsonl", records)
-        with patch("sumbi.model.RepositoryAttributor.origin", return_value=("example.test/owner/project", "origin")):
+        with patch("sumbi.measure.attribution.RepositoryAttributor.origin", return_value=("example.test/owner/project", "origin")):
             report = compare_local(self.home, self.repo, self.registration(), verify=[SCRIPT], resamples=100)
         self.assertEqual(report["arms"]["after"]["n"], 1)
         self.assertEqual(report["arms"]["after"]["units"][0]["state"], "success")
@@ -581,8 +584,8 @@ class UnitTests(unittest.TestCase):
         self.assertIn("verify", config.read_text())
 
     def test_verifier_all_fail_mixed_all_pass_and_no_completed_results(self):
-        from sumbi.local_outcomes import text_summary as deliver_summary
-        from sumbi.local_compare import text_summary as compare_summary
+        from sumbi.outcomes.local_verify.workers import text_summary as deliver_summary
+        from sumbi.judge.compare_local import text_summary as compare_summary
         for before, after, expected in ((2, 3, True), (2, 0, False), (0, 0, False), (None, None, False)):
             with self.subTest(codes=(before, after)):
                 self.write_codex("before", code=before)
@@ -606,7 +609,7 @@ class UnitTests(unittest.TestCase):
                     self.assertTrue(next(f for f in compared["flags"] if f["name"] == "verifier_never_passed")["blocking"])
 
     def test_compare_verifier_health_per_arm(self):
-        from sumbi.local_compare import text_summary
+        from sumbi.judge.compare_local import text_summary
         for before, after in ((2, 0), (0, 3), (2, 3), (0, 0)):
             with self.subTest(codes=(before, after)):
                 self.write_codex("before", code=before)

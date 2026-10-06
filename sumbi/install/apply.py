@@ -11,7 +11,7 @@ import tempfile
 import re
 
 from sumbi.catalog import VERSION, load_judgment_policy
-from .baseline import baseline
+from .baseline_hook import baseline
 from .errors import InstallError
 from .inventory import read_bytes, safe_path
 from .planner import Plan, build_plan, digest
@@ -69,7 +69,7 @@ def _protect_local_artifacts(root: Path) -> None:
 
 
 def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = None, intervention_id=None) -> dict:
-    from sumbi.ledger import LABEL
+    from sumbi.outcomes.github.ledger import LABEL
     if intervention_id is not None and (not isinstance(intervention_id, str) or not re.fullmatch(LABEL, intervention_id)):
         raise InstallError("Intervention ID must be a bounded public-safe label.")
     if not plan.changes:

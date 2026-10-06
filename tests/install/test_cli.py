@@ -8,12 +8,12 @@ from pathlib import Path
 import types
 from unittest.mock import patch
 
-from sumbi.install.__main__ import main
-from sumbi.install.baseline import baseline
+from sumbi.cli.install import main
+from sumbi.install.baseline_hook import baseline
 from sumbi.install.errors import InstallError
 from .test_inventory import OfflineTest
 
-baseline_module = importlib.import_module("sumbi.install.baseline")
+baseline_module = importlib.import_module("sumbi.install.baseline_hook")
 
 
 class CliTests(OfflineTest):
@@ -102,7 +102,7 @@ class CliTests(OfflineTest):
             self.assertNotIn(tree + "/CLAUDE.md", output + raw)
 
     def test_pending_baseline(self):
-        missing = ModuleNotFoundError("Synthetic unavailable entry point", name="sumbi.collect")
+        missing = ModuleNotFoundError("Synthetic unavailable entry point", name="sumbi.install.baseline")
         with patch.object(baseline_module.importlib, "import_module", side_effect=missing):
             self.assertEqual(baseline(Path(".")), {"status": "pending (collect not available)"})
 
@@ -113,9 +113,9 @@ class CliTests(OfflineTest):
             self.assertFalse((repository / "AGENTS.md").exists())
             calls.append(repository)
             return {"private_text": "SYNTHETIC_PRIVATE_BASELINE"}
-        module = types.ModuleType("sumbi.collect")
+        module = types.ModuleType("sumbi.install.baseline")
         module.baseline = entry
-        with patch.dict("sys.modules", {"sumbi.collect": module}):
+        with patch.dict("sys.modules", {"sumbi.install.baseline": module}):
             result, output, errors = self.run_cli(["--root", str(root), "--dry-run"])
             self.assertEqual(result, 0, errors)
             self.assertIn("baseline: available (runs before apply)", output)
@@ -129,11 +129,11 @@ class CliTests(OfflineTest):
 
     def test_baseline_failure_prevents_practice_writes(self):
         root = self.copy_fixture("empty")
-        module = types.ModuleType("sumbi.collect")
+        module = types.ModuleType("sumbi.install.baseline")
         def entry(*, repository, home=None):
             raise ValueError("SYNTHETIC_PRIVATE_ERROR")
         module.baseline = entry
-        with patch.dict("sys.modules", {"sumbi.collect": module}):
+        with patch.dict("sys.modules", {"sumbi.install.baseline": module}):
             result, output, errors = self.run_cli(["--root", str(root), "--apply"])
         self.assertEqual(result, 1)
         self.assertIn("Collect baseline failed", errors)

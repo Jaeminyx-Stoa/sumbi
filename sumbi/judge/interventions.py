@@ -3,8 +3,8 @@
 import json
 from pathlib import Path
 
-from sumbi.ledger import utc
-from sumbi.registration import _unique
+from sumbi.outcomes.github.ledger import utc
+from sumbi.judge.registration import _unique
 
 
 def exposure_gap(registration, path: Path | None, intervention_id=None):
@@ -42,12 +42,12 @@ def exposure_gap(registration, path: Path | None, intervention_id=None):
 
 
 def in_exposure_gap(when, gap):
-    from sumbi.model import timestamp
+    from sumbi.core.values import timestamp
     return bool(gap and when is not None and timestamp(gap["since"]) <= when < timestamp(gap["until"]))
 
 
 def exposure_side(when, planned, gap):
-    from sumbi.model import timestamp
+    from sumbi.core.values import timestamp
     if in_exposure_gap(when, gap):
         return "mixed"
     boundary = timestamp(gap["actual_write_at"]) if gap else planned

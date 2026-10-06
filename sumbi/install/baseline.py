@@ -1,44 +1,37 @@
-"""A narrow optional hook; the installer does not collect logs itself."""
+"""Repository-scoped, offline pre-install measurement."""
 
-import importlib
+from datetime import datetime, timedelta, timezone
+import json
 from pathlib import Path
-import re
 
-from .errors import InstallError
-
-PENDING = "pending (collect not available)"
+from sumbi.core.time import Window
+from sumbi.measure.report import collect, log_roots
 
 
-def baseline(repository: Path, *, run: bool = False, home: Path | None = None,
-             salt: bytes | None = None) -> dict:
-    try:
-        module = importlib.import_module("sumbi.collect")
-    except ModuleNotFoundError as error:
-        if error.name in {"sumbi.collect", "sumbi"}:
-            return {"status": PENDING}
-        raise InstallError("Collect baseline import failed; no practices applied.") from None
-    except Exception:
-        raise InstallError("Collect baseline import failed; no practices applied.") from None
-    entry = getattr(module, "baseline", None)
-    if not callable(entry):
-        return {"status": PENDING}
-    if not run:
-        return {"status": "available (runs before apply)"}
-    try:
-        options = {}
-        if home is not None:
-            options["home"] = home
-        if salt is not None:
-            options["salt"] = salt
-        result = entry(repository=repository, **options)
-    except Exception:
-        raise InstallError("Collect baseline failed; no practices applied.") from None
-    # Only recognized statuses and validated, relative artifact IDs cross into
-    # committable intervention records; arbitrary collector text stays local.
-    if (isinstance(result, dict) and isinstance(result.get("status"), str)
-            and result["status"] in {"recorded", "no sessions found"}
-            and isinstance(result.get("file"), str)
-            and re.fullmatch(r"\.sumbi/baseline/[0-9]{8}T[0-9]{6}\.[0-9]{6}Z\.json", result["file"])
-            and type(result.get("sessions")) is int and result["sessions"] >= 0):
-        return {key: result[key] for key in ("status", "file", "sessions")}
-    return {"status": "recorded", "entry_point": "sumbi.collect.baseline"}
+def baseline(*, repository: Path, home: Path | None = None,
+             salt: bytes | None = None, now: datetime | None = None) -> dict:
+    """Write a counts-only report for the previous 14 UTC days, before apply."""
+    # Use the installer's checked, exclusive publication for repository metadata.
+    from sumbi.install.apply import _write
+    from sumbi.install.inventory import safe_path
+
+    repository = repository.resolve()
+    if not repository.is_dir():
+        raise ValueError("Baseline requires an existing repository directory")
+    home = home if home is not None else Path.home()
+    until = now or datetime.now(timezone.utc)
+    if until.tzinfo is None:
+        raise ValueError("Baseline time must include a timezone")
+    until = until.astimezone(timezone.utc)
+    window = Window(until - timedelta(days=14), until)
+    relative = ".sumbi/baseline/" + until.strftime("%Y%m%dT%H%M%S.%fZ") + ".json"
+    destination = safe_path(repository, relative)
+    sources = log_roots(home)
+    if any(destination.resolve().is_relative_to(source.resolve()) for source in sources):
+        raise ValueError("Baseline must be outside session-log directories")
+    report, _ = collect(home, window, repository=repository, salt=salt)
+    data = (json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n").encode()
+    _write(repository, relative, None, data, 0o600)
+    sessions = report["summary"]["sessions"]
+    return {"status": "recorded" if sessions else "no sessions found", "file": relative,
+            "sessions": sessions}

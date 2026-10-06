@@ -10,11 +10,16 @@ from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from sumbi.adapters import claude_code, codex
+from sumbi.events.adapters import claude_code, codex
 from sumbi.cli import main, parser
-from sumbi.model import (Attributor, Coverage, ProjectRule, Session, Window,
-                         normalize_origin, normalize_path, pseudonym, timestamp)
-from sumbi.report import collect, text_summary
+from sumbi.measure.attribution import Attributor, ProjectRule
+from sumbi.core.records import Coverage
+from sumbi.sessions.session import Session
+from sumbi.core.time import Window
+from sumbi.core.paths import normalize_origin, normalize_path
+from sumbi.core.privacy import pseudonym
+from sumbi.core.values import timestamp
+from sumbi.measure.report import collect, text_summary
 
 FIXTURES = Path(__file__).parent / "fixtures"
 WINDOW = Window(timestamp("2030-01-01T00:00:00Z"), timestamp("2030-01-01T00:10:00Z"))
@@ -476,7 +481,7 @@ class AttributionTests(SyntheticHome):
         result = subprocess.CompletedProcess([], 0, "git@example.test:sample/repo.git\n", "")
         repo = subprocess.CompletedProcess([], 0, "true\n", "")
         attributor = Attributor(self.rules)
-        with patch("sumbi.model.subprocess.run", side_effect=[repo, result]) as run:
+        with patch("sumbi.measure.attribution.subprocess.run", side_effect=[repo, result]) as run:
             self.assertEqual(attributor.origin(str(self.one))[0], "example.test/sample/repo")
             attributor.origin(str(self.one))
         self.assertEqual(run.call_count, 2)
@@ -485,7 +490,7 @@ class AttributionTests(SyntheticHome):
 
     def test_non_repository_does_not_read_global_origin_configuration(self):
         attributor = Attributor(self.rules)
-        with patch("sumbi.model.subprocess.run", return_value=subprocess.CompletedProcess([], 1, "", "")) as run:
+        with patch("sumbi.measure.attribution.subprocess.run", return_value=subprocess.CompletedProcess([], 1, "", "")) as run:
             self.assertEqual(attributor.origin(str(self.one)), (None, "path_only"))
         run.assert_called_once()
 
@@ -558,7 +563,7 @@ class CliTests(SyntheticHome):
         self.assertEqual(before, {p: (p.read_bytes(), p.stat().st_mtime_ns) for p in paths})
 
     def test_output_failure_returns_error_without_exposing_paths(self):
-        with patch("sumbi.cli.atomic_write", side_effect=OSError("Synthetic private path canary")):
+        with patch("sumbi.cli.collect.atomic_write", side_effect=OSError("Synthetic private path canary")):
             result, stdout, stderr = self.invoke(["--json", str(self.home / "report.json")])
         self.assertEqual(result, 1)
         self.assertEqual(stdout, "")
@@ -588,7 +593,7 @@ class ContractTests(unittest.TestCase):
         # All links depend on caller configuration; adapters expose no project defaults.
         self.assertEqual(Attributor([]).rules, [])
         for path in (Path(__file__).parent.parent / "sumbi").rglob("*.py"):
-            if path.name == "github_outcomes.py":
+            if path.relative_to(Path(__file__).parent.parent).as_posix() == "sumbi/outcomes/github/live.py":
                 continue  # Only the explicitly selected live outcome adapter uses HTTP.
             source = path.read_text(encoding="utf-8")
             self.assertNotIn("import socket", source)

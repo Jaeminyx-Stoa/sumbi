@@ -14,8 +14,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from sumbi.ledger import PR, utc
-from sumbi.outcomes import FixtureOutcomes, SHA
+from sumbi.outcomes.github.ledger import PR, utc
+from sumbi.outcomes.github.recorded import FixtureOutcomes, SHA
 
 API = "https://api.github.com"
 MAX_BYTES = 16 * 1024 * 1024

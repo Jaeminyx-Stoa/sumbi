@@ -4,10 +4,14 @@ from collections import Counter
 from datetime import timedelta
 from pathlib import Path
 
-from sumbi.model import Coverage, RepositoryAttributor, TOKEN_KINDS, Window, execution_cwd
-from sumbi.privacy import current_key, pseudonym_key, read_salt
-from sumbi.report import ADAPTERS, DEFAULT_AGENTS
-from sumbi.verification import declared_commands, recognize
+from sumbi.core.records import Coverage
+from sumbi.measure.attribution import RepositoryAttributor
+from sumbi.sessions.session import TOKEN_KINDS
+from sumbi.core.time import Window
+from sumbi.core.paths import execution_cwd
+from sumbi.core.privacy import current_key, pseudonym_key, read_salt
+from sumbi.events.registry import ADAPTERS, DEFAULT_AGENTS
+from sumbi.outcomes.local_verify.recognizer import declared_commands, recognize
 
 STATES = ("success", "failed", "unverified", "in_progress", "no_change")
 METRICS = (*TOKEN_KINDS, "total", "time")
@@ -156,8 +160,8 @@ def deliver_local(home: Path, window: Window, repository: Path, *, agents=None,
                     **({"metadata_incomplete": dict(session.metadata_incomplete)} if session.agent == "sumbi-events" else {})})
         units.sort(key=lambda row: row["id"])
         retained = [r for r in units if r["state"] not in ("in_progress", "no_change")]
-        from sumbi.deliver import wilson
-        from sumbi.compare_stats import estimate
+        from sumbi.outcomes.github.deliver import wilson
+        from sumbi.judge.stats import estimate
         verification = verification_report(verification_counts)
         if verification_windows:
             verification["arms"] = {arm: verification_report(counts) for arm, counts in arm_counts.items()}

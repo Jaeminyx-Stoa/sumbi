@@ -1,320 +1,26 @@
-"""Shared accounting, coverage, time and candidate project links."""
+"""Session accounting and machine execution evidence."""
 
 from __future__ import annotations
-
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-import fnmatch
+from datetime import datetime
 import hashlib
 import json
-import math
-import ntpath
-import os
-from pathlib import Path
-import re
-import subprocess
-from urllib.parse import unquote, urlsplit
+from sumbi.core.records import Coverage
+from sumbi.core.time import Window
+from sumbi.core.values import timestamp
+from sumbi.core.privacy import pseudonym
+from sumbi.measure.attribution import Attributor
 
-from sumbi.privacy import pseudonym
 
 TOKEN_KINDS = ("new_input", "cache_write", "cache_read", "output", "reasoning_output")
+
+
 EVIDENCE_TYPES = ("cwd", "tool_path", "previous_event", "unassigned")
+
+
 COUNT_KINDS = ("compactions", "tool_calls", "tool_results", "tool_errors", "api_errors",
                "user_input_requests", "counter_resets")
-
-
-def label(value: object, category: str = "label") -> str:
-    """Allow bounded machine labels; fingerprint unsupported free-text shapes."""
-    if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_<][A-Za-z0-9_.:<>-]{0,95}", value):
-        return value
-    return pseudonym(category, str(value))
-
-
-def timestamp(value: object) -> datetime | None:
-    if not isinstance(value, str):
-        return None
-    try:
-        result = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if result.tzinfo is None:
-            return None
-        return result.astimezone(timezone.utc)
-    except (ValueError, OverflowError):
-        return None
-
-
-def epoch(value: object, *, milliseconds: bool = False) -> datetime | None:
-    if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
-        try:
-            return datetime.fromtimestamp(value / (1000 if milliseconds else 1), timezone.utc)
-        except (ValueError, OverflowError, OSError):
-            return None
-    return timestamp(value)
-
-
-def integer(value: object) -> int | None:
-    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else None
-
-
-@dataclass(frozen=True)
-class Window:
-    since: datetime
-    until: datetime
-
-    def __post_init__(self):
-        if (self.since.tzinfo is None or self.until.tzinfo is None
-                or self.since.utcoffset().total_seconds() != 0
-                or self.until.utcoffset().total_seconds() != 0 or self.since >= self.until):
-            raise ValueError("Window bounds must be UTC and since must precede until")
-
-    def contains(self, when: datetime | None) -> bool:
-        return when is not None and self.since <= when < self.until
-
-    def overlap(self, start: datetime, end: datetime) -> float:
-        return max(0.0, (min(end, self.until) - max(start, self.since)).total_seconds())
-
-
-@dataclass
-class Coverage:
-    files_scanned: int = 0
-    lines_read: int = 0
-    broken_lines: int = 0
-    duplicate_events: int = 0
-    unreadable_files: int = 0
-    invalid_timestamps: int = 0
-    invalid_token_records: int = 0
-    inherited_session_meta: int = 0
-    unknown_record_types: Counter = field(default_factory=Counter)
-
-    def unknown(self, kind: object):
-        self.unknown_record_types[label(kind, "type")] += 1
-
-    def as_dict(self):
-        return {name: (dict(sorted(value.items())) if isinstance(value, Counter) else value)
-                for name, value in vars(self).items()}
-
-
-def records(path: Path, coverage: Coverage, *, ignore_blank: bool = False):
-    """Continue after broken JSON, invalid UTF-8 and non-object records."""
-    coverage.files_scanned += 1
-    try:
-        with path.open("rb") as stream:
-            for raw in stream:
-                coverage.lines_read += 1
-                if ignore_blank and not raw.strip():
-                    continue
-                try:
-                    event = json.loads(raw.decode("utf-8"))
-                    if not isinstance(event, dict):
-                        raise ValueError("Expected object")
-                except (ValueError, UnicodeDecodeError):
-                    coverage.broken_lines += 1
-                    continue
-                yield event
-    except OSError:
-        coverage.unreadable_files += 1
-
-
-def mapping(value: object) -> dict:
-    return value if isinstance(value, dict) else {}
-
-
-def normalize_path(value: str) -> str:
-    value = value.replace("\\", "/")
-    if ntpath.splitdrive(value)[0] or value.startswith("//"):
-        return ntpath.normpath(value).replace("\\", "/").casefold().rstrip("/")
-    return os.path.normpath(value).replace("\\", "/").rstrip("/")
-
-
-def execution_cwd(value: object) -> str | None:
-    """Normalize plain cwd or a strict local Windows file URI, never a remote URI."""
-    if not isinstance(value, str) or not value or "\x00" in value:
-        return None
-    if value.lower().startswith("file:"):
-        try:
-            uri = urlsplit(value)
-            if (uri.netloc or "?" in value or "#" in value or "\\" in value
-                    or re.search(r"[\x00-\x1f\x7f]", value)
-                    or not re.match(r"^/[A-Za-z]:/", uri.path)
-                    or re.search(r"%(?![0-9A-Fa-f]{2})", uri.path)
-                    or re.search(r"%(?:2f|5c)", uri.path, re.I)):
-                return None
-            value = unquote(uri.path, errors="strict")[1:]
-            if re.search(r"[\x00-\x1f\x7f]", value):
-                return None
-        except (ValueError, UnicodeError):
-            return None
-    elif "://" in value:
-        return None
-    return normalize_path(value)
-
-
-def normalize_origin(value: str) -> str | None:
-    """Discard transport, credentials and .git; preserve repository path case."""
-    value = value.strip()
-    if "://" not in value:
-        match = re.fullmatch(r"(?:[^/@:]+@)?([^/:]+):(.+)", value)
-        if not match:
-            return None
-        host, path = match.groups()
-    else:
-        try:
-            parsed = urlsplit(value)
-            if parsed.scheme not in ("https", "http", "ssh", "git") or not parsed.hostname:
-                return None
-            host, path = parsed.hostname, parsed.path
-            if parsed.port and parsed.port not in (22, 80, 443, 9418):
-                host += ":" + str(parsed.port)
-        except ValueError:
-            return None
-    path = path.strip("/")
-    if path.endswith(".git"):
-        path = path[:-4]
-    return host.casefold() + "/" + path if path else None
-
-
-@dataclass
-class ProjectRule:
-    name: str
-    origins: list[str] = field(default_factory=list)
-    paths: list[str] = field(default_factory=list)
-
-    def __post_init__(self):
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", self.name):
-            raise ValueError("Project rule names must be bounded labels")
-
-
-class Attributor:
-    """Git origins are candidates, never proof of deliverable ownership."""
-
-    def __init__(self, rules: list[ProjectRule]):
-        self.rules = rules
-        self.cache: dict[str, tuple[str | None, str]] = {}
-        self.roots: dict[str, str] = {}
-
-    def repository_path(self, value: str) -> str:
-        """Resolve an existing file/subdirectory to its local repository root."""
-        normalized = normalize_path(value)
-        if normalized in self.roots:
-            return self.roots[normalized]
-        root = normalized
-        path = Path(value)
-        # Do not interpret foreign Windows paths as relative paths on POSIX.
-        if not normalized.startswith("//") and (os.name == "nt" or not ntpath.splitdrive(value)[0]):
-            while not path.exists() and path != path.parent:
-                path = path.parent
-            directory = path if path.is_dir() else path.parent
-            if directory.is_dir():
-                try:
-                    result = subprocess.run(["git", "-C", str(directory), "rev-parse", "--show-toplevel"],
-                                            capture_output=True, text=True, timeout=5,
-                                            env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
-                    if result.returncode == 0 and result.stdout.strip():
-                        root = normalize_path(result.stdout.strip())
-                except (OSError, subprocess.TimeoutExpired, UnicodeError):
-                    pass
-        self.roots[normalized] = root
-        return root
-
-    def event_link(self, path: str) -> dict:
-        root = self.repository_path(path)
-        # Scope against the observed operand as well as its repository root.
-        link = self.link(path)
-        root_link = self.link(root) if root != normalize_path(path) else link
-        if root_link["bucket"] == "unassigned" or root_link["evidence"] in (
-                "git_origin_out_of_scope", "git_origin_candidate"):
-            return root_link
-        if link["bucket"] != "project" and root_link["bucket"] == "project":
-            link = root_link
-        if root != normalize_path(path):
-            link = {**link, "project_key": root_link["project_key"]}
-        return link
-
-    def origin(self, cwd: str) -> tuple[str | None, str]:
-        normalized = normalize_path(cwd)
-        if normalized in self.cache:
-            return self.cache[normalized]
-        origin, state = None, "path_only"
-        try:
-            if not normalized.startswith("//") and (os.name == "nt" or not ntpath.splitdrive(cwd)[0]) and Path(cwd).is_dir():
-                options = dict(
-                    capture_output=True, text=True, timeout=5,
-                    env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"},
-                )
-                repo = subprocess.run(["git", "-C", cwd, "rev-parse", "--is-inside-work-tree"], **options)
-                if repo.returncode == 0 and repo.stdout.strip() == "true":
-                    result = subprocess.run(["git", "-C", cwd, "config", "--get", "remote.origin.url"], **options)
-                    if result.returncode == 0 and result.stdout.strip():
-                        origin = normalize_origin(result.stdout)
-                        state = "origin" if origin else "unsupported_origin"
-        except (OSError, subprocess.TimeoutExpired, UnicodeError):
-            state = "origin_unavailable"
-        self.cache[normalized] = origin, state
-        return origin, state
-
-    def link(self, cwd: str) -> dict:
-        origin, state = self.origin(cwd)
-        path = normalize_path(cwd)
-        matches = []
-        evidence = "path_pattern"
-        if state in ("unsupported_origin", "origin_unavailable") and any(r.origins for r in self.rules):
-            return {"project_key": pseudonym("project", path), "rule": None,
-                    "evidence": state, "bucket": "unassigned"}
-        if origin:
-            matches = [r.name for r in self.rules if any(
-                fnmatch.fnmatchcase(origin, normalize_origin(p) or p) for p in r.origins)]
-            evidence = "git_origin_candidate"
-            if not matches and any(r.origins for r in self.rules):
-                return {"project_key": pseudonym("project", origin), "rule": None,
-                        "evidence": "git_origin_out_of_scope", "bucket": "other"}
-        if not matches:
-            matches = [r.name for r in self.rules if any(
-                fnmatch.fnmatchcase(path, normalize_path(p)) for p in r.paths)]
-            evidence = "path_pattern" if state == "path_only" else "path_pattern_" + state
-        key = pseudonym("project", origin or path)
-        if len(set(matches)) > 1:
-            return {"project_key": key, "rule": None, "evidence": "ambiguous_rules", "bucket": "unassigned"}
-        if not self.rules:
-            return {"project_key": key, "rule": None, "evidence": "git_origin_candidate" if origin else "cwd_candidate",
-                    "bucket": "project"}
-        return {"project_key": key, "rule": matches[0] if matches else None,
-                "evidence": evidence if matches else "unmatched_path", "bucket": "project" if matches else "other"}
-
-    def session_link(self, paths: set[str]) -> dict:
-        links = [self.link(path) for path in sorted(paths)]
-        if not links:
-            return {"bucket": "unassigned", "project_key": None, "rule": None,
-                    "evidence": "missing_cwd", "links": []}
-        signatures = {(x["project_key"], x["rule"], x["bucket"]) for x in links}
-        if len(signatures) > 1:
-            return {"bucket": "unassigned", "project_key": None, "rule": None,
-                    "evidence": "multiple_projects", "links": links}
-        return {**links[0], "links": links}
-
-
-class RepositoryAttributor(Attributor):
-    """Exact repository scope, consolidating subdirectories and local clones."""
-
-    def __init__(self, repository: Path):
-        super().__init__([])
-        self.path = normalize_path(str(repository.resolve()))
-        self.repository_origin, _ = self.origin(str(repository.resolve()))
-
-    def link(self, cwd: str) -> dict:
-        origin, state = self.origin(cwd)
-        path = normalize_path(cwd)
-        matched = path == self.path or path.startswith(self.path + "/")
-        evidence = "path_pattern"
-        bucket = "project" if matched else "other"
-        if self.repository_origin and origin:
-            matched = origin == self.repository_origin
-            bucket = "project" if matched else "other"
-            evidence = "git_origin_candidate" if matched else "git_origin_out_of_scope"
-        elif self.repository_origin and state in ("unsupported_origin", "origin_unavailable"):
-            matched, bucket, evidence = False, "unassigned", state
-        identity = (self.repository_origin or self.path) if matched else (origin or path)
-        return {"project_key": pseudonym("project", identity),
-                "rule": "repository" if matched else None, "evidence": evidence, "bucket": bucket}
 
 
 @dataclass
@@ -419,7 +125,7 @@ class Session:
             self.attribution_events.append((when, order, "usage", (values, cwd, paths)))
 
     def event_allocations(self, window, attributor, idle_minutes):
-        from sumbi.evidence import resolve_path
+        from sumbi.events.tool_paths import resolve_path
 
         context_cwd = None
         command_cwd = None

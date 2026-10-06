@@ -9,8 +9,8 @@ from pathlib import Path
 import re
 import tempfile
 
-from sumbi.ledger import LABEL, utc
-from sumbi.model import Window
+from sumbi.outcomes.github.ledger import LABEL, utc
+from sumbi.core.time import Window
 
 
 @dataclass(frozen=True)

@@ -6,8 +6,8 @@ from datetime import datetime
 from pathlib import Path
 import re
 
-from sumbi.deliver_evidence import branch
-from sumbi.model import timestamp
+from sumbi.events.references import branch
+from sumbi.core.values import timestamp
 
 COLUMNS = ("id", "dispatched_at", "acceptance", "repos", "prs", "branches",
            "state_override", "accepted_by_human", "notes")

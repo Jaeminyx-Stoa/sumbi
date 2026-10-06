@@ -4,15 +4,16 @@ from collections import Counter
 from pathlib import Path
 
 from sumbi.catalog import load_judgment_policy
-from sumbi.compare import (DECISION_ORDER, EXCLUDED_SHARE, MIX_DISTANCE, fraction,
+from sumbi.judge.compare_github import (DECISION_ORDER, EXCLUDED_SHARE, MIX_DISTANCE, fraction,
                            agent_only_in_one_arm, mix_distance, mix_report, verdict)
-from sumbi.compare_stats import bootstrap, newcombe, sample_size
-from sumbi.deliver import wilson
-from sumbi.local_outcomes import METRICS, STATES, deliver_local, verifier_signals, verifier_summary
-from sumbi.interventions import exposure_gap, exposure_side, gap_summary, in_exposure_gap
-from sumbi.model import Window, timestamp
-from sumbi.privacy import pseudonym, pseudonym_key, read_salt
-from sumbi.registration import read_registration
+from sumbi.judge.stats import bootstrap, newcombe, sample_size
+from sumbi.outcomes.github.deliver import wilson
+from sumbi.outcomes.local_verify.workers import METRICS, STATES, deliver_local, verifier_signals, verifier_summary
+from sumbi.judge.interventions import exposure_gap, exposure_side, gap_summary, in_exposure_gap
+from sumbi.core.time import Window
+from sumbi.core.values import timestamp
+from sumbi.core.privacy import pseudonym, pseudonym_key, read_salt
+from sumbi.judge.registration import read_registration
 
 
 def compare_local(home: Path, repository: Path, registration_path: Path, *, agents=None,

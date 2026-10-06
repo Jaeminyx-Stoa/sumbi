@@ -9,9 +9,11 @@ from support import IsolatedTemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from sumbi.evidence import resolve_path, shell_paths, tool_evidence
-from sumbi.model import Attributor, ProjectRule, Window, timestamp
-from sumbi.report import collect, text_summary
+from sumbi.events.tool_paths import resolve_path, shell_paths, tool_evidence
+from sumbi.measure.attribution import Attributor, ProjectRule
+from sumbi.core.time import Window
+from sumbi.core.values import timestamp
+from sumbi.measure.report import collect, text_summary
 
 START = timestamp("2030-01-01T00:00:00Z")
 WINDOW = Window(START, START + timedelta(minutes=30))
@@ -302,7 +304,7 @@ class PathEvidenceTests(unittest.TestCase):
     def test_unc_paths_are_candidates_without_network_filesystem_access(self):
         with patch.object(Path, "exists", side_effect=AssertionError("No UNC probing")), \
                 patch.object(Path, "is_dir", side_effect=AssertionError("No UNC probing")), \
-                patch("sumbi.model.subprocess.run", side_effect=AssertionError("No UNC Git commands")):
+                patch("sumbi.measure.attribution.subprocess.run", side_effect=AssertionError("No UNC Git commands")):
             link = Attributor([ProjectRule("alpha", paths=["//synthetic/alpha/*"])]).event_link(
                 r"\\synthetic\alpha\folder")
         self.assertEqual(link["bucket"], "project")

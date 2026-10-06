@@ -4,7 +4,7 @@ import json
 import re
 import shlex
 
-from sumbi.model import mapping
+from sumbi.core.values import mapping
 
 BRANCH = r"[A-Za-z0-9][A-Za-z0-9_./-]{0,199}"
 PR_URL = re.compile(r"(?<![A-Za-z0-9./-])https://github\.com/"

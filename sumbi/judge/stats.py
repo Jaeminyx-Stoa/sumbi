@@ -4,7 +4,7 @@ import math
 import random
 from statistics import NormalDist
 
-from sumbi.deliver import wilson
+from sumbi.outcomes.github.deliver import wilson
 
 
 def newcombe(before_successes, before_n, after_successes, after_n):

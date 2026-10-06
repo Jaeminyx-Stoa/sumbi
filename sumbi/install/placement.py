@@ -8,7 +8,9 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 
-from sumbi.model import Coverage, Window, normalize_path
+from sumbi.core.records import Coverage
+from sumbi.core.time import Window
+from sumbi.core.paths import normalize_path
 from .errors import InstallError
 from .gaps import has_import
 from .inventory import read_bytes, safe_path
@@ -47,7 +49,7 @@ def load_rules() -> dict:
 
 def read_starts(home: Path, *, now: datetime | None = None) -> tuple[list, Window, dict]:
     """Read default native adapter starts without exporting log text."""
-    from sumbi.report import ADAPTERS
+    from sumbi.events.registry import ADAPTERS
 
     until = now or datetime.now(timezone.utc)
     window = Window(until - timedelta(days=14), until)

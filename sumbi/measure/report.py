@@ -5,17 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from sumbi import SCHEMA_VERSION
-from sumbi.adapters import claude_code, codex, sumbi_events
-from sumbi.model import (Attributor, COUNT_KINDS, Coverage, EVIDENCE_TYPES, ProjectRule,
-                         RepositoryAttributor, TOKEN_KINDS, Window)
-from sumbi.privacy import current_key, pseudonym_key, read_salt
+from sumbi.events.registry import ADAPTERS, DEFAULT_AGENTS, log_roots
+from sumbi.measure.attribution import Attributor, ProjectRule, RepositoryAttributor
+from sumbi.sessions.session import COUNT_KINDS, EVIDENCE_TYPES, TOKEN_KINDS
+from sumbi.core.records import Coverage
+from sumbi.core.time import Window
+from sumbi.core.privacy import current_key, pseudonym_key, read_salt
 
-ADAPTERS = {"claude-code": claude_code, "codex": codex, "sumbi-events": sumbi_events}
-DEFAULT_AGENTS = ("claude-code", "codex")
 
 
-def log_roots(home):
-    return [home / ".claude/projects", home / ".codex/sessions", home / ".sumbi/events"]
 
 
 def totals(sessions: list[dict], idle_minutes: float = 5) -> dict:

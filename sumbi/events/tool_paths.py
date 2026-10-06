@@ -10,7 +10,8 @@ import posixpath
 import re
 import shlex
 
-from sumbi.model import mapping, normalize_path
+from sumbi.core.values import mapping
+from sumbi.core.paths import normalize_path
 
 
 def resolve_path(value, cwd=None):

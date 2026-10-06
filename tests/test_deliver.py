@@ -12,11 +12,13 @@ import unittest
 from unittest.mock import patch
 
 from sumbi.cli import main
-from sumbi.deliver import deliver, id_matches, judge, text_summary, wilson
-from sumbi.deliver_evidence import branch_query, tool_refs
-from sumbi.ledger import COLUMNS, Deliverable, read_ledger
-from sumbi.model import ProjectRule, Window, timestamp
-from sumbi.outcomes import FixtureOutcomes
+from sumbi.outcomes.github.deliver import deliver, id_matches, judge, text_summary, wilson
+from sumbi.events.references import branch_query, tool_refs
+from sumbi.outcomes.github.ledger import COLUMNS, Deliverable, read_ledger
+from sumbi.measure.attribution import ProjectRule
+from sumbi.core.time import Window
+from sumbi.core.values import timestamp
+from sumbi.outcomes.github.recorded import FixtureOutcomes
 
 START = timestamp("2030-01-01T00:00:00Z")
 WINDOW = Window(START, timestamp("2030-01-10T00:00:00Z"))

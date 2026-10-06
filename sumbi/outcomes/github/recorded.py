@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 from typing import Protocol
 
-from sumbi.ledger import REPO, utc
+from sumbi.outcomes.github.ledger import REPO, utc
 
 SHA = r"[0-9a-fA-F]{40}"
 FIX = re.compile(r"\b(?:fix(?:es|ed|ing)?|revert(?:s|ed|ing)?|regression|follow[ -]?up|hotfix)\b", re.I)

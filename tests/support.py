@@ -65,7 +65,7 @@ def isolate_github_destinations(test):
     any filesystem metadata or weaken checks within the test root. A separate
     isolation test exercises the checker against the enclosing real checkout.
     """
-    from sumbi.github_outcomes import outside_repository
+    from sumbi.outcomes.github.live import outside_repository
 
     def bounded(path):
         target = path.resolve()
@@ -87,6 +87,6 @@ def isolate_github_destinations(test):
         outside_repository(FixtureDestination())
         return target
 
-    guard = patch("sumbi.github_outcomes.outside_repository", side_effect=bounded)
+    guard = patch("sumbi.outcomes.github.live.outside_repository", side_effect=bounded)
     guard.start()
     test.addCleanup(guard.stop)
