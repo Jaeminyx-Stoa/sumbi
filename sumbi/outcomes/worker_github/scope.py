@@ -54,6 +54,15 @@ class ScopedOutcomes:
     def commit_fixes(self, pull, days):
         return self.sources[pull.id.rsplit("#", 1)[0]].commit_fixes(pull, days)
 
+    def evidence_gaps(self):
+        """Count each captured adapter once, including shared recorded adapters."""
+        total, seen = Counter(), set()
+        for source in self.sources.values():
+            if id(source) not in seen:
+                seen.add(id(source))
+                total.update(getattr(source, "evidence_gaps", {}))
+        return total
+
 
 def owned_repositories(found, scan, owners, fixed):
     repos = set()

@@ -351,11 +351,11 @@ class WorkerGitHubTests(unittest.TestCase):
         self.assertEqual(report["states"]["no_pr"], 2)
         self.assertEqual(report["coverage"]["evidence_gaps"]["link_conflicts"], 2)
 
-    def test_judgment_exception_is_a_unit_coverage_gap(self):
+    def test_temporal_judgment_exception_is_a_unit_coverage_gap(self):
         codex_worker(self.home, "first", self.repo, 1)
         codex_worker(self.home, "second", self.repo, 2)
         from sumbi.outcomes.worker_github.workers import judge
-        for exception in (ValueError("Synthetic conflict"), OverflowError(), RecursionError()):
+        for exception in (OverflowError(), RecursionError()):
             def conflicting(unit, outcomes, days):
                 if REPO + "#1" in unit.prs:
                     raise exception
@@ -368,6 +368,13 @@ class WorkerGitHubTests(unittest.TestCase):
                 self.assertEqual(affected["links"], [])
                 self.assertEqual(affected["state"], "in_progress")
                 self.assertEqual(report["coverage"]["evidence_gaps"]["judgment_conflicts"], 1)
+
+    def test_structural_judgment_errors_are_not_swallowed(self):
+        codex_worker(self.home, "worker", self.repo, 1)
+        with patch("sumbi.outcomes.worker_github.workers.judge",
+            side_effect=ValueError("Synthetic structural error")), self.assertRaisesRegex(
+                ValueError, "Synthetic structural error"):
+            self.report([pull(1)])
 
     def test_invalid_follow_up_configuration_still_fails_fast(self):
         with self.assertRaisesRegex(ValueError, "timestamp range"):

@@ -433,7 +433,10 @@ synthetic data. Cache/record flags require `--outcomes github`.
 `Outcomes` is the adapter interface (`pull`, `observation`, `disturbances`), separate
 from judgment. `FixtureOutcomes` reads every top-level `*.json` in its directory.
 Each file covers one unique repository and uses this wrapper around GitHub REST
-response objects. Unknown wrapper fields and inconsistent evidence are rejected.
+response objects. Structural validation rejects malformed JSON, missing documented
+fields, wrong types, invalid labels or identifier formats, and duplicate IDs.
+Evidence semantics are evaluated separately and never raise: unusable evidence
+is discarded with counted reasons in worker GitHub `coverage.evidence_gaps`.
 No fixture filename or response prose is emitted.
 
 ```json
@@ -452,18 +455,28 @@ The empty `response` above is a shape placeholder. A PR response needs `number`,
 `state` (`open`/`closed`), `created_at`, nullable `closed_at`, boolean `merged`,
 nullable `merged_at`, `head.sha`, nullable `merge_commit_sha`, `title` and nullable
 `body`. SHAs are full 40-character hex IDs. Merged PRs must be closed, and timestamp
-order must be consistent. Recorded changes precede the exclusive `observed_at`.
+order must be consistent to qualify as evidence. Inconsistent PRs are excluded
+with `pr_evidence_inconsistent`, and the repository's PR capture becomes incomplete.
+Recorded changes precede the exclusive `observed_at` to qualify as evidence.
+String head refs outside the bounded link recognizer are omitted with
+`head_ref_unsupported`; a wrong-type ref remains a structural error.
 Each commit response needs `sha`, `commit.message`, and `commit.committer.date`,
-within `[coverage_start, observed_at)`.
+within `[coverage_start, observed_at)`. Out-of-window commits are excluded with
+`commit_outside_coverage`. Observation bounds themselves must define a nonempty
+interval; invalid interval declarations remain structural errors.
 PR entries may also carry `observed_checks_at_merge` (`green`, `red`, or
 `unknown`); it is diagnostic and never substitutes for `checks_at_merge`.
 Live recordings additionally retain `current_policy_evidence`, an object with
 exactly `required` and `results`. `required` is null for unreadable policy or an
 array of `{ "context": "test", "app_id": null }` requirements (empty for
 `all_visible`). `results` is null when no pre-merge results exist, or the snapshot
-shape below with `required: []`, the selected head or merge SHA, and check-run
+shape below with `required: []`, a head or merge SHA, and check-run
 `app.id` fields. This evidence is evaluated on replay and never promoted to
-`historical`. Raw policy cache/record pages retain only the enforcement, context
+`historical`. `results` may also be an ordered array of snapshots, retaining both
+merge-SHA and head-SHA query results. The first usable source supplies the verdict;
+a pre-merge attempt that completed late blocks substitution by another SHA.
+All candidates receive structural validation and semantic diagnostics, including
+those not selected. Raw policy cache/record pages retain only the enforcement, context
 and app fields used by the adapter, plus rule types to preserve pagination.
 Denied-policy responses retain a normalized null; the plan exception retains an
 empty rule array. Response error prose is discarded.
@@ -473,16 +486,49 @@ or an object with exactly `head_sha`, `captured_at`, `required`, `check_runs` an
 `statuses`. `captured_at` equals `merged_at` and `head_sha` equals the PR head.
 `required` is the unique list of historically required check names/contexts. An
 explicit empty list means no checks were required; null does not mean that.
-Check-run REST objects need `name`, `head_sha`, `started_at`, nullable
+Check-run REST objects need `name`, `head_sha`, nullable `started_at`, nullable
 `completed_at`, `status`, and nullable `conclusion`. Commit status objects need
-`context`, `sha`, `updated_at`, and `state`. All evidence must be for this head
-and at or before merge. The latest check attempt by start time and latest commit
-status by update time win; conflicting ties fail validation. If both check and
-status use the same required name, both must pass. Completed `success`, `neutral`
+`context`, `sha`, `updated_at`, and `state`.
+Optional numeric REST `id` fields must be positive and unique within each result
+array when present. They are retained for structural duplicate detection.
+All evidence must be for this head and at or before merge. The latest check
+attempt by start time and latest commit status by update time win; conflicting
+ties discard the affected name/app's evidence at that time and earlier, so an
+older green result cannot hide a conflict. Newer reliable evidence still qualifies.
+If both check and status use the same required name, both must pass.
+Completed `success`, `neutral`
 and `skipped` checks qualify; commit statuses require `success`. Missing required
 results are unknown, never green. Present-day checks cannot stand in for checks
 at merge. Current policy supplies a separately labeled weaker basis, never an
 authoritative historical list.
+
+Checks after merge or on another SHA are excluded with `check_after_merge` or
+`check_not_on_head`; incomplete or contradictory check state/timing uses
+`check_incomplete`. Statuses use `status_after_merge`, `status_not_on_head`, and
+`conflicting_status_evidence`; check conflicts use `conflicting_check_evidence`.
+Snapshot identity/time mismatches use `snapshot_not_on_head` and
+`snapshot_not_at_merge`. Null or partial policy uses `policy_incomplete`; policy
+for an unmerged PR uses `policy_not_at_merge`. Missing documented fixture fields
+remain structural errors, even inside evidence that would be excluded.
+Unknown historical requirements are not an empty requirement list. The remaining
+evidence follows the existing verdict rules; when a required result has no usable
+evidence left, `checks_missing_required` prevents success. Counts are deduplicated per
+PR and item, including repeated live access and recorded replay. Counter keys
+are fixed labels; check names, repository names, command output and response
+prose remain local-only.
+
+Live pagination and result-count gaps use `pulls_capture_incomplete`,
+`pagination_incomplete`, `checks_capture_incomplete`, and `checks_unreadable`.
+An unreadable check/status endpoint affects only its PR's evidence. Partial policy
+captures remain unknown. Incomplete checks cannot qualify as at-merge evidence; incomplete
+PR/commit captures prevent success under the existing coverage rules. Live and
+recorded adapters share the same structural and semantic evidence validator.
+Authentication, unsafe destinations, malformed or oversized responses, and
+invalid configuration still fail fast. Rate-limit and transient request failures
+retain their existing retry/fail behavior. Owner-discovered non-rate-limit 403/404
+repositories retain the counted `repository_unreadable` exclusion; explicit
+repositories still fail fast. Worker judgment catches temporal overflow and
+cyclic repairs as `judgment_conflicts`, but never swallows structural errors.
 
 The completeness flags attest that all PRs and commits in the declared interval
 were captured (including pagination). They do not infer completeness from a

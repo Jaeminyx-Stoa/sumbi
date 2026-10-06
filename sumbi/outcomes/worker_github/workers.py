@@ -75,7 +75,7 @@ def worker_row(session, scan, links, outcomes, days, scope, gaps, authored=False
     judgment_incomplete = False
     try:
         result = worker_judgment(session, lifetime, links, outcomes, days, authored)
-    except (ValueError, OverflowError, RecursionError):
+    except (OverflowError, RecursionError):
         # Malformed temporal evidence or cyclic repairs affect this unit only.
         gaps["judgment_conflicts"] += 1
         links = {}
@@ -158,6 +158,7 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
                 if unreadable_only:
                     row.update(state="in_progress", reason="repository_unreadable")
                 units.append(row)
+        gaps.update(outcomes.evidence_gaps())
         return worker_report(window, scan, repos, units, overhead, excluded, adapters,
             observations, follow_up_days, gaps, outcomes.unreadable)
 
