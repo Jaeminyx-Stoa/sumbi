@@ -19,7 +19,7 @@
 <!-- sumbi:end handoff -->
 
 <!-- sumbi:begin friction-line -->
-작업 보고서는 `Harness friction: none` 또는 하네스 장애를 짧게 설명하는 한 줄로 끝낸다. 민감한 내용은 로컬 메모에 둔다. [마찰 피드백](docs/sumbi/friction.md)를 참고한다.
+작업 보고서는 `Harness friction: none` 또는 하네스 때문에 막힌 점을 짧게 설명하는 한 줄로 끝낸다. 민감한 내용은 로컬 메모에 둔다. [마찰 피드백](docs/sumbi/friction.md)을 참고한다.
 <!-- sumbi:end friction-line -->
 
 <!-- sumbi:begin parallel-worktrees -->

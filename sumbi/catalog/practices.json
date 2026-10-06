@@ -249,11 +249,11 @@
           "mode": "managed-block",
           "text": {
             "en": "End a work report with `Harness friction: none` or one short description of the harness obstacle. Keep sensitive details in local notes. See [friction feedback](docs/sumbi/friction.md).",
-            "ko": "작업 보고서는 `Harness friction: none` 또는 하네스 장애를 짧게 설명하는 한 줄로 끝낸다. 민감한 내용은 로컬 메모에 둔다. [마찰 피드백](docs/sumbi/friction.md)를 참고한다."
+            "ko": "작업 보고서는 `Harness friction: none` 또는 하네스 때문에 막힌 점을 짧게 설명하는 한 줄로 끝낸다. 민감한 내용은 로컬 메모에 둔다. [마찰 피드백](docs/sumbi/friction.md)을 참고한다."
           },
           "text_without_links": {
             "en": "End a work report with `Harness friction: none` or one short description of the harness obstacle. Keep sensitive details in local notes.",
-            "ko": "작업 보고서는 `Harness friction: none` 또는 하네스 장애를 짧게 설명하는 한 줄로 끝낸다. 민감한 내용은 로컬 메모에 둔다."
+            "ko": "작업 보고서는 `Harness friction: none` 또는 하네스 때문에 막힌 점을 짧게 설명하는 한 줄로 끝낸다. 민감한 내용은 로컬 메모에 둔다."
           }
         },
         {
@@ -261,7 +261,7 @@
           "mode": "managed-block",
           "text": {
             "en": "# Friction feedback\n\nUse the final friction line to identify an instruction, tool or check that blocked or repeated work. Describe the failing layer and its consequence briefly; do not include prompts, transcripts, secrets or machine identifiers in shared output.\n\nReview repeated obstacles before adding more instructions. Prefer a reliable check or a simpler workflow when it addresses the cause. A report is evidence to investigate, not proof that the proposed fix saves cost.",
-            "ko": "# 마찰 피드백\n\n마지막 마찰 줄에는 작업을 막거나 반복하게 한 지침, 도구, 검사를 적는다. 실패한 계층과 그 영향을 짧게 설명한다. 공유하는 출력에는 프롬프트, 대화록, 비밀 정보, 기기 식별자를 넣지 않는다.\n\n지침을 추가하기 전에 반복되는 장애를 검토한다. 원인을 해결할 수 있다면 신뢰할 수 있는 검사나 더 단순한 작업 절차를 우선한다. 보고서는 조사할 증거이며, 제안한 수정이 비용을 줄인다는 증명은 아니다."
+            "ko": "# 마찰 피드백\n\n보고서 마지막의 하네스 마찰 항목에는 작업을 막거나 반복하게 한 지침, 도구, 검사를 적는다. 어디에서 막혔고 어떤 영향을 받았는지 짧게 설명한다. 공유하는 출력에는 프롬프트, 대화록, 비밀 정보, 기기 식별자를 넣지 않는다.\n\n지침을 추가하기 전에 반복되는 하네스 마찰을 검토한다. 원인을 해결할 수 있다면 신뢰할 수 있는 검사나 더 단순한 작업 절차를 우선한다. 보고서는 조사의 근거로 삼되, 제안한 수정이 비용을 줄인다는 증명으로 간주하지 않는다."
           }
         }
       ],
