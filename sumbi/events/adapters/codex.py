@@ -51,11 +51,11 @@ def verification_exit_code(payload: dict) -> int | None:
 
 def _input(identity, name, arguments, *, at=None, own_time=False):
     return ToolEvidence(inputs=(ToolInput(identity, name, freeze(arguments)),), at=at,
-                        own_time=own_time, include_empty_refs=True)
+                        own_time=own_time, include_empty_refs=True, fallback_identity=True)
 
 
 def _output(identity, output):
-    return ToolEvidence(outputs=(ToolOutput(identity, freeze(output)),), include_empty_refs=True)
+    return ToolEvidence(outputs=(ToolOutput(identity, freeze(output)),), include_empty_refs=True, fallback_identity=True)
 
 
 def _item(payload, subtype, identity, when):

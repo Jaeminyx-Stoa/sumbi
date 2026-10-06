@@ -113,6 +113,7 @@ class ToolEvidence:
     own_time: bool = False
     apply: bool = True
     include_empty_refs: bool = False
+    fallback_identity: bool = False
 
 
 @dataclass(frozen=True)

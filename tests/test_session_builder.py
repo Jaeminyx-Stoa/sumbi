@@ -253,6 +253,13 @@ class BuilderTests(unittest.TestCase):
             self.record(2, e.Resume()), self.record(3, e.SessionEnd("observed"), seconds=600))
         self.assertIsNone(session.completed_at)
 
+    def test_anonymous_tool_records_do_not_pair_reference_evidence_across_records(self):
+        query = e.ToolEvidence(inputs=(e.ToolInput(None, "exec_command",
+            e.freeze({"command": "git branch --show-current"})),), fallback_identity=True)
+        output = e.ToolEvidence(outputs=(e.ToolOutput(None, "feature/example"),), fallback_identity=True)
+        session, _ = self.fold(self.record(1, query), self.record(2, output), collect_links=True)
+        self.assertFalse(session.deliverable_events)
+
 
 if __name__ == "__main__":
     unittest.main()

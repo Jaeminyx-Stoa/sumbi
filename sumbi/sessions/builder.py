@@ -111,7 +111,7 @@ def _context(state, event, when, order, window, coverage, links):
     _metadata(state, event.metadata, when, window, coverage)
 
 
-def _tool_evidence(state, evidence, when, order, links, *, apply=True):
+def _tool_evidence(state, evidence, when, order, links, *, apply=True, fallback=None):
     session = state.session
     at = evidence.at if evidence.own_time else when
     paths, cwd, refs = [], None, set()
@@ -121,7 +121,8 @@ def _tool_evidence(state, evidence, when, order, links, *, apply=True):
         cwd = workdir or cwd
         paths.extend(operands)
         if links:
-            state.tool_names[item.tool_call_id] = item.name, branch_query(item.name, arguments)
+            identity = item.tool_call_id or fallback if evidence.fallback_identity else item.tool_call_id
+            state.tool_names[identity] = item.name, branch_query(item.name, arguments)
             refs.update(tool_refs(item.name, arguments))
     if links:
         for item in evidence.outputs:
@@ -129,7 +130,8 @@ def _tool_evidence(state, evidence, when, order, links, *, apply=True):
             if item.text_blocks and isinstance(output, list):
                 output = "\n".join(b.get("text", "") for b in output
                                    if isinstance(b, dict) and b.get("type") == "text")
-            name, query = state.tool_names.get(item.tool_call_id, (None, False))
+            identity = item.tool_call_id or fallback if evidence.fallback_identity else item.tool_call_id
+            name, query = state.tool_names.get(identity, (None, False))
             refs.update(tool_refs(name, output, output=True, query=query))
     if apply and evidence.apply:
         session.tool_paths(at, order, cwd or (evidence.cwd if paths else None), paths)
@@ -232,7 +234,7 @@ def _fold(state, event, record, order, fallback, window, coverage, review, links
             if window.contains(when):
                 session.add_tokens(values)
     elif isinstance(event, e.ToolEvidence):
-        _tool_evidence(state, event, when, order, links)
+        _tool_evidence(state, event, when, order, links, fallback=fallback)
     elif isinstance(event, (e.ToolStart, e.ToolEnd)):
         at = event.at if event.own_time else when
         start = isinstance(event, e.ToolStart)
