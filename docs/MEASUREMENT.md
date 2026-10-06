@@ -942,28 +942,32 @@ cwd can still be scoped by an explicit measured PR. Unconfirmed repositories
 and missing starts are counted separately; missing starts block comparison.
 No parent's cwd, references, costs or outcome are inherited by a child.
 
-Links use the existing bounded reference extraction from recognized tool inputs
-and outputs, with additional literal worker branch observations. Ordinary
-messages and unknown tools cannot link work. Every linked PR retains its
-strongest own-session evidence:
+Links require own-session authorship from normalized command executions that
+started and completed inside the worker lifetime and exited zero. PR URLs that
+are read, viewed, quoted or listed in inputs, outputs or briefs cannot link work.
+Every linked PR retains its strongest own-session evidence:
 
 | Evidence label | Strength and meaning |
 | --- | --- |
-| `pr_url` | Strongest: an exact GitHub PR URL in a recognized tool input or output. |
-| `pushed_branch` | Strong: a literal push target or anchored push result. Input evidence proves the named attempted target, not a successful push. |
-| `created_branch` | Strong: a literal branch creation or explicit `gh pr create --head` operand. |
-| `cwd_branch` | Weak: structured cwd/context branch, branch query, or ordinary branch switch evidence only. |
+| `pr_created` | Strongest: a successful `gh pr create` result or API create response naming the PR. |
+| `pushed_branch` | Strong: a successful push's literal origin target or anchored result naming the destination branch. |
+| `committed_branch` | Strong: a successful commit result naming its branch. |
+| `cwd_branch` | Weak: structured cwd/context branch or a literal current-branch query only. |
 
-Branches match exact PR `head.ref` values in measured repositories, restricted
-to the start-origin repository when known. A branch match must refer to a PR
-created at or after dispatch; a reused name cannot import an earlier PR. The
-worker's branch can match a PR opened later by the main session without reading
-the main session's evidence. All matched PRs are constituents; a failed
-constituent cannot be dropped. If any link is only weak, the unit counts as
-unlinked for comparison and is excluded with that reason.
+Branches match exact PR `head.ref` values in measured repositories using the
+execution cwd's origin or an explicit destination. Successful pushes or commits
+can advance a PR created before dispatch; such links have role `continued`.
+New PRs have role `constituent`. Actions after PR closure and conflicting
+creation, repository or execution evidence are excluded and counted as coverage
+gaps. Older PR mentions are counted separately. Per-unit judgment conflicts
+also become coverage gaps; configuration errors still fail fast. The worker's
+pushed branch can match a PR opened later by the main session without borrowing
+the main session's evidence. A failed constituent cannot be dropped. If any
+link is only weak, the unit counts as unlinked for comparison and is excluded
+with that reason.
 
 Recorded fixtures may include `response.head.ref`; older fixtures without it
-still support explicit URL links. The live worker capture retains that field
+still support successful PR-creation links. The live worker capture retains that field
 and uses a separate cache namespace so old cached pages cannot silently omit
 branch evidence. Private recordings preserve refs; public reports contain only
 pseudonymous branch, PR, repository and session IDs, evidence labels and counts.

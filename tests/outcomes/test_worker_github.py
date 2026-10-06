@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from support import IsolatedTemporaryDirectory
-from worker_github_fixtures import (REPO, at, codex_worker, claude_worker, pull,
+from worker_github_fixtures import (REPO, at, codex_worker, claude_worker, execution, pull,
     recording, repository, save, stream)
 from sumbi.core.records import Coverage
 from sumbi.core.time import Window
@@ -85,14 +85,13 @@ class WorkerGitHubTests(unittest.TestCase):
 
     def test_link_strength_and_priority_from_each_own_evidence_kind(self):
         cases = [
-            ("url-input", 1, "gh pr view https://github.com/example/sample/pull/1", None, None,
-                "pr_url", "explicit"),
             ("url-output", 2, "gh pr create --head worker-2",
-                "https://github.com/example/sample/pull/2", None, "pr_url", "explicit"),
+                "https://github.com/example/sample/pull/2", None, "pr_created", "strong"),
             ("push-input", 3, "git push -u origin worker-3", None, None, "pushed_branch", "strong"),
             ("push-output", 4, "git push origin HEAD", " * [new branch] HEAD -> worker-4\n", None,
                 "pushed_branch", "strong"),
-            ("created", 5, "git switch -c worker-5", None, None, "created_branch", "strong"),
+            ("committed", 5, "git commit -m 'Synthetic change'", "[worker-5 abc1234] Synthetic change\n",
+                None, "committed_branch", "strong"),
             ("cwd", 6, None, None, "worker-6", "cwd_branch", "weak"),
             ("query", 7, "git branch --show-current", "worker-7\n", None, "cwd_branch", "weak")]
         for identity, number, command, output, context, _, _ in cases:
@@ -102,13 +101,13 @@ class WorkerGitHubTests(unittest.TestCase):
         evidence = sorted((r["links"][0]["evidence"], r["links"][0]["strength"])
             for r in report["units"])
         self.assertEqual(evidence, sorted((e, s) for *_, e, s in cases))
-        self.assertEqual(report["success_rate"]["denominator"], 5)
+        self.assertEqual(report["success_rate"]["denominator"], 4)
         public = json.dumps(report)
         for value in (str(self.repo), "worker-1", "example/sample", "/pull/1", "git push"):
             self.assertNotIn(value, public)
 
     def test_pr_opened_by_main_uses_worker_branch_without_borrowing_main_evidence(self):
-        codex_worker(self.home, "worker", self.repo, command="git switch -c worker-1")
+        codex_worker(self.home, "worker", self.repo, command="git push origin worker-1")
         codex_worker(self.home, "unlinked", self.repo)
         codex_worker(self.home, "main", self.repo, kind="vscode",
             command="gh pr create --head worker-1", output="https://github.com/example/sample/pull/1")
@@ -117,7 +116,7 @@ class WorkerGitHubTests(unittest.TestCase):
         self.assertEqual(report["states"]["no_pr"], 1)
         self.assertEqual(report["success_rate"]["denominator"], 2)
         self.assertEqual(next(r for r in report["units"] if r["state"] == "success")
-            ["links"][0]["evidence"], "created_branch")
+            ["links"][0]["evidence"], "pushed_branch")
 
     def test_all_six_states_keep_no_pr_and_exclude_no_change(self):
         for i in range(1, 5):
@@ -154,16 +153,19 @@ class WorkerGitHubTests(unittest.TestCase):
                 self.assertEqual(report["states"]["failed"], 1)
 
     def test_multiple_constituents_and_failed_one_cannot_disappear(self):
-        codex_worker(self.home, "worker", self.repo, command="gh pr view "
-            "https://github.com/example/sample/pull/1 https://github.com/example/sample/pull/2")
+        rows = codex_worker(self.home, "worker", self.repo, command="gh pr create",
+            output="https://github.com/example/sample/pull/1")
+        stream(self.home / ".codex/sessions/rollout-worker.jsonl", [*rows,
+            *execution("gh pr create", "https://github.com/example/sample/pull/2", self.repo,
+                identity="second", start=12, end=20)])
         report = self.report([pull(1), pull(2, merged=False)])
         self.assertEqual(report["states"]["failed"], 1)
         self.assertEqual(len(report["units"][0]["prs"]), 2)
 
     def test_explicit_pr_can_scope_worker_without_start_origin(self):
         missing = self.root / "missing"
-        codex_worker(self.home, "worker", missing, command="gh pr view "
-            "https://github.com/example/sample/pull/1")
+        codex_worker(self.home, "worker", missing, command="gh pr create --repo example/sample",
+            output="https://github.com/example/sample/pull/1")
         report = self.report([pull(1)])
         self.assertEqual(report["units"][0]["start_scope"], "own_reference")
         self.assertEqual(report["states"]["success"], 1)
@@ -175,27 +177,27 @@ class WorkerGitHubTests(unittest.TestCase):
         self.assertEqual(report["units"][0]["start_scope"], "own_reference")
         self.assertEqual(report["states"]["no_pr"], 1)
 
-    def test_structured_push_result_names_a_strong_branch(self):
+    def test_anchored_push_result_names_a_strong_branch(self):
         codex_worker(self.home, "worker", self.repo, command="git push origin HEAD",
-            output={"branch": "worker-1"})
+            output="To https://github.com/example/sample.git\n   abc1234..def5678 HEAD -> worker-1\n")
         report = self.report([pull(1)])
         self.assertEqual(report["units"][0]["links"][0]["evidence"], "pushed_branch")
 
     def test_strongest_link_wins_per_pr_but_other_weak_constituents_remain_weak(self):
-        codex_worker(self.home, "same-pr", self.repo, 1, context_branch="worker-1",
+        codex_worker(self.home, "same-pr", self.repo, command="gh pr create", context_branch="worker-1",
             output="https://github.com/example/sample/pull/1")
         codex_worker(self.home, "mixed", self.repo, context_branch="worker-2",
-            command="gh pr view https://github.com/example/sample/pull/1")
+            command="gh pr create", output="https://github.com/example/sample/pull/1")
         report = self.report([pull(1), pull(2)])
         strong = next(r for r in report["units"] if not r["weak_link"])
         weak = next(r for r in report["units"] if r["weak_link"])
-        self.assertEqual(strong["links"][0]["evidence"], "pr_url")
+        self.assertEqual(strong["links"][0]["evidence"], "pr_created")
         self.assertEqual(len(strong["links"]), 1)
-        self.assertEqual({r["strength"] for r in weak["links"]}, {"explicit", "weak"})
+        self.assertEqual({r["strength"] for r in weak["links"]}, {"strong", "weak"})
         self.assertEqual(report["success_rate"]["denominator"], 1)
 
     def test_branch_reuse_and_out_of_scope_pr_cannot_supply_success(self):
-        codex_worker(self.home, "worker", self.repo, 1,
+        codex_worker(self.home, "worker", self.repo, command="gh pr create",
             output="https://github.com/other/sample/pull/2")
         previous = pull(1)
         previous["response"]["created_at"] = "2029-12-31T00:00:00Z"
@@ -210,8 +212,8 @@ class WorkerGitHubTests(unittest.TestCase):
         self.assertEqual(len(report["units"][0]["links"]), 1)
 
     def test_missing_explicit_pr_is_pending_and_reported_for_coverage(self):
-        codex_worker(self.home, "worker", self.repo,
-            command="gh pr view https://github.com/example/sample/pull/1")
+        codex_worker(self.home, "worker", self.repo, command="gh pr create",
+            output="https://github.com/example/sample/pull/1")
         report = self.report([])
         self.assertEqual(report["states"]["in_progress"], 1)
         self.assertEqual(report["coverage"]["missing_prs"], 1)
@@ -236,6 +238,177 @@ class WorkerGitHubTests(unittest.TestCase):
             self.assertFalse(any(k in ("branch_created", "branch_push_intent") for k, _ in refs))
         self.assertEqual(tool_refs("unknown", "https://github.com/example/sample/pull/1",
             output=True, worker=True), set())
+
+    def test_views_old_pr_then_creates_own_pr(self):
+        rows = codex_worker(self.home, "worker", self.repo,
+            command="gh pr view https://github.com/example/sample/pull/1",
+            output="https://github.com/example/sample/pull/1")
+        rows.extend(execution("gh pr create --head worker-2",
+            "https://github.com/example/sample/pull/2", self.repo,
+            identity="create", start=20, end=30))
+        stream(self.home / ".codex/sessions/rollout-worker.jsonl", rows)
+        older = pull(1)
+        older["response"]["created_at"] = "2029-12-31T00:00:00Z"
+        report = self.report([older, pull(2)])
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual([r["evidence"] for r in report["units"][0]["links"]], ["pr_created"])
+        self.assertEqual(report["coverage"]["evidence_gaps"]["pre_dispatch_pr_mentions"], 1)
+
+    def test_push_and_commit_can_continue_older_pr(self):
+        older = pull(1)
+        older["response"]["created_at"] = "2029-12-31T00:00:00Z"
+        codex_worker(self.home, "push", self.repo, 1)
+        codex_worker(self.home, "commit", self.repo, command="git commit -m 'Synthetic fix'",
+            output="[worker-1 abc1234] Synthetic fix\n")
+        report = self.report([older])
+        self.assertEqual(report["states"]["success"], 2)
+        self.assertEqual({r["links"][0]["role"] for r in report["units"]}, {"continued"})
+        self.assertEqual({r["dispatched_at"] for r in report["units"]}, {at(1).isoformat()})
+        self.assertEqual(report["cost"]["per_success"]["total"]["numerator"], 200)
+
+    def test_failed_or_unobserved_push_never_links(self):
+        for code in (1, None):
+            with self.subTest(exit_code=code):
+                codex_worker(self.home, "worker", self.repo, 1, exit_code=code,
+                    output="To https://github.com/example/sample.git\n"
+                    " * [new branch] worker-1 -> worker-1\n")
+                report = self.report([pull(1)])
+                self.assertEqual(report["states"]["no_pr"], 1)
+                self.assertEqual(report["units"][0]["links"], [])
+                gap = "failed_authorship_commands" if code else "authorship_exit_unknown"
+                self.assertEqual(report["coverage"]["evidence_gaps"][gap], 1)
+
+    def test_brief_views_lists_and_branch_creation_are_not_authorship(self):
+        for command, output in (("cat brief.md", "Review https://github.com/example/sample/pull/1"),
+            ("gh pr list", "https://github.com/example/sample/pull/1"),
+            ("gh pr view https://github.com/example/sample/pull/1", {"branch": "worker-1"}),
+            ("git switch -c worker-1", "Switched to a new branch 'worker-1'")):
+            with self.subTest(command=command):
+                rows = codex_worker(self.home, "worker", self.repo, command=command, output=output)
+                rows.append({"type": "response_item", "timestamp": at(1, 1).isoformat(),
+                    "payload": {"type": "message", "role": "user", "content": [{
+                        "type": "input_text", "text": "Brief: https://github.com/example/sample/pull/1"}]}})
+                stream(self.home / ".codex/sessions/rollout-worker.jsonl", rows)
+                report = self.report([pull(1)])
+                self.assertEqual(report["units"][0]["links"], [])
+                self.assertEqual(report["states"]["no_pr"], 1)
+
+    def test_api_create_response_requires_successful_create_action(self):
+        for command, code, expected in (("gh api repos/example/sample/pulls -X POST", 0, 1),
+            ("gh api repos/example/sample/pulls -f title=Synthetic", 0, 1),
+            ("gh api repos/example/sample/pulls", 0, 0),
+            ("gh api repos/example/sample/pulls -X POST", 1, 0)):
+            with self.subTest(command=command, code=code):
+                codex_worker(self.home, "worker", self.repo, command=command, exit_code=code,
+                    output=json.dumps({"html_url": "https://github.com/example/sample/pull/1"}))
+                self.assertEqual(len(self.report([pull(1)])["units"][0]["links"]), expected)
+
+    def test_creation_or_push_temporal_conflicts_do_not_abort_other_workers(self):
+        older = pull(1)
+        older["response"]["created_at"] = "2029-12-31T00:00:00Z"
+        closed = pull(2, seconds=1)
+        closed["response"]["created_at"] = "2029-12-31T00:00:00Z"
+        codex_worker(self.home, "conflicting-create", self.repo, command="gh pr create",
+            output="https://github.com/example/sample/pull/1")
+        codex_worker(self.home, "closed-push", self.repo, 2)
+        codex_worker(self.home, "healthy", self.repo, 3)
+        report = self.report([older, closed, pull(3)])
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(report["states"]["no_pr"], 2)
+        self.assertEqual(report["coverage"]["evidence_gaps"]["link_conflicts"], 2)
+
+    def test_judgment_exception_is_a_unit_coverage_gap(self):
+        codex_worker(self.home, "first", self.repo, 1)
+        codex_worker(self.home, "second", self.repo, 2)
+        from sumbi.outcomes.worker_github.workers import judge
+        for exception in (ValueError("Synthetic conflict"), OverflowError(), RecursionError()):
+            def conflicting(unit, outcomes, days):
+                if REPO + "#1" in unit.prs:
+                    raise exception
+                return judge(unit, outcomes, days)
+            with self.subTest(exception=type(exception).__name__), patch(
+                "sumbi.outcomes.worker_github.workers.judge", side_effect=conflicting):
+                report = self.report([pull(1), pull(2)])
+                self.assertEqual(report["states"]["success"], 1)
+                affected = next(r for r in report["units"] if r["evidence_incomplete"])
+                self.assertEqual(affected["links"], [])
+                self.assertEqual(affected["state"], "in_progress")
+                self.assertEqual(report["coverage"]["evidence_gaps"]["judgment_conflicts"], 1)
+
+    def test_invalid_follow_up_configuration_still_fails_fast(self):
+        with self.assertRaisesRegex(ValueError, "timestamp range"):
+            deliver_workers(self.home, self.window, [REPO], self.outcomes([]), follow_up_days=1e100)
+
+    def test_codex_completed_item_commit_result_links_its_branch(self):
+        rows = codex_worker(self.home, "worker", self.repo)
+        rows.append({"type": "event_msg", "timestamp": at(1, 11).isoformat(), "payload": {
+            "type": "item_completed", "started_at_ms": int(at(1, 3).timestamp() * 1000),
+            "item": {"id": "commit", "type": "CommandExecution",
+                "command": ["git", "commit", "-m", "Synthetic change"], "cwd": str(self.repo),
+                "exit_code": 0, "aggregated_output": "[worker-1 abc1234] Synthetic change\n"}}})
+        stream(self.home / ".codex/sessions/rollout-worker.jsonl", rows)
+        report = self.report([pull(1)])
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(report["units"][0]["links"][0]["evidence"], "committed_branch")
+
+    def test_launch_only_and_failed_create_output_cannot_link(self):
+        for code in (1, None):
+            codex_worker(self.home, "worker", self.repo, command="gh pr create", exit_code=code,
+                output="https://github.com/example/sample/pull/1")
+            self.assertEqual(self.report([pull(1)])["units"][0]["links"], [])
+        rows = codex_worker(self.home, "worker", self.repo, 1)
+        rows = [r for r in rows if r.get("payload", {}).get("type") != "exec_command_end"]
+        stream(self.home / ".codex/sessions/rollout-worker.jsonl", rows)
+        self.assertEqual(self.report([pull(1)])["units"][0]["links"], [])
+
+    def test_push_repository_conflict_and_unknown_remote_cannot_link(self):
+        for command, output in (("git push origin worker-1",
+            "To https://github.com/other/sample.git\n * [new branch] worker-1 -> worker-1\n"),
+            ("git push upstream worker-1", None),
+            ("cd other && git push origin worker-1", None)):
+            codex_worker(self.home, "worker", self.repo, command=command, output=output)
+            self.assertEqual(self.report([pull(1)])["units"][0]["links"], [])
+
+    def test_git_c_operand_uses_execution_repository(self):
+        missing = self.root / "missing"
+        codex_worker(self.home, "worker", missing,
+            command=["git", "-C", str(self.repo), "push", "origin", "worker-1"])
+        report = self.report([pull(1)])
+        self.assertEqual(report["states"]["success"], 1)
+        self.assertEqual(report["units"][0]["start_scope"], "own_reference")
+
+    def test_pre_dispatch_execution_and_weak_old_branch_cannot_continue_pr(self):
+        older = pull(1)
+        older["response"]["created_at"] = "2029-12-31T00:00:00Z"
+        rows = codex_worker(self.home, "worker", self.repo, context_branch="worker-1")
+        events = execution("git push origin worker-1", None, self.repo, start=-10, end=11)
+        stream(self.home / ".codex/sessions/rollout-worker.jsonl", [*rows, *events])
+        report = self.report([older])
+        self.assertEqual(report["states"]["no_pr"], 1)
+        self.assertEqual(report["units"][0]["links"], [])
+        self.assertEqual(report["coverage"]["evidence_gaps"]["link_conflicts"], 1)
+
+    def test_claude_failed_push_result_cannot_link(self):
+        claude_worker(self.home, "worker", self.repo, 1)
+        path = self.home / ".claude/projects/group/main/subagents/agent-worker.jsonl"
+        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        rows[-1]["toolUseResult"]["exitCode"] = 1
+        rows[-1]["message"]["content"][0].update(is_error=True,
+            content="Exit code 1\nSynthetic rejection")
+        stream(path, rows)
+        report = self.report([pull(1)])
+        self.assertEqual(report["states"]["no_pr"], 1)
+        self.assertEqual(report["units"][0]["links"], [])
+
+    def test_malformed_execution_cwd_is_a_gap_not_a_global_abort(self):
+        rows = codex_worker(self.home, "worker", self.repo, 1)
+        launch = next(r for r in rows if r.get("payload", {}).get("type") == "exec_command_begin")
+        launch["payload"]["cwd"] = {"unsupported": "Synthetic value"}
+        stream(self.home / ".codex/sessions/rollout-worker.jsonl", rows)
+        report = self.report([pull(1)])
+        self.assertEqual(report["states"]["no_pr"], 1)
+        self.assertEqual(report["units"][0]["links"], [])
+        self.assertEqual(report["coverage"]["evidence_gaps"]["link_conflicts"], 1)
 
 
 if __name__ == "__main__":

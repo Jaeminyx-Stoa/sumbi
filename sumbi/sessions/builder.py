@@ -12,6 +12,7 @@ from sumbi.core.records import Coverage
 from sumbi.core.time import Window
 from sumbi.core.values import label
 from sumbi.events import schema as e
+from sumbi.events.authorship import result_refs
 from sumbi.events.references import branch, branch_query, tool_refs
 from sumbi.events.tool_paths import tool_evidence
 from sumbi.sessions.session import Session
@@ -128,6 +129,11 @@ def _tool_evidence(state, evidence, when, order, links, *, apply=True, fallback=
         paths.extend(operands)
         if links:
             identity = _source_identity(item, evidence, fallback)
+            if (state.worker_links and at and item.tool_call_id
+                and item.name == "CommandExecution" and isinstance(arguments, dict)):
+                session.deliverable_events.append((at, order, "execution_refs",
+                    (item.tool_call_id, result_refs(arguments.get("aggregated_output",
+                        arguments.get("output"))))))
             own_refs = tool_refs(item.name, arguments, worker=state.worker_links)
             operation = next((v for k, v in own_refs if k == "branch_operation"), None)
             state.tool_names[identity] = item.name, branch_query(item.name, arguments), operation
@@ -140,6 +146,9 @@ def _tool_evidence(state, evidence, when, order, links, *, apply=True, fallback=
                     if isinstance(b, dict) and b.get("type") == "text")
             identity = _source_identity(item, evidence, fallback)
             name, query, operation = state.tool_names.get(identity, (None, False, None))
+            if state.worker_links and at and item.tool_call_id:
+                session.deliverable_events.append((at, order, "execution_refs",
+                    (item.tool_call_id, result_refs(output))))
             refs.update(tool_refs(name, output, output=True, query=query,
                 worker=state.worker_links, operation=operation))
     if apply and evidence.apply:

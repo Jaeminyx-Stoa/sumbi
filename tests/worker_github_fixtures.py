@@ -42,7 +42,7 @@ def recording(pulls, end="2030-02-01T00:00:00Z", commits=None):
 
 
 def codex_worker(home, identity, cwd, number=None, *, day=1, cost=100, kind="exec", edit=True,
-    command=None, output=None, context_branch=None, seconds=100):
+    command=None, output=None, context_branch=None, seconds=100, exit_code=0):
     source = {"subagent": {"thread_spawn": {"parent_thread_id": "main"}}} if kind == "subagent" else kind
     header = {"id": identity, "cwd": str(cwd), "source": source,
         "originator": "codex_exec" if kind == "exec" else "desktop", "cli_version": "1.0"}
@@ -61,9 +61,7 @@ def codex_worker(home, identity, cwd, number=None, *, day=1, cost=100, kind="exe
         rows.append({"type": "response_item", "timestamp": at(day, 3).isoformat(), "payload": {
             "type": "function_call", "call_id": "shell", "name": "exec_command",
             "arguments": json.dumps({"cmd": command})}})
-    if output is not None:
-        rows.append({"type": "response_item", "timestamp": at(day, 4).isoformat(), "payload": {
-            "type": "function_call_output", "call_id": "shell", "output": output}})
+        rows.extend(execution(command, output, cwd, day=day, exit_code=exit_code))
     rows.extend([{"type": "event_msg", "timestamp": at(day, seconds).isoformat(), "payload": {
         "type": "token_count", "info": {"total_token_usage": {"input_tokens": cost - 10,
             "cached_input_tokens": 0, "output_tokens": 10, "reasoning_output_tokens": 0}}}},
@@ -71,6 +69,19 @@ def codex_worker(home, identity, cwd, number=None, *, day=1, cost=100, kind="exe
             "payload": {"type": "task_complete"}}])
     stream(home / ".codex/sessions" / ("rollout-" + identity + ".jsonl"), rows)
     return rows
+
+
+def execution(command, output, cwd, *, day=1, identity="shell", start=3, end=11,
+    exit_code=0):
+    """Native execution events, with response output mirrored as in a rollout."""
+    return [{"type": "event_msg", "timestamp": at(day, start).isoformat(), "payload": {
+        "type": "exec_command_begin", "call_id": identity, "command": command,
+        "cwd": str(cwd)}},
+        {"type": "event_msg", "timestamp": at(day, end).isoformat(), "payload": {
+            "type": "exec_command_end", "call_id": identity, "exit_code": exit_code,
+            "output": output}},
+        {"type": "response_item", "timestamp": at(day, end).isoformat(), "payload": {
+            "type": "function_call_output", "call_id": identity, "output": output}}]
 
 
 def claude_worker(home, identity, cwd, number, *, day=1, cost=100, seconds=100):
@@ -85,7 +96,12 @@ def claude_worker(home, identity, cwd, number, *, day=1, cost=100, seconds=100):
                 "model": "synthetic-claude", "usage": {"input_tokens": cost - 10,
                     "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0,
                     "output_tokens": 10}, "content": [{"type": "tool_use", "id": "push",
-                        "name": "Bash", "input": {"command": f"git push origin worker-{number}"}}]}}]
+                        "name": "Bash", "input": {"command": f"git push origin worker-{number}"}}]}},
+        {"type": "user", "sessionId": "main", "agentId": identity, "cwd": str(cwd),
+            "timestamp": at(day, seconds).isoformat(), "toolUseResult": {
+                "stdout": "", "stderr": "", "interrupted": False}, "message": {"content": [
+                    {"type": "tool_result", "tool_use_id": "push", "content": "",
+                        "is_error": False}]}}]
     stream(home / ".claude/projects/group/main/subagents" / ("agent-" + identity + ".jsonl"), rows)
 
 

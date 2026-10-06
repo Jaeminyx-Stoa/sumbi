@@ -39,7 +39,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_b9039a1ba42bf394e64e73cd",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -91,7 +92,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_8988fd24fd0b9f1435fd3265",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -143,7 +145,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_1e51b52aa215bc748e55b883",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -193,7 +196,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_fe402cff384d85eb05085b10",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -245,7 +249,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_6c768f7be7f82c028e87fd19",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -295,7 +300,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_01c8b81f92446da68a837c12",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -347,7 +353,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_9706742e93dfdf2bd759b449",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -399,7 +406,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_e7b673894424ff8167afff97",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -451,7 +459,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_a164b80da64a771f9cd0c530",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -501,7 +510,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_8dc8235ffb2a01a4c47751be",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -553,7 +563,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_e940bbc26f9816af33554402",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -603,7 +614,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_b6c1bdaa020d82ed3cfbb8aa",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -653,7 +665,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_0eb6094c8386882e4a526866",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -705,7 +718,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_d83d2d745ab9a6136d11aaa9",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -755,7 +769,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_9d4ff114cb5b837da35ae049",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -807,7 +822,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_96a697b414d593927d464dbd",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -859,7 +875,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_6d93d77d11e5f220e3e9918e",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -911,7 +928,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_6f535241c564d35dddf16813",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -963,7 +981,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_fe723a28c9a80749c7d6559f",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -1013,7 +1032,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_08fd682709b96e8ba80cbd61",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -1065,7 +1085,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_62ea5ffe22100067c8226a1a",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -1117,7 +1138,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_7bbd6f2fb72245f75e62e6fb",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -1167,7 +1189,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_0f56c16f4580c5388038dd53",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -1219,7 +1242,8 @@
           "repository_id": "repository_43523e188c49217989df5a27",
           "branch_id": "branch_813c1273f155d2fc68db9950",
           "evidence": "pushed_branch",
-          "strength": "strong"
+          "strength": "strong",
+          "role": "constituent"
         }
       ],
       "weak_link": false,
@@ -1359,7 +1383,7 @@
     "adapters": {
       "claude-code": {
         "files_scanned": 8,
-        "lines_read": 24,
+        "lines_read": 32,
         "broken_lines": 0,
         "duplicate_events": 0,
         "unreadable_files": 0,
@@ -1371,7 +1395,7 @@
       },
       "codex": {
         "files_scanned": 18,
-        "lines_read": 108,
+        "lines_read": 160,
         "broken_lines": 0,
         "duplicate_events": 0,
         "unreadable_files": 0,
@@ -1393,6 +1417,7 @@
       }
     ],
     "missing_prs": 0,
+    "evidence_gaps": {},
     "link_evidence_counts": {
       "pushed_branch": 24
     }
@@ -1402,7 +1427,7 @@
     "shell_edits_invisible",
     "deleted_logs_undetectable",
     "last_observed_time_is_not_acceptance",
-    "branch_reuse_requires_post_dispatch_pr",
+    "continued_pr_requires_authorship",
     "repairs_fail_original_dispatch"
   ]
 }

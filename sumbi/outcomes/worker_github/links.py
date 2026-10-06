@@ -4,9 +4,10 @@ import re
 
 from sumbi.core.paths import execution_cwd, normalize_origin
 from sumbi.core.privacy import pseudonym
+from sumbi.events.authorship import actions, command_scope
 from sumbi.outcomes.github.ledger import REPO
 
-EVIDENCE = {"pr_url": 4, "pushed_branch": 3, "created_branch": 2, "cwd_branch": 1}
+EVIDENCE = {"pr_created": 4, "pushed_branch": 3, "committed_branch": 2, "cwd_branch": 1}
 
 
 def repositories(values):
@@ -29,48 +30,125 @@ def references(session, scan):
             name, own = data
             if name:
                 refs.add(("branch", name))
-            refs.update(own)
+            refs.update((k, v) for k, v in own if k != "branch")
         elif kind == "refs":
-            refs.update(data)
+            refs.update((k, v) for k, v in data if k != "branch")
     return refs
 
 
 def start_repo(session, attributor, repos):
-    cwd = execution_cwd(session.start_cwd)
+    return start_repo_cwd(session.start_cwd, attributor, repos)
+
+
+def authorship(session, scan, gaps):
+    results = {}
+    for at, _, kind, data in session.deliverable_events:
+        if kind == "execution_refs" and scan.contains(at):
+            identity, refs = data
+            results.setdefault(identity, []).append((at, refs))
+    for identity, execution in session.commands.items():
+        action = actions(execution.command)
+        if not scan.contains(execution.at) or not action:
+            continue
+        if execution.exit_code != 0:
+            gaps["failed_authorship_commands" if execution.exit_code is not None
+                else "authorship_exit_unknown"] += 1
+            continue
+        if (not scan.contains(execution.started_at)
+            or execution.at < execution.started_at):
+            gaps["link_conflicts"] += 1
+            continue
+        output = {ref for at, refs in results.get(identity, [])
+            if execution.started_at <= at <= execution.at for ref in refs}
+        if (len({v for k, v in output if k == "pr_created"}) > 1
+            or len({v for k, v in output if k == "branch_committed"}) > 1):
+            gaps["link_conflicts"] += 1
+            continue
+        for kind, value in output:
+            if (kind == "pr_created" and ("create", None) in action
+                or kind == "branch_pushed" and ("push", None) in action
+                or kind == "branch_committed" and ("commit", None) in action):
+                yield kind, value, execution, output
+        targets = {v for k, v in output if k == "branch_pushed"}
+        if not targets:
+            for kind, value in action:
+                if kind == "push" and value:
+                    yield "branch_pushed", value, execution, output
+
+
+def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps):
+    """Only completed authorship links; mentions and conflicts remain coverage."""
+    links = {}
+    for kind, value in refs:
+        if kind == "pr" and value.rsplit("#", 1)[0] in repos:
+            pr = outcomes.pull(value)
+            if pr and pr.created_at < session.start_at:
+                gaps["pre_dispatch_pr_mentions"] += 1
+    for kind, value, execution, output in authorship(session, scan, gaps):
+        cwd, command_repos, valid = command_scope(execution.command, execution.cwd)
+        if not valid:
+            gaps["link_conflicts"] += 1
+            continue
+        cwd_repo = start_repo_cwd(cwd, attributor, repos)
+        named = {v for k, v in output if k == "repository"} | command_repos
+        scope = (cwd_repo,)
+        if named:
+            if len(named) != 1 or scope[0] and scope[0] not in named:
+                gaps["link_conflicts"] += 1
+                continue
+            scope = tuple(named)
+        elif not scope[0]:
+            scope = ()
+        evidence = {"pr_created": "pr_created", "branch_pushed": "pushed_branch",
+            "branch_committed": "committed_branch"}[kind]
+        identities = ([value] if kind == "pr_created" else
+            [p for r in scope if r in repos for p in outcomes.branch_pulls(r, value)])
+        if kind != "pr_created" and len({p.rsplit("#", 1)[0] for p in identities}) > 1:
+            gaps["link_conflicts"] += 1
+            continue
+        for identity in identities:
+            if identity.rsplit("#", 1)[0] not in repos:
+                continue
+            pr = outcomes.pull(identity)
+            if kind == "pr_created" and scope and identity.rsplit("#", 1)[0] not in scope:
+                gaps["link_conflicts"] += 1
+                continue
+            continued = bool(pr and pr.created_at < session.start_at)
+            if ((continued and kind == "pr_created")
+                or (pr and pr.closed_at and pr.closed_at < execution.at)
+                or (pr and kind == "pr_created" and pr.created_at > execution.at)):
+                gaps["link_conflicts"] += 1
+                continue
+            candidate = evidence, None if kind == "pr_created" else value, (
+                "continued" if continued else "constituent")
+            if identity not in links or EVIDENCE[evidence] > EVIDENCE[links[identity][0]]:
+                links[identity] = candidate
+    weak_links(refs, repos, origin_repo, outcomes, session.start_at, links)
+    return links
+
+
+def start_repo_cwd(cwd, attributor, repos):
+    cwd = execution_cwd(cwd)
     origin = attributor.origin(cwd)[0] if cwd else None
     return next((r for r in repos if origin and origin.lower()
         == normalize_origin("https://github.com/" + r).lower()), None)
 
 
-def link_prs(refs, repos, origin_repo, outcomes, dispatched_at):
-    """Keep every constituent and choose the strongest evidence per PR."""
-    links = {}
-    for kind, value in sorted(refs):
-        if kind == "pr" and value.rsplit("#", 1)[0] in repos:
-            links[value] = ("pr_url", None)
-    branch_repos = (origin_repo,) if origin_repo else repos
-    for kind, name in sorted(refs):
-        evidence = ("pushed_branch" if kind in ("branch_pushed", "branch_push_intent")
-            else "created_branch" if kind == "branch_created"
-            else "cwd_branch" if kind in ("branch", "branch_observed", "branch_change")
-            else None)
-        if evidence is None:
+def weak_links(refs, repos, origin_repo, outcomes, dispatched_at, links):
+    for kind, name in refs:
+        if kind not in ("branch", "branch_observed"):
             continue
-        for repo in branch_repos:
+        for repo in (origin_repo,) if origin_repo else repos:
             for identity in outcomes.branch_pulls(repo, name):
                 pr = outcomes.pull(identity)
-                # Reused branch names cannot import a PR that predates dispatch.
-                if pr.created_at < dispatched_at:
-                    continue
-                if identity not in links or EVIDENCE[evidence] > EVIDENCE[links[identity][0]]:
-                    links[identity] = evidence, name
-    return links
+                if pr and pr.created_at >= dispatched_at:
+                    links.setdefault(identity, ("cwd_branch", name, "constituent"))
 
 
 def public_links(session_id, links):
     return [{"session_id": session_id, "pr_id": pseudonym("pr", identity),
         "repository_id": pseudonym("repository", identity.rsplit("#", 1)[0]),
         "branch_id": pseudonym("branch", name) if name else None,
-        "evidence": evidence, "strength": "explicit" if evidence == "pr_url"
-        else "weak" if evidence == "cwd_branch" else "strong"}
-        for identity, (evidence, name) in sorted(links.items())]
+        "evidence": evidence, "strength": "weak" if evidence == "cwd_branch" else "strong",
+        "role": role}
+        for identity, (evidence, name, role) in sorted(links.items())]

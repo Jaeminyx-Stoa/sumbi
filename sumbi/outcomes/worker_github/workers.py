@@ -1,6 +1,7 @@
 """Measure fixed worker sessions against remote GitHub constituent outcomes."""
 
 from collections import Counter
+from datetime import timedelta
 import math
 
 from sumbi.core.privacy import current_key, pseudonym, pseudonym_key, read_salt
@@ -44,12 +45,13 @@ def worker_judgment(session, lifetime, links, outcomes, days):
         return {"state": "no_pr" if edits or incomplete else "no_change",
             "reason": "no_linked_pr" if edits or incomplete else "no_known_edit",
             "attempt_prs": []}
-    identity = Deliverable(session.id(), session.start_at,
+    # Link extraction already excludes actions after closure. Continued PRs
+    # need their original creation bound only for the reused ledger judge;
+    # dispatch membership, costs and elapsed time still use the worker start.
+    created = [p.created_at for key in links if (p := outcomes.pull(key))]
+    identity = Deliverable(session.id(), min([session.start_at, *created]),
         tuple(sorted({p.rsplit("#", 1)[0] for p in links})), tuple(sorted(links)), ())
-    try:
-        result = judge(identity, outcomes, days)
-    except OverflowError:
-        raise ValueError("Outcome observation window exceeds timestamp range") from None
+    result = judge(identity, outcomes, days)
     for pr_id in result["attempt_prs"]:
         pr = outcomes.pull(pr_id)
         if not pr or not pr.merged_at:
@@ -64,10 +66,19 @@ def worker_judgment(session, lifetime, links, outcomes, days):
     return result
 
 
-def worker_row(session, scan, links, outcomes, days, scope):
+def worker_row(session, scan, links, outcomes, days, scope, gaps):
     lifetime = Window(session.start_at, scan.until)
     tokens, complete, observed = token_measurement(session, lifetime)
-    result = worker_judgment(session, lifetime, links, outcomes, days)
+    judgment_incomplete = False
+    try:
+        result = worker_judgment(session, lifetime, links, outcomes, days)
+    except (ValueError, OverflowError, RecursionError):
+        # Malformed temporal evidence or cyclic repairs affect this unit only.
+        gaps["judgment_conflicts"] += 1
+        links = {}
+        judgment_incomplete = True
+        result = {"state": "in_progress", "reason": "outcome_evidence_incomplete",
+            "attempt_prs": []}
     latest = max((t for t in session.times if lifetime.contains(t)), default=None)
     prs = [outcomes.pull(p) for p in result["attempt_prs"]]
     return {"id": session.id(), "agent": session.public_agent(),
@@ -76,7 +87,7 @@ def worker_row(session, scan, links, outcomes, days, scope):
         "last_at": latest.isoformat() if latest else None,
         "state": result["state"], "reason": result["reason"], "task_type": None,
         "links": public_links(session.id(), links),
-        "weak_link": any(evidence == "cwd_branch" for evidence, _ in links.values()),
+        "weak_link": any(evidence == "cwd_branch" for evidence, _, _ in links.values()),
         "prs": [pseudonym("pr", p) for p in result["attempt_prs"]],
         "missing_prs": sum(p is None for p in prs),
         "checks_basis": [p.checks_basis for p in prs if p and p.merged_at],
@@ -86,13 +97,17 @@ def worker_row(session, scan, links, outcomes, days, scope):
         "model": sorted(session.models), "effort": sorted(session.efforts),
         "cli_version": sorted(session.versions),
         "metadata_incomplete": dict(session.metadata_incomplete),
-        "evidence_incomplete": bool(session.local_evidence_gaps)}
+        "evidence_incomplete": bool(session.local_evidence_gaps) or judgment_incomplete}
 
 
 def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, follow_up_days=7):
     repos = repositories(repos)
     if not math.isfinite(follow_up_days) or follow_up_days <= 0:
         raise ValueError("Follow-up days must be positive and finite")
+    try:
+        window.until + timedelta(days=follow_up_days)
+    except OverflowError:
+        raise ValueError("Outcome observation window exceeds timestamp range") from None
     with pseudonym_key(salt if salt is not None else read_salt()):
         # Freeze dispatch membership before a live adapter reads any outcome.
         initial, _ = sessions(home, window, agents)
@@ -104,7 +119,7 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
         observations = [outcomes.observation(r) for r in repos]
         scan = Window(window.since, max([window.until, *[o.until for o in observations if o]]))
         found, adapters = sessions(home, scan, agents)
-        units, overhead, excluded = [], [], Counter()
+        units, overhead, excluded, gaps = [], [], Counter(), Counter()
         attributor = Attributor([])
         for session in found:
             if not session.in_window(scan):
@@ -118,7 +133,8 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
             if lifetime is None:
                 continue
             refs = references(session, lifetime)
-            links = link_prs(refs, repos, origin_repo, outcomes, session.start_at)
+            links = link_prs(session, lifetime, refs, repos, origin_repo, outcomes,
+                attributor, gaps if session.id() in fixed else Counter())
             explicit = any(k == "pr" and v.rsplit("#", 1)[0] in repos
                 or k == "repository" and v in repos for k, v in refs)
             if not origin_repo and not links and not explicit:
@@ -131,12 +147,13 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
                 continue
             if session.id() in fixed:
                 units.append(worker_row(session, scan, links, outcomes, follow_up_days,
-                    "start_origin" if origin_repo else "own_reference"))
+                    "start_origin" if origin_repo else "own_reference", gaps))
         return worker_report(window, scan, repos, units, overhead, excluded, adapters,
-            observations, follow_up_days)
+            observations, follow_up_days, gaps)
 
 
-def worker_report(window, scan, repos, units, overhead, excluded, adapters, observations, days):
+def worker_report(window, scan, repos, units, overhead, excluded, adapters, observations, days,
+    gaps):
     units.sort(key=lambda row: row["id"])
     overhead.sort(key=lambda row: row["id"])
     retained = [r for r in units if r["state"] != "no_change" and not r["weak_link"]]
@@ -163,11 +180,12 @@ def worker_report(window, scan, repos, units, overhead, excluded, adapters, obse
                 "commits_complete": o.commits_complete if o else False}
                 for repo, o in zip(repos, observations)],
             "missing_prs": sum(r["missing_prs"] for r in units),
+            "evidence_gaps": dict(sorted(gaps.items())),
             "link_evidence_counts": dict(sorted(Counter(link["evidence"]
                 for r in units for link in r["links"]).items()))},
         "limitations": ["worker_costs_exclude_dispatch_overhead", "shell_edits_invisible",
             "deleted_logs_undetectable", "last_observed_time_is_not_acceptance",
-            "branch_reuse_requires_post_dispatch_pr", "repairs_fail_original_dispatch"]}
+            "continued_pr_requires_authorship", "repairs_fail_original_dispatch"]}
 
 
 def text_summary(report):
