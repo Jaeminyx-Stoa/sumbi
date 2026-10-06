@@ -20,6 +20,7 @@ class LocalVerifySource:
     name = "local-verify"
     registration_error = "Registration and both arms must use local-verify outcome source"
     mix_kinds = ("agent", "model", "effort", "cli_version")
+    deduplicate_metadata = False
     exclusion_flag = "_excluded_or_mixed"
     exclusion_collection = "units"
     risky_exclusions = True

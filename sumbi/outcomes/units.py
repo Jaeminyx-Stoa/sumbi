@@ -62,6 +62,7 @@ class OutcomeSource(Protocol):
     name: str
     registration_error: str
     mix_kinds: tuple[str, ...]
+    deduplicate_metadata: bool
     exclusion_flag: str
     exclusion_collection: str
     risky_exclusions: bool

@@ -23,6 +23,7 @@ class GitHubSource:
     name = "github"
     registration_error = "GitHub comparison requires github outcome source in registration"
     mix_kinds = ("model", "effort", "cli_version")
+    deduplicate_metadata = True
     exclusion_flag = "_excluded_or_unlinked"
     exclusion_collection = "deliverables"
     risky_exclusions = False

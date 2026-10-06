@@ -92,7 +92,7 @@ def compare(home, registration_path, source: OutcomeSource, *, agents=None, salt
         candidates = {arm: [u for u in units if w.contains(u.dispatched_at)] for arm, w in windows.items()}
         flags = source.source_gates({}, candidates=candidates, report=measured, stage="candidates")
         arms, exclusions = assign_arms(candidates, registration.applied_at, gap, source, flags)
-        metadata = arm_metadata(arms)
+        metadata = arm_metadata(arms, deduplicate=source.deduplicate_metadata)
         mixes = metadata_mixes(metadata, source.mix_kinds, flags)
         tasks = task_mix(arms, mixes, flags) if source.task_breakdowns else {}
         context_flags(arms, registration, windows, flags)
@@ -152,10 +152,13 @@ def assign_arms(candidates, applied_at, gap, source, flags):
     return arms, exclusions
 
 
-def arm_metadata(arms):
-    # Linked sessions can belong to several retained units. Count each once.
-    return {arm: sorted({s["id"]: s for u in rows for s in u.session_metadata}.values(), key=lambda s: s["id"])
-            for arm, rows in arms.items()}
+def arm_metadata(arms, *, deduplicate):
+    observations = {arm: [s for u in rows for s in u.session_metadata] for arm, rows in arms.items()}
+    if not deduplicate:
+        return observations
+    # GitHub linked sessions can belong to several retained deliverables.
+    return {arm: sorted({s["id"]: s for s in rows}.values(), key=lambda s: s["id"])
+            for arm, rows in observations.items()}
 
 
 def observability(metadata, kind, flags):

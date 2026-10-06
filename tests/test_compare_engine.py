@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from sumbi.core.stats import estimate
 from sumbi.core.values import timestamp
-from sumbi.judge.compare import assign_arms, compare, metadata_mixes
+from sumbi.judge.compare import arm_metadata, assign_arms, compare, metadata_mixes
 from sumbi.judge.compare_github import compare as compare_github
 from sumbi.judge.compare_local import compare_local
 from sumbi.judge.stats import bootstrap
@@ -24,7 +24,7 @@ REGISTRATION = ROOT / "tests/fixtures/compare/registration.json"
 
 def unit(identity, dispatch, *, state="success", order_key=None, exposure=None, **fields):
     when = timestamp(dispatch)
-    return Unit(identity, when, state, "synthetic", (exposure or when,), (),
+    return Unit(identity, when, state, "synthetic", (exposure or when,), fields.pop("session_metadata", ()),
                 {**dict.fromkeys(TOKEN_KINDS, 10), "total": 40}, True, 30, None,
                 {"id": identity}, order_key or identity, **fields)
 
@@ -35,6 +35,7 @@ class SyntheticSource:
     name = "github"
     registration_error = "synthetic source mismatch"
     mix_kinds = ("model", "effort", "cli_version")
+    deduplicate_metadata = True
     exclusion_flag = "_excluded_or_unlinked"
     exclusion_collection = "deliverables"
     risky_exclusions = False
@@ -60,6 +61,17 @@ class SyntheticSource:
 
 
 class ComparisonEngineTests(unittest.TestCase):
+    def test_metadata_observations_keep_each_sources_historical_counting_unit(self):
+        metadata = {"id": "shared", "agent": "codex", "model": ["m"], "effort": [], "cli_version": []}
+        row = unit("u1", "2030-01-02T00:00:00Z", session_metadata=(metadata,))
+        arms = {"before": [row, replace(row, id="u2")], "after": []}
+        for source, expected in ((GitHubSource(Path("ledger"), object()), 1),
+                                 (LocalVerifySource(Path("repository")), 2)):
+            with self.subTest(source=source.name):
+                observations = arm_metadata(arms, deduplicate=source.deduplicate_metadata)
+                mixes = metadata_mixes(observations, source.mix_kinds, [])
+                self.assertEqual(mixes["model"]["before"]["values"]["m"]["numerator"], expected)
+
     def test_statistical_primitives_accept_units_without_zero_filling(self):
         row = unit("u1", "2030-01-02T00:00:00Z")
         self.assertEqual(estimate([row], "total")["value"], 40)

@@ -220,8 +220,9 @@ wrap the existing delivery measurements, supply source-specific coverage and
 comparability gates, and preserve each public schema's field order. Candidate
 gates run before exclusions, retained gates after common comparability checks,
 and coverage-stage flags before statistical judgment. Bootstrap order remains
-ledger ID for GitHub and public worker ID for local verification; linked session
-metadata is counted once per retained arm.
+ledger ID for GitHub and public worker ID for local verification. GitHub linked
+session metadata is counted once per retained arm; local metadata is counted
+per retained worker row.
 
 ### 3. Propagate — `sumbi notice sync`
 
