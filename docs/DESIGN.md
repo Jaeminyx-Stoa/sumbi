@@ -223,6 +223,17 @@ Windows are `[start, end)` everywhere. Errors, caps and unsupported fields are r
   Both arms must use the same checks basis, including all merged attempts.
   See [M2 measurement rules](MEASUREMENT.md#m2-pre-registered-comparison-and-verdict-proposals).
 
+Both outcome sources feed fixed `Unit` records to `judge/compare.py`. The engine
+owns dispatch arms, exposure exclusions, metadata observability, mix and volume
+shifts, statistics, ordered verdicts and text summaries. Outcome-source plug-ins
+wrap the existing delivery measurements, supply source-specific coverage and
+comparability gates, and preserve each public schema's field order. Candidate
+gates run before exclusions, retained gates after common comparability checks,
+and coverage-stage flags before statistical judgment. Bootstrap order remains
+ledger ID for GitHub and public worker ID for local verification. GitHub linked
+session metadata is counted once per retained arm; local metadata is counted
+per retained worker row.
+
 ### 3. Propagate — `sumbi notice sync`
 
 - **Delivery:**
