@@ -88,10 +88,22 @@ class Tokens:
 
 
 @dataclass(frozen=True)
+class SourceIdentity:
+    """Optional source key representation for native pairing.
+
+    Counts use the normalized string ID. Pairing must not equate a numeric
+    source key with a string key when the log distinguishes them.
+    """
+
+    value: Value
+
+
+@dataclass(frozen=True)
 class ToolInput:
     tool_call_id: str | None
     name: str | None
     arguments: Value = None
+    source_identity: SourceIdentity | None = None
 
 
 @dataclass(frozen=True)
@@ -99,6 +111,7 @@ class ToolOutput:
     tool_call_id: str | None
     output: Value = None
     text_blocks: bool = False
+    source_identity: SourceIdentity | None = None
 
 
 @dataclass(frozen=True)
@@ -164,6 +177,7 @@ class CommandExecution:
     deferred: bool = False
     require_pair: bool = False
     infer_cwd: bool = False
+    source_identity: SourceIdentity | None = None
 
 
 @dataclass(frozen=True)
@@ -240,3 +254,4 @@ class Record:
     worker: bool = False
     before_dedup: tuple[Metadata, ...] = ()
     usage_record: bool = False
+    fallback_source_identity: SourceIdentity | None = None

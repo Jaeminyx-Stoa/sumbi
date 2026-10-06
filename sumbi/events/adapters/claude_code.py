@@ -8,7 +8,7 @@ from sumbi.core.values import integer, mapping, timestamp
 from sumbi.events.schema import (
     Record, SessionStart, Context, Metadata, Tokens, TokenUsage, ToolEvidence,
     ToolInput, ToolOutput, ToolStart, ToolEnd, CommandExecution, FileEdit,
-    Counter, Request, LocalText, Diagnostic, freeze,
+    Counter, Request, LocalText, Diagnostic, SourceIdentity, freeze,
 )
 from .common import key, record_identity
 
@@ -48,11 +48,12 @@ def _blocks(event, kind, blocks, when):
         suffix = ":" + str(index)
         if kind == "assistant" and block.get("type") == "tool_use":
             identity = key(block.get("id") or None)
+            source = SourceIdentity(freeze(block["id"])) if block.get("id") else None
             name, args = block.get("name"), mapping(block.get("input"))
             if name == "Bash":
                 yield CommandExecution(identity, freeze(args.get("command")), started_at=when,
                     cwd=freeze(args.get("cwd", event.get("cwd"))), phase="start", pairing="launch", suffix=suffix,
-                    deferred=args.get("run_in_background", False) is not False)
+                    deferred=args.get("run_in_background", False) is not False, source_identity=source)
             if name in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
                 yield FileEdit(identity, suffix)
             yield ToolStart(identity, suffix)
@@ -60,9 +61,10 @@ def _blocks(event, kind, blocks, when):
                 yield Counter("user_input_requests", identity, suffix)
         elif kind == "user" and block.get("type") == "tool_result":
             identity = key(block.get("tool_use_id") or None)
+            source = SourceIdentity(freeze(block["tool_use_id"])) if block.get("tool_use_id") else None
             # Pairing and deferred-launch status are resolved by the builder.
             yield CommandExecution(identity, exit_code=bash_exit_code(event, block),
-                phase="end", pairing="launch", suffix=suffix, require_pair=True)
+                phase="end", pairing="launch", suffix=suffix, require_pair=True, source_identity=source)
             yield ToolEnd(identity, block.get("is_error") is True, suffix)
 
 
@@ -79,9 +81,11 @@ def _translate(event, when):
         yield Context(cwd, branch=freeze(event.get("gitBranch")))
     if kind not in KNOWN:
         yield Diagnostic(freeze(kind))
-    inputs = tuple(ToolInput(key(b.get("id")), b.get("name"), freeze(b.get("input")))
+    inputs = tuple(ToolInput(key(b.get("id")), b.get("name"), freeze(b.get("input")),
+                            SourceIdentity(freeze(b.get("id"))))
                    for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use")
-    outputs = tuple(ToolOutput(key(b.get("tool_use_id")), freeze(b.get("content")), text_blocks=True)
+    outputs = tuple(ToolOutput(key(b.get("tool_use_id")), freeze(b.get("content")), text_blocks=True,
+                              source_identity=SourceIdentity(freeze(b.get("tool_use_id"))))
                     for b in blocks if isinstance(b, dict) and b.get("type") == "tool_result")
     evidence = ToolEvidence(inputs, outputs, cwd, freeze(event.get("gitBranch")))
     usage = mapping(message.get("usage"))

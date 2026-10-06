@@ -260,6 +260,19 @@ class BuilderTests(unittest.TestCase):
         session, _ = self.fold(self.record(1, query), self.record(2, output), collect_links=True)
         self.assertFalse(session.deliverable_events)
 
+    def test_pairing_retains_numeric_versus_string_source_keys(self):
+        session, _ = self.fold(
+            self.record(1, e.CommandExecution("1", "check", started_at=START, phase="start",
+                source_identity=e.SourceIdentity(1))),
+            self.record(2, e.CommandExecution("1", exit_code=0, phase="end", pairing="launch", require_pair=True,
+                source_identity=e.SourceIdentity("1"))))
+        self.assertFalse(session.commands)
+
+    def test_missing_call_id_uses_numeric_record_sequence_for_pairing(self):
+        session, _ = self.fold(self.record(1, e.CommandExecution(None, "check", phase="start")),
+            self.record(2, e.CommandExecution("1", exit_code=0, phase="end", pairing="launch", require_pair=True)))
+        self.assertFalse(session.commands)
+
 
 if __name__ == "__main__":
     unittest.main()

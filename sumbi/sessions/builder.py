@@ -121,7 +121,7 @@ def _tool_evidence(state, evidence, when, order, links, *, apply=True, fallback=
         cwd = workdir or cwd
         paths.extend(operands)
         if links:
-            identity = item.tool_call_id or fallback if evidence.fallback_identity else item.tool_call_id
+            identity = _source_identity(item, evidence, fallback)
             state.tool_names[identity] = item.name, branch_query(item.name, arguments)
             refs.update(tool_refs(item.name, arguments))
     if links:
@@ -130,7 +130,7 @@ def _tool_evidence(state, evidence, when, order, links, *, apply=True, fallback=
             if item.text_blocks and isinstance(output, list):
                 output = "\n".join(b.get("text", "") for b in output
                                    if isinstance(b, dict) and b.get("type") == "text")
-            identity = item.tool_call_id or fallback if evidence.fallback_identity else item.tool_call_id
+            identity = _source_identity(item, evidence, fallback)
             name, query = state.tool_names.get(identity, (None, False))
             refs.update(tool_refs(name, output, output=True, query=query))
     if apply and evidence.apply:
@@ -138,6 +138,12 @@ def _tool_evidence(state, evidence, when, order, links, *, apply=True, fallback=
         if links and at and (refs or evidence.include_empty_refs):
             session.deliverable_events.append((at, order, "refs", refs))
     return cwd, paths, refs
+
+
+def _source_identity(item, evidence, fallback):
+    if item.source_identity is not None:
+        return e.thaw(item.source_identity.value)
+    return (item.tool_call_id or fallback) if evidence.fallback_identity else item.tool_call_id
 
 
 def maximal_output_snapshot(state, event, when, order, links):
@@ -151,13 +157,15 @@ def maximal_output_snapshot(state, event, when, order, links):
                                   paths, cwd, branch(e.thaw(event.evidence.branch)), refs)
 
 
-def paired_execution(state, event, identity, when):
+def paired_execution(state, event, identity, when, fallback):
     """Pair launches without repairing contradictory start/cwd evidence."""
     session = state.session
+    pairing_identity = e.thaw(event.source_identity.value) if event.source_identity is not None else (
+        identity if event.tool_call_id is not None or event.suffix else fallback)
     if event.phase == "start":
-        state.launches[identity] = event
+        state.launches[pairing_identity] = event
         return
-    launch = state.launches.get(identity)
+    launch = state.launches.get(pairing_identity)
     if event.require_pair and launch is None:
         return
     command, code = e.thaw(event.command), event.exit_code
@@ -208,7 +216,7 @@ def _diagnostic(state, event, coverage):
             state.starts.append(None)
 
 
-def _fold(state, event, record, order, fallback, window, coverage, review, links):
+def _fold(state, event, record, order, fallback, source_fallback, window, coverage, review, links):
     session, when = state.session, record.timestamp
     identity = str(getattr(event, "tool_call_id", None) or getattr(event, "identity", None)
                    or fallback) + (getattr(event, "suffix", "") if not (
@@ -234,7 +242,7 @@ def _fold(state, event, record, order, fallback, window, coverage, review, links
             if window.contains(when):
                 session.add_tokens(values)
     elif isinstance(event, e.ToolEvidence):
-        _tool_evidence(state, event, when, order, links, fallback=fallback)
+        _tool_evidence(state, event, when, order, links, fallback=source_fallback)
     elif isinstance(event, (e.ToolStart, e.ToolEnd)):
         at = event.at if event.own_time else when
         start = isinstance(event, e.ToolStart)
@@ -245,7 +253,7 @@ def _fold(state, event, record, order, fallback, window, coverage, review, links
         if start or event.interval:
             session.interval("tool", identity, at if start else None, None if start else at)
     elif isinstance(event, e.CommandExecution):
-        paired_execution(state, event, identity, when)
+        paired_execution(state, event, identity, when, source_fallback)
     elif isinstance(event, e.FileEdit):
         session.edit(identity, when)
     elif isinstance(event, e.Counter):
@@ -449,8 +457,10 @@ def build(records: Iterable[e.Record], window: Window, coverage: Coverage, *,
         sequence = len(session.seen)
         order = position if state.explicit else (record.ordinal if record.ordinal is not None else sequence, sequence)
         fallback = record.identity.event_id if state.explicit else record.fallback_id or str(sequence)
+        source_fallback = e.thaw(record.fallback_source_identity.value) if record.fallback_source_identity is not None else (
+            record.fallback_id if record.fallback_id is not None else sequence)
         for event in record.events:
-            _fold(state, event, record, order, fallback, window, coverage, local_review, collect_links)
+            _fold(state, event, record, order, fallback, source_fallback, window, coverage, local_review, collect_links)
     for state in states.values():
         _finish(state, window, coverage, collect_links)
     return [state.session for state in states.values()]

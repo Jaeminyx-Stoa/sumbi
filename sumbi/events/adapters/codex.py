@@ -8,7 +8,7 @@ from sumbi.core.values import epoch, integer, mapping, timestamp
 from sumbi.events.schema import (
     Record, SessionStart, Context, Metadata, Tokens, TokenUsage, ToolEvidence,
     ToolInput, ToolOutput, ToolStart, ToolEnd, CommandExecution, FileEdit,
-    Counter, Request, SessionEnd, Resume, LocalText, Diagnostic, freeze,
+    Counter, Request, SessionEnd, Resume, LocalText, Diagnostic, SourceIdentity, freeze,
 )
 from .common import key, record_identity
 
@@ -50,37 +50,42 @@ def verification_exit_code(payload: dict) -> int | None:
 
 
 def _input(identity, name, arguments, *, at=None, own_time=False):
-    return ToolEvidence(inputs=(ToolInput(identity, name, freeze(arguments)),), at=at,
+    source = SourceIdentity(freeze(identity)) if identity is not None else None
+    return ToolEvidence(inputs=(ToolInput(key(identity), name, freeze(arguments), source),), at=at,
                         own_time=own_time, include_empty_refs=True, fallback_identity=True)
 
 
 def _output(identity, output):
-    return ToolEvidence(outputs=(ToolOutput(identity, freeze(output)),), include_empty_refs=True, fallback_identity=True)
+    source = SourceIdentity(freeze(identity)) if identity is not None else None
+    return ToolEvidence(outputs=(ToolOutput(key(identity), freeze(output), source_identity=source),),
+                        include_empty_refs=True, fallback_identity=True)
 
 
 def _item(payload, subtype, identity, when):
     item = mapping(payload.get("item"))
     kind = item.get("type")
-    identity = key(item.get("id") or identity)
+    identity = item.get("id") or identity
+    source = SourceIdentity(freeze(identity)) if identity is not None else None
     start = epoch(payload.get("started_at_ms"), milliseconds=True)
     end = epoch(payload.get("completed_at_ms"), milliseconds=True)
     if kind not in ITEMS:
         yield Diagnostic("item:" + str(kind))
     if kind in TOOL_ITEMS:
-        yield ToolStart(identity, at=start, own_time=True)
+        yield ToolStart(key(identity), at=start, own_time=True)
         if subtype == "item_completed":
-            yield ToolEnd(identity, exit_code(item) not in (None, 0), interval=False)
+            yield ToolEnd(key(identity), exit_code(item) not in (None, 0), interval=False)
         # The interval's completion time is independently machine-reported.
         if end is not None:
-            yield ToolEnd(identity, at=end, own_time=True, count=False)
+            yield ToolEnd(key(identity), at=end, own_time=True, count=False)
     if kind == "CommandExecution":
         yield Context(item.get("cwd") if isinstance(item.get("cwd"), str) else None, attribution=False)
-        yield CommandExecution(identity, freeze(item.get("command")), verification_exit_code(item),
+        yield CommandExecution(key(identity), freeze(item.get("command")), verification_exit_code(item),
             started_at=(start or when) if subtype == "item_started" else start,
             cwd=freeze(item.get("cwd")), cwd_supplied="cwd" in item,
-            phase="start" if subtype == "item_started" else "complete", pairing="interval", infer_cwd=True)
+            phase="start" if subtype == "item_started" else "complete", pairing="interval", infer_cwd=True,
+            source_identity=source)
     if kind == "FileChange" and subtype == "item_completed":
-        yield FileEdit(identity)
+        yield FileEdit(key(identity))
     if kind in ("CommandExecution", "FileChange"):
         yield _input(identity, kind, item, at=start or when, own_time=True)
     if kind == "AgentMessage":
@@ -89,7 +94,8 @@ def _item(payload, subtype, identity, when):
 
 def _event(payload, event, when):
     subtype = payload.get("type")
-    identity = key(payload.get("call_id") or payload.get("turn_id") or event.get("ordinal"))
+    identity = payload.get("call_id") or payload.get("turn_id") or event.get("ordinal")
+    source = SourceIdentity(freeze(identity)) if identity is not None else None
     if subtype not in EVENTS:
         yield Diagnostic("event_msg:" + str(subtype))
     if subtype == "token_count":
@@ -106,45 +112,46 @@ def _event(payload, event, when):
                     selection="cumulative_including_cache", input_total=values["input_tokens"])
     elif subtype in ("task_started", "task_complete", "task_completed"):
         yield Resume() if subtype == "task_started" else SessionEnd("observed")
-        yield Request(identity, epoch(payload.get("started_at")), epoch(payload.get("completed_at")),
+        yield Request(key(identity), epoch(payload.get("started_at")), epoch(payload.get("completed_at")),
                       "start" if subtype == "task_started" else "end")
     elif subtype in ("exec_command_begin", "mcp_tool_call_begin"):
         if subtype == "exec_command_begin":
-            yield CommandExecution(identity, freeze(payload.get("command", payload.get("cmd"))),
+            yield CommandExecution(key(identity), freeze(payload.get("command", payload.get("cmd"))),
                 started_at=when, cwd=freeze(payload.get("cwd", payload.get("workdir"))),
-                cwd_supplied="cwd" in payload or "workdir" in payload, phase="start", pairing="launch")
+                cwd_supplied="cwd" in payload or "workdir" in payload, phase="start", pairing="launch", source_identity=source)
             yield _input(identity, "exec_command", payload)
-        yield ToolStart(identity)
+        yield ToolStart(key(identity))
     elif subtype in ("exec_command_end", "mcp_tool_call_end"):
         if subtype == "exec_command_end":
-            yield CommandExecution(identity, freeze(payload.get("command")), verification_exit_code(payload),
-                phase="end", pairing="launch", command_supplied="command" in payload, infer_cwd=True)
+            yield CommandExecution(key(identity), freeze(payload.get("command")), verification_exit_code(payload),
+                phase="end", pairing="launch", command_supplied="command" in payload, infer_cwd=True,
+                source_identity=source)
         yield _output(identity, payload.get("output"))
-        yield ToolEnd(identity, exit_code(payload) not in (None, 0))
+        yield ToolEnd(key(identity), exit_code(payload) not in (None, 0))
     elif subtype in ("item_completed", "item_started"):
         yield from _item(payload, subtype, identity, when)
     elif subtype == "shutdown_complete":
         yield SessionEnd("observed")
     elif subtype in ("error", "request_user_input"):
-        yield Counter("api_errors" if subtype == "error" else "user_input_requests", identity)
+        yield Counter("api_errors" if subtype == "error" else "user_input_requests", key(identity))
 
 
 def _response(payload, event):
     subtype = payload.get("type")
-    identity = key(payload.get("call_id") or payload.get("id") or event.get("ordinal"))
+    identity = payload.get("call_id") or payload.get("id") or event.get("ordinal")
     if subtype not in RESPONSES:
         yield Diagnostic("response_item:" + str(subtype))
     if subtype in ("function_call", "custom_tool_call", "local_shell_call", "web_search_call"):
         name = payload.get("name", subtype)
         if str(payload.get("name", "")).split(".")[-1] == "apply_patch":
-            yield FileEdit(identity)
+            yield FileEdit(key(identity))
         yield _input(identity, name, payload.get("arguments", payload.get("input", payload.get("action"))))
-        yield ToolStart(identity)
+        yield ToolStart(key(identity))
         if str(payload.get("name", "")).split(".")[-1] in ("request_user_input", "request_user_input_async"):
-            yield Counter("user_input_requests", identity)
+            yield Counter("user_input_requests", key(identity))
     elif subtype in ("function_call_output", "custom_tool_call_output"):
         yield _output(identity, payload.get("output"))
-        yield ToolEnd(identity, exit_code(payload) not in (None, 0))
+        yield ToolEnd(key(identity), exit_code(payload) not in (None, 0))
     if subtype in ("message", "agent_message"):
         yield LocalText(freeze(payload.get("content")))
 
@@ -193,4 +200,5 @@ def collect(home: Path, coverage: Coverage):
             when = timestamp(event.get("timestamp"))
             yield Record("codex", raw_id, when, record_identity(event), tuple(_translate(event, payload, when, inherited)),
                 timestamp_supplied="timestamp" in event, ordinal=integer(event.get("ordinal")), before_dedup=before,
-                fallback_id=str(event["ordinal"]) if "ordinal" in event else None)
+                fallback_id=str(event["ordinal"]) if "ordinal" in event else None,
+                fallback_source_identity=SourceIdentity(freeze(event["ordinal"])) if "ordinal" in event else None)
