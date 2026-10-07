@@ -19,7 +19,7 @@ from sumbi.outcomes.worker_github.scope import capture
 from sumbi.sessions.builder import collect
 from sumbi.sessions.session import TOKEN_KINDS
 
-STATES = ("success", "failed", "immature", "in_progress", "no_pr", "no_change")
+STATES = ("success", "failed", "immature", "in_progress", "unverified", "no_pr", "no_change")
 METRICS = (*TOKEN_KINDS, "total", "time")
 
 

@@ -1,5 +1,5 @@
 sumbi deliver
-States: success 3; failed 2; in_progress 0; immature 1
+States: success 3; failed 2; in_progress 0; immature 1; unverified 0
 Checks bases (deliverables): historical 5; current_policy 0; all_visible 0; unknown 1
 success_rate: 3/6; Wilson 95% [0.187616, 0.812384]
 first_pass_success_rate: 2/6; Wilson 95% [0.096771, 0.700007]

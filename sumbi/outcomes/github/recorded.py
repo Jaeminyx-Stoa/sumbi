@@ -43,6 +43,7 @@ class PullRequest:
     checks_basis: str = "unknown"
     checks_reason: str = "checks_policy_unreadable"
     head_ref: str | None = None
+    checks_capture_complete: bool = True
 
 
 @dataclass(frozen=True)
@@ -166,7 +167,8 @@ class FixtureOutcomes:
         self.pulls[identity] = PullRequest(identity, pr["state"], created, closed, merged,
             head.lower(), merge.lower() if merge else None,
             checks, pr["title"], pr["body"] or "", observed,
-            basis, reason, head_ref)
+            basis, reason, head_ref, entry["checks_at_merge"] is not None
+            or (entry.get("current_policy_evidence") or {}).get("results") is not None)
 
     def branch_pulls(self, repo, head_ref):
         """Enumerate exact heads without exposing branch text in public reports."""

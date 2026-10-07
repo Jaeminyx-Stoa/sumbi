@@ -120,11 +120,14 @@ class WorkerRobustnessTests(unittest.TestCase):
                 self.assertEqual(len(report["coverage"]["repositories"]), 3)
                 if command == "deliver":
                     self.assertEqual(report["states"]["success"], 2)
-                    self.assertEqual(report["states"]["in_progress"], 11)
+                    self.assertEqual(report["states"]["in_progress"], 2)
+                    self.assertEqual(report["states"]["unverified"], 9)
                     self.assertEqual(report["success_rate"]["denominator"], 12)
                     self.assertEqual(report["state_reasons"]["in_progress"], {
-                        "checks_missing_required": 9, "checks_policy_unreadable": 1,
+                        "checks_policy_unreadable": 1,
                         "repository_unreadable": 1})
+                    self.assertEqual(report["state_reasons"]["unverified"],
+                        {"checks_missing_required": 9})
                     links = [link for unit in report["units"] for link in unit["links"]]
                     self.assertEqual(sum(link["role"] == "continued" for link in links), 1)
                     self.assertEqual(len(links), 12)

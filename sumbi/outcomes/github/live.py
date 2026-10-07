@@ -23,6 +23,7 @@ API = "https://api.github.com"
 MAX_BYTES = 16 * 1024 * 1024
 MAX_TEXT = 65536
 CACHE_SECONDS = 300
+RERUN_HINT = "; cached responses make a rerun cheap while the cache is fresh"
 PLAN_UNAVAILABLE = "Upgrade to GitHub Pro or make this repository public to enable this feature."
 
 
@@ -249,7 +250,8 @@ class GitHubOutcomes(FixtureOutcomes):
                         except (ValueError, TypeError):
                             delay = 60 * (retry + 1)
                         if not 0 <= delay <= 3600:
-                            raise ValueError("GitHub rate limit requires a later retry") from None
+                            raise ValueError("GitHub rate limit requires a later retry"
+                                + RERUN_HINT) from None
                         # Short sleeps also allow callers to interrupt long waits.
                         while delay > 0:
                             step = min(30, delay)
@@ -271,8 +273,11 @@ class GitHubOutcomes(FixtureOutcomes):
                     failure = (RepositoryUnreadable
                         if code in (403, 404) and not limited else ValueError)
                     raise failure("GitHub request failed (HTTP " + str(code)
-                        + "); check access or retry later") from None
-                except (urllib.error.URLError, OSError, UnicodeError, json.JSONDecodeError,
+                        + "); check access or retry later"
+                        + (RERUN_HINT if limited or code >= 500 else "")) from None
+                except (urllib.error.URLError, OSError):
+                    raise ValueError("GitHub response was unavailable" + RERUN_HINT) from None
+                except (UnicodeError, json.JSONDecodeError,
                     KeyError, TypeError, AttributeError):
                     raise ValueError("GitHub response was unavailable or malformed") from None
         return self._record_response(key, payload)
@@ -375,7 +380,8 @@ class GitHubOutcomes(FixtureOutcomes):
                 raise ValueError("GitHub check response was malformed") from None
             entry["observed_checks_at_merge"] = value
             pr = replace(pr, observed_checks=value, checks=checks, checks_basis=basis,
-                checks_reason=reason)
+                checks_reason=reason, checks_capture_complete=(
+                    entry["checks_at_merge"] is not None or results is not None))
             self.pulls[identity] = pr
             self._record_repo(identity.rsplit("#", 1)[0])
         return pr

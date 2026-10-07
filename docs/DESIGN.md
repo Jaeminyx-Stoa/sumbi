@@ -34,7 +34,7 @@ Self-improvement that is not filtered by outcomes can make things worse. Context
 1. **Deliverables are fixed when work is dispatched.**
    - Each one gets an ID and acceptance criteria up front.
    - Work abandoned before any pull request existed is recorded too.
-   - States: `success`, `failed`, `in_progress`, `immature` (merged, but the revert and follow-up window has not closed).
+   - States: `success`, `failed`, `in_progress`, `immature` (merged, but the revert and follow-up window has not closed), and `unverified` (mature merged work whose at-merge checks cannot prove success).
    - First-pass success and eventual success after retries are counted separately.
 2. **Success uses an explicitly declared machine outcome source.** With
    `github`, success requires outside signals: merged, required checks green at

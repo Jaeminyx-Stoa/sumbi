@@ -74,7 +74,8 @@ def configure_outcome_source(command):
     command.add_argument("--outcomes", metavar="github|DIR")
     command.add_argument("--repo", action="append", metavar="owner/name",
         help="Measured remote repository for worker GitHub outcomes; repeatable")
-    command.add_argument("--repo-owner", action="append", metavar="OWNER", help=argparse.SUPPRESS)
+    command.add_argument("--repo-owner", action="append", metavar="OWNER",
+        help="Include evidenced repositories under this owner for worker-github (repeatable)")
     command.add_argument("--repository", type=Path,
         help="Repository scope for local verification units")
     command.add_argument("--verify", action="append",

@@ -139,7 +139,8 @@ class DeliverTests(unittest.TestCase):
 
     def test_hand_computed_truths(self):
         report = self.report()
-        self.assertEqual(report["states"], {"success": 3, "failed": 2, "in_progress": 0, "immature": 1})
+        self.assertEqual(report["states"], {"success": 3, "failed": 2, "in_progress": 0,
+            "immature": 1, "unverified": 0})
         self.assertEqual(report["success_rate"]["numerator"], 3)
         self.assertEqual(report["success_rate"]["denominator"], 6)
         self.assertEqual(report["first_pass_success_rate"]["numerator"], 2)
@@ -162,6 +163,19 @@ class DeliverTests(unittest.TestCase):
         rows[1][6] = "abandoned"
         self.write_rows(rows)
         self.assertIsNone(judge(self.d("Dfail"), self.outcomes())["closed_at"])
+
+    def test_unverified_delivery_retains_denominator_and_lifetime_spend(self):
+        raw = outcome_fixture()
+        raw["pulls"][0]["checks_at_merge"]["check_runs"] = []
+        self.outcomes(raw)
+        report = self.report()
+        self.assertEqual(report["states"]["unverified"], 1)
+        self.assertEqual(report["success_rate"]["numerator"], 2)
+        self.assertEqual(report["success_rate"]["denominator"], 6)
+        self.assertEqual(report["cost"]["cohort"]["spend"]["total"], 180)
+        self.assertEqual(report["cost"]["cohort"]["successes"], 2)
+        self.assertIn("unverified 1", text_summary(report))
+        self.assertIn("unverified; checks_missing_required", text_summary(report))
 
     def test_revert_inside_window(self):
         self.assertEqual(judge(self.d("Drev"), self.outcomes())["reason"], "reverted")

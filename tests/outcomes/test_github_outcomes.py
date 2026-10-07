@@ -408,6 +408,8 @@ class GitHubTests(unittest.TestCase):
         pr = adapter.pull(REPO + "#1")
         self.assertEqual(pr.checks, "unknown")
         self.assertEqual(adapter.evidence_gaps["checks_capture_incomplete"], 1)
+        self.assertEqual(judge(self.ledger()[0], adapter)["state"], "in_progress")
+        self.assertFalse(pr.checks_capture_complete)
 
     def test_unreadable_check_results_are_local_gaps(self):
         original = self.respond
@@ -422,6 +424,38 @@ class GitHubTests(unittest.TestCase):
                 adapter, pr = self.policy_pull()
                 self.assertEqual(pr.checks, "unknown")
                 self.assertEqual(adapter.evidence_gaps["checks_unreadable"], 2)
+                self.assertEqual(judge(self.ledger()[0], adapter)["state"], "in_progress")
+                self.assertFalse(pr.checks_capture_complete)
+
+    def test_aborted_live_runs_explain_cached_reruns_and_reuse_successful_responses(self):
+        for kind in ("transient", "server", "rate_limit", "long_rate_limit"):
+            cache = self.root / kind
+            def abort(request, **kwargs):
+                if urllib.parse.urlsplit(request.full_url).path.endswith("/commits"):
+                    if kind == "transient":
+                        raise urllib.error.URLError("Synthetic unavailable response")
+                    code = 503 if kind == "server" else 429
+                    headers = {"Retry-After": "7200" if kind == "long_rate_limit" else "0"}
+                    raise urllib.error.HTTPError(request.full_url, code,
+                        "Synthetic unavailable response", headers, io.BytesIO())
+                return self.respond(request, **kwargs)
+            self.open.side_effect = abort
+            with self.subTest(kind=kind), patch("sumbi.outcomes.github.live.time.sleep"), \
+                self.assertRaisesRegex(ValueError, "cached responses make a rerun cheap"):
+                GitHubOutcomes(self.ledger(), cache=cache)
+            self.open.side_effect = self.respond
+            self.calls.clear()
+            rerun = GitHubOutcomes(self.ledger(), cache=cache)
+            self.assertGreater(rerun.cache_hits, 0)
+            self.assertTrue(all(not urllib.parse.urlsplit(request.full_url).path.endswith("/pulls")
+                for request in self.calls))
+
+    def test_check_pagination_gap_remains_pending(self):
+        adapter = self.adapter()
+        adapter._capture_gap("pagination_incomplete", "synthetic-endpoint")
+        with patch.object(adapter, "_merge_results", return_value=None):
+            self.assertEqual(judge(self.ledger()[0], adapter)["state"], "in_progress")
+        self.assertEqual(adapter.evidence_gaps["pagination_incomplete"], 1)
 
     def test_incomplete_results_do_not_poison_another_pr(self):
         bad = "/repos/example/sample/commits/" + f"{101:040x}" + "/check-runs"
@@ -550,6 +584,7 @@ class GitHubTests(unittest.TestCase):
         adapter, pr = self.policy_pull()
         self.assertEqual((pr.checks, pr.checks_basis, pr.checks_reason), ("unknown", "all_visible", "no_checks"))
         self.assertEqual(judge(self.ledger()[0], adapter)["reason"], "checks_none")
+        self.assertEqual(judge(self.ledger()[0], adapter)["state"], "unverified")
 
     def test_disabled_classic_and_active_rules(self):
         self.policy_case(contexts=["missing"], enabled=False, rules=[self.rule("test")])
