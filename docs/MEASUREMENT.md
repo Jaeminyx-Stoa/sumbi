@@ -469,7 +469,10 @@ PR entries may also carry `observed_checks_at_merge` (`green`, `red`, or
 Live recordings additionally retain `current_policy_evidence`, an object with
 exactly `required` and `results`. `required` is null for unreadable policy or an
 array of `{ "context": "test", "app_id": null }` requirements (empty for
-`all_visible`). `results` is null when no pre-merge results exist, or the snapshot
+`all_visible`). `results: null` means uncaptured results, or legacy no-evidence
+from the 0.1.0 adapter. These cases cannot be distinguished, so such merged PRs
+stay `in_progress`; re-record with the current adapter to classify them. Current
+recordings write an array even when it is empty. `results` can also be the snapshot
 shape below with `required: []`, a head or merge SHA, and check-run
 `app.id` fields. This evidence is evaluated on replay and never promoted to
 `historical`. `results` may also be an ordered array of snapshots, retaining both

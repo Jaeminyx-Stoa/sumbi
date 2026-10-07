@@ -161,6 +161,16 @@ class UnverifiedTests(unittest.TestCase):
                 for result in self.judgments(self.outcomes(recording([entry]))):
                     self.assertEqual((result["state"], result["reason"]), ("in_progress", reason))
 
+    def test_legacy_null_results_stay_in_progress_in_recorded_replay(self):
+        entry = pull(1)
+        entry.update(checks_at_merge=None,
+            current_policy_evidence={"required": [], "results": None})
+        outcomes = self.outcomes(recording([entry]))
+        self.assertFalse(outcomes.pull(REPO + "#1").checks_capture_complete)
+        for result in self.judgments(outcomes):
+            self.assertEqual((result["state"], result["reason"]),
+                ("in_progress", "checks_none"))
+
     def test_pending_follow_up_and_missing_constituent_still_block(self):
         raw = recording([unknown(pull(1), "checks_missing_required")])
         follow = pull(2, day=2, merged=False, state="open")
