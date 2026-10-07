@@ -162,6 +162,7 @@
         "failed": {},
         "immature": {},
         "in_progress": {},
+        "unverified": {},
         "no_pr": {},
         "no_change": {}
       },
@@ -170,6 +171,7 @@
         "failed": 0,
         "immature": 0,
         "in_progress": 0,
+        "unverified": 0,
         "no_pr": 0,
         "no_change": 0
       },
@@ -180,6 +182,7 @@
         "failed": {},
         "immature": {},
         "in_progress": {},
+        "unverified": {},
         "no_pr": {},
         "no_change": {}
       },
@@ -911,6 +914,7 @@
         "failed": {},
         "immature": {},
         "in_progress": {},
+        "unverified": {},
         "no_pr": {},
         "no_change": {}
       },
@@ -919,6 +923,7 @@
         "failed": 0,
         "immature": 0,
         "in_progress": 0,
+        "unverified": 0,
         "no_pr": 0,
         "no_change": 0
       },
@@ -929,6 +934,7 @@
         "failed": {},
         "immature": {},
         "in_progress": {},
+        "unverified": {},
         "no_pr": {},
         "no_change": {}
       },

@@ -169,7 +169,8 @@
         "success": 16,
         "failed": 4,
         "in_progress": 0,
-        "immature": 0
+        "immature": 0,
+        "unverified": 0
       },
       "checks_basis_counts": {
         "historical": 16
@@ -923,7 +924,8 @@
         "success": 0,
         "failed": 0,
         "in_progress": 0,
-        "immature": 0
+        "immature": 0,
+        "unverified": 0
       },
       "checks_basis_counts": {},
       "deliverables": []

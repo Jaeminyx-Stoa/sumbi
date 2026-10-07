@@ -189,6 +189,25 @@ class CompareRoundTests(unittest.TestCase):
             for arm in report["arms"].values() for row in arm["deliverables"] for p in row["pr_outcomes"]))
         self.assertEqual(report["bootstrap"], {"seed": 1729, "resamples": 1000, "unit": "deliverable", "quantiles": [.025, .975]})
 
+    def test_unverified_rows_retain_costs_and_reach_a_verdict(self):
+        def missing_checks(raw):
+            for entry in (raw["pulls"][0], raw["pulls"][20]):
+                entry["checks_at_merge"]["check_runs"] = []
+                entry["checks_at_merge"]["statuses"] = []
+        self.edit_json(self.outcome_path, missing_checks)
+        report = self.run_round()
+        self.assertEqual(report["verdict"]["proposal"], "adopt")
+        for arm, spend in (("before", 2000), ("after", 800)):
+            row = report["arms"][arm]
+            self.assertEqual(row["success_rate"]["denominator"], 20)
+            self.assertEqual(row["success_rate"]["numerator"], 15)
+            self.assertEqual(row["cost"]["total"]["numerator"], spend)
+            unverified = [r for r in row["deliverables"] if r["state"] == "unverified"]
+            self.assertEqual(len(unverified), 1)
+            self.assertEqual(unverified[0]["reason"], "checks_missing_required")
+            self.assertFalse(unverified[0]["eventual_success"])
+            self.assertEqual(report["exclusions"][arm]["share"]["numerator"], 0)
+
     def test_round_reject_inferior(self):
         def fail(rows):
             for r in rows:

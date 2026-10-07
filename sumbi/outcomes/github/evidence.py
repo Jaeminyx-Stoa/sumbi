@@ -90,7 +90,8 @@ def at_merge(snapshot, head, merged, gap, *, by_app=False):
             else "status_after_merge" if merged and utc(status["updated_at"],
                 "Outcomes status updated_at") > merged else None)
         if reason:
-            gap(reason, status)
+            if valid:
+                gap(reason, status)
         elif valid:
             statuses.append(status)
     runs = without_conflicts(runs, "name", "started_at", "conflicting_check_evidence", gap, by_app)

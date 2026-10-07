@@ -14,7 +14,8 @@
     "success": 3,
     "failed": 2,
     "in_progress": 0,
-    "immature": 1
+    "immature": 1,
+    "unverified": 0
   },
   "checks_basis_counts": {
     "historical": 5,

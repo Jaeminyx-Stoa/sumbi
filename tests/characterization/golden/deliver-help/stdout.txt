@@ -3,8 +3,9 @@ usage: sumbi deliver [-h] --since SINCE --until UNTIL [--home HOME]
                      [--match-origin MATCH_ORIGIN] [--match-path MATCH_PATH]
                      [--idle-minutes IDLE_MINUTES] [--json OUT]
                      [--salt-file SALT_FILE]
-                     [--outcome-source {github,local-verify}]
+                     [--outcome-source {github,local-verify,worker-github}]
                      [--ledger LEDGER] [--outcomes github|DIR]
+                     [--repo owner/name] [--repo-owner OWNER]
                      [--repository REPOSITORY] [--verify VERIFY]
                      [--scan-until SCAN_UNTIL]
                      [--active-minutes ACTIVE_MINUTES] [--cache DIR]
@@ -23,12 +24,16 @@ options:
   --json OUT
   --salt-file SALT_FILE
                         Local pseudonym key file (overrides SUMBI_SALT)
-  --outcome-source {github,local-verify}
+  --outcome-source {github,local-verify,worker-github}
                         Local verification reports verifier_never_passed with
                         exit-code counts; compare blocks before non-
                         inferiority
   --ledger LEDGER
   --outcomes github|DIR
+  --repo owner/name     Measured remote repository for worker GitHub outcomes;
+                        repeatable
+  --repo-owner OWNER    Include evidenced repositories under this owner for
+                        worker-github (repeatable)
   --repository REPOSITORY
                         Repository scope for local verification units
   --verify VERIFY       Repository-relative executed verification script

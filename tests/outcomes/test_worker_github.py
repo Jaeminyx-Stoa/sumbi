@@ -76,6 +76,20 @@ class WorkerGitHubTests(unittest.TestCase):
         self.assertFalse(any(s.is_worker for s in sessions))
         self.assertEqual(self.report([pull(1), pull(2)])["states"]["success"], 1)
 
+    def test_unverified_workers_retain_denominator_and_lifetime_spend(self):
+        from outcomes.test_github_unverified import unknown
+        for number in (1, 2, 3):
+            codex_worker(self.home, f"unit-{number}", self.repo, number)
+        report = self.report([pull(1), unknown(pull(2), "checks_missing_required"),
+            unknown(pull(3), "checks_none")])
+        self.assertEqual(report["states"]["unverified"], 2)
+        self.assertEqual(report["success_rate"]["numerator"], 1)
+        self.assertEqual(report["success_rate"]["denominator"], 3)
+        self.assertEqual(report["cost"]["per_success"]["total"]["numerator"], 300)
+        self.assertEqual(report["state_reasons"]["unverified"], {
+            "checks_missing_required": 1, "checks_none": 1})
+        self.assertIn("unverified: checks_none 1", text_summary(report))
+
     def test_sibling_worktree_with_same_origin_is_in_scope(self):
         subprocess.run(["git", "-C", str(self.repo), "-c", "user.name=Synthetic",
             "-c", "user.email=synthetic@example.test", "commit", "--allow-empty", "-qm",
@@ -138,8 +152,9 @@ class WorkerGitHubTests(unittest.TestCase):
         snapshot["captured_at"] = snapshot["statuses"][0]["updated_at"] = "2030-01-30T02:00:00Z"
         report = self.report([pull(1), pull(2, merged=False), immature,
             pull(4, merged=False, state="open")])
-        self.assertEqual(report["states"], dict.fromkeys(
-            ("success", "failed", "immature", "in_progress", "no_pr", "no_change"), 1))
+        self.assertEqual(report["states"], {**dict.fromkeys(
+            ("success", "failed", "immature", "in_progress", "no_pr", "no_change"), 1),
+            "unverified": 0})
         self.assertEqual(report["success_rate"]["denominator"], 5)
         self.assertEqual(report["cost"]["per_success"]["total"]["numerator"], 500)
 
@@ -835,9 +850,10 @@ class WorkerGitHubTests(unittest.TestCase):
         for p in pulls:
             p["checks_at_merge"]["statuses"] = []
         report = self.report(pulls)
-        self.assertEqual(report["state_reasons"]["in_progress"], {"checks_missing_required": 2})
+        self.assertEqual(report["state_reasons"]["unverified"], {"checks_missing_required": 2})
+        self.assertEqual(report["state_reasons"]["in_progress"], {})
         self.assertEqual(report["state_reasons"]["no_change"], {"no_known_edit": 1})
-        self.assertIn("in_progress: checks_missing_required 2", text_summary(report))
+        self.assertIn("unverified: checks_missing_required 2", text_summary(report))
         self.assertIn("no_change: no_known_edit 1", text_summary(report))
 
 

@@ -42,6 +42,23 @@ class EvidenceTests(unittest.TestCase):
                 self.assertEqual(outcomes.pull("example/sample#1").checks, "unknown")
                 self.assertEqual(sum(outcomes.evidence_gaps.values()), 1)
 
+    def test_invalid_snapshot_counts_only_snapshot_gaps_for_checks_and_statuses(self):
+        for invalid in ("head_sha", "captured_at"):
+            entry = self.check_entry()
+            snapshot = entry["checks_at_merge"]
+            snapshot["statuses"] = deepcopy(pull(1)["checks_at_merge"]["statuses"])
+            snapshot["check_runs"][0]["head_sha"] = "d" * 40
+            snapshot["statuses"][0]["sha"] = "d" * 40
+            if invalid == "head_sha":
+                snapshot[invalid] = "e" * 40
+            else:
+                snapshot[invalid] = at(1, 101).isoformat()
+            with self.subTest(invalid=invalid):
+                outcomes = self.outcomes([entry])
+                self.assertEqual(outcomes.pull("example/sample#1").checks, "unknown")
+                self.assertEqual(outcomes.evidence_gaps, {
+                    "snapshot_not_on_head" if invalid == "head_sha" else "snapshot_not_at_merge": 1})
+
     def test_remaining_evidence_determines_required_verdict(self):
         for state, expected in (("success", "green"), ("failure", "red")):
             entry = self.check_entry()

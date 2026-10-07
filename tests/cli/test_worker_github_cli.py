@@ -39,6 +39,15 @@ class WorkerCliTests(unittest.TestCase):
         return base + (["--since", "2030-01-01T00:00:00Z", "--until", "2030-01-15T00:00:00Z"]
             if command == "deliver" else ["--registration", str(self.registration), "--resamples", "100"])
 
+    def test_owner_scope_is_visible_in_help(self):
+        for command in ("deliver", "compare"):
+            with self.subTest(command=command):
+                status, output, errors = self.invoke([command, "--help"])
+                self.assertEqual(status, 0)
+                self.assertEqual(errors, "")
+                self.assertIn("--repo-owner OWNER", output)
+                self.assertIn("evidenced repositories", output)
+
     def test_deliver_and_compare_stdout_json_and_repeatable_repository(self):
         for command in ("deliver", "compare"):
             status, output, errors = self.invoke(self.args(command) + ["--repo", REPO.upper()])
@@ -71,7 +80,7 @@ class WorkerCliTests(unittest.TestCase):
                 self.assertEqual(report["verdict"]["proposal"], "adopt")
                 self.assertEqual(report["arms"]["before"]["state_reasons"],
                     {"success": {"accepted": 12}, "failed": {}, "immature": {},
-                        "in_progress": {}, "no_pr": {}, "no_change": {}})
+                        "in_progress": {}, "unverified": {}, "no_pr": {}, "no_change": {}})
                 self.assertIn("before candidate success: accepted 12", errors)
             else:
                 self.assertIn("state_reasons", report)

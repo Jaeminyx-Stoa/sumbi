@@ -469,7 +469,10 @@ PR entries may also carry `observed_checks_at_merge` (`green`, `red`, or
 Live recordings additionally retain `current_policy_evidence`, an object with
 exactly `required` and `results`. `required` is null for unreadable policy or an
 array of `{ "context": "test", "app_id": null }` requirements (empty for
-`all_visible`). `results` is null when no pre-merge results exist, or the snapshot
+`all_visible`). `results: null` means uncaptured results, or legacy no-evidence
+from the 0.1.0 adapter. These cases cannot be distinguished, so such merged PRs
+stay `in_progress`; re-record with the current adapter to classify them. Current
+recordings write an array even when it is empty. `results` can also be the snapshot
 shape below with `required: []`, a head or merge SHA, and check-run
 `app.id` fields. This evidence is evaluated on replay and never promoted to
 `historical`. `results` may also be an ordered array of snapshots, retaining both
@@ -516,6 +519,9 @@ evidence left, `checks_missing_required` prevents success. Counts are deduplicat
 PR and item, including repeated live access and recorded replay. Counter keys
 are fixed labels; check names, repository names, command output and response
 prose remain local-only.
+When the snapshot itself is off-head or not at merge, both check and status items
+are discarded without additional item-gap counts. Structural validation still
+runs for every item; snapshot-gap counts remain visible.
 
 Live pagination and result-count gaps use `pulls_capture_incomplete`,
 `pagination_incomplete`, `checks_capture_incomplete`, and `checks_unreadable`.
@@ -523,9 +529,19 @@ An unreadable check/status endpoint affects only its PR's evidence. Partial poli
 captures remain unknown. Incomplete checks cannot qualify as at-merge evidence; incomplete
 PR/commit captures prevent success under the existing coverage rules. Live and
 recorded adapters share the same structural and semantic evidence validator.
+`checks_unreadable`, `checks_capture_incomplete` and check/status
+`pagination_incomplete` appear as evidence-gap counters. Their missing result
+capture can surface as `checks_missing_required` or `checks_none`, but the unit
+remains `in_progress`, including on recorded replay. Unreadable or incomplete
+policy surfaces as `in_progress` with `checks_policy_unreadable` and
+`policy_incomplete`. Incomplete PR/commit pagination instead leaves merged work
+`immature` and blocks comparison coverage. These capture/access gaps never
+qualify a merge for terminal `unverified` judgment.
 Authentication, unsafe destinations, malformed or oversized responses, and
 invalid configuration still fail fast. Rate-limit and transient request failures
-retain their existing retry/fail behavior. Owner-discovered non-rate-limit 403/404
+retain their existing retry/fail behavior; abort errors explain that cached
+responses make a rerun cheap while the five-minute cache is fresh.
+Owner-discovered non-rate-limit 403/404
 repositories retain the counted `repository_unreadable` exclusion; explicit
 repositories still fail fast. Worker judgment catches temporal overflow and
 cyclic repairs as `judgment_conflicts`, but never swallows structural errors.
@@ -559,6 +575,21 @@ recorded-evidence signal and can have false positives; it is not semantic review
   merge check, or pending human acceptance.
 - `immature`: merged work whose observation window remains open or incomplete,
   including the window of a merged follow-up repair.
+- `unverified`: merged work with unknown checks and reason
+  `checks_missing_required` or `checks_none`, after a complete, mature follow-up
+  window with no disturbance. Missing required checks at merge and no-CI work
+  cannot later prove at-merge success. The original reason is retained.
+  This is terminal non-success: it stays in retained success denominators and
+  cost numerators, and does not block the comparison maturity gate.
+
+For an unverified merge, a detected revert, merged follow-up fix or fix commit
+makes the result `failed`; later repair does not recover verified success.
+An open or incomplete follow-up window gives `immature` until it closes.
+Across constituents, any `failed` wins, then `in_progress`, then `immature`,
+then `unverified`; only all-green, mature work can give `success`, subject to
+the ledger's human acceptance requirement. Pending repairs remain pending.
+Delivery text includes `unverified` in the state counts and prints each
+unverified deliverable with its original checks reason.
 
 A detected repair is another attempt of the original deliverable. Eventual
 success requires its own green merge and completed observation window. A revert
@@ -641,7 +672,7 @@ Period and lifetime scan lines separately display `linked`, `unallocated`,
 `unassigned` and `other` spend. Unknown spend is never spread into individual
 deliverables or cohort costs. The cohort has no invented share of unlinked spend.
 Zero successes produce null costs per success. Each rate includes numerator,
-denominator and a Wilson 95% interval; denominators include failed, immature and
+denominator and a Wilson 95% interval; denominators include failed, unverified, immature and
 ongoing rows, so immature cohorts must not be treated as final verdicts. A zero
 denominator yields a null rate and interval. M1d always reports savings verdict
 `not_evaluated`; M2 applies the completeness thresholds and comparison rules below.
@@ -844,6 +875,10 @@ costs are shown, with no per-type verdict or multiple-comparison claims.
 For eventual success, each retained arm reports successes / all retained
 deliverables and the existing Wilson 95% interval. Immature and in-progress
 deliverables remain in this descriptive denominator, but block a verdict.
+Terminal `unverified` deliverables remain non-success in the same denominator
+and retain their full observed costs in cost numerators. They do not trigger
+`immature_or_in_progress`; all other coverage, comparability, sample-size and
+statistical gates still apply.
 The after-minus-before interval is Newcombe's hybrid score **method 10**, without
 continuity correction. If the two Wilson intervals are `[La, Ua]` and `[Lb, Ub]`,
 with rates `pa` and `pb`, the difference `d = pa - pb` has limits
@@ -913,6 +948,7 @@ The catalog's `judgment_policy.decision_order` governs four stages:
    `not_preregistered` and/or `not_comparable` plus named flags.
 3. Success: immature/in-progress work, undersized arms, and inconclusive success
    propose `withhold`; inferior success proposes `reject`.
+   Mature `unverified` work does not block this gate and counts as non-success.
 4. Time and total tokens, once success is non-inferior:
    - Significant success improvement (difference lower bound > 0) with any
      worse cost proposes `owner_decides`, even if both costs worsen.
@@ -967,7 +1003,7 @@ matching is case-insensitive. Repositories are captured lazily as evidence appea
 without listing all repositories under an owner. `--repo` remains an additional
 explicit scope and permits the existing cwd-origin path. Owner scope alone does
 not admit repositories from cwd origins, weak branches or URL mentions. The owner
-option is documented here without changing existing general command help output.
+option is also visible in `deliver --help` and `compare --help`.
 
 The registration explicitly names `"outcome_source": "worker-github"` and uses
 the same M2 windows, predictions, margin, sample size, confounders and follow-up
@@ -1060,6 +1096,10 @@ with dispatch-level failure rules:
   cannot recover the original worker dispatch into success.
 - `immature`: merged work with an open or incomplete follow-up capture.
 - `in_progress`: an open PR, missing PR/check evidence or pending repair.
+- `unverified`: a merged constituent with unknown checks and original reason
+  `checks_missing_required` or `checks_none`, with complete result capture and a
+  mature, disturbance-free follow-up window. It is retained non-success and
+  does not block comparison. Capture and access gaps remain pending as above.
 - `no_pr`: known edits or strong authorship without a linked PR, including conservatively incomplete
   edit evidence. It remains non-success in retained success and cost denominators.
 - `no_change`: neither recognized edits nor strong authorship, excluded but counted.
@@ -1067,10 +1107,13 @@ with dispatch-level failure rules:
   never invoke a local edit tool. Weak cwd-branch evidence alone does not.
 
 Delivery JSON includes `state_reasons`, a reason-count mapping per state; text
-prints rows such as `in_progress: checks_missing_required 2`. Comparison arms
+prints rows such as `unverified: checks_missing_required 2`. Comparison arms
 include retained `state_reasons` and all-candidate `candidate_state_reasons`;
 their text summary prints the candidate breakdown. Reasons are fixed labels,
 and repository IDs remain pseudonymous in both scope modes.
+Worker aggregation uses the same precedence: `failed`, `in_progress`,
+`immature`, `unverified`, then `success`. Detected reverts, merged follow-up fixes
+and fix commits still fail the original dispatch, including unverified work.
 
 Comparisons use the shared M2 engine: actual apply-time exposure gaps, endpoint
 exposure, per-agent metadata observability, agent/model/effort/version mixes,
@@ -1084,9 +1127,14 @@ to this gate while staying in denominators; overlapping reasons count once.
 The reported `risky_share` includes retained `no_pr` units as well as risky
 exclusions. Exclusions whose reason is `no_change` do not contribute; exposure
 gap exclusions still do. A no-change share shift over 0.2 blocks comparison.
+`repository_unreadable` diagnostic units remain `in_progress` in candidate
+counts, but are excluded from retained arms with that reason. Their costs stay
+in excluded-worker spend and their exclusions contribute to `risky_share`.
+Retained `unverified` rows contribute to success denominators and cost
+numerators without triggering `immature_or_in_progress`.
 
 All cost estimates and proposals use retained worker sessions only, including
-failed and no-PR workers' full observed lifetime tokens. Time is dispatch to the
+failed, unverified and no-PR workers' full observed lifetime tokens. Time is dispatch to the
 worker's last observed activity, labeled `observed_worker_span`, rather than
 PR acceptance or human waiting time. Dispatcher overhead and excluded worker
 spend appear separately. An adopt proposal concerns worker costs only.

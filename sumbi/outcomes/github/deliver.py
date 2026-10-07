@@ -22,7 +22,7 @@ from sumbi.outcomes.github.recorded import Outcomes, REVERT
 from sumbi.core.privacy import current_key, pseudonym, pseudonym_key, read_salt
 from sumbi.events.registry import ADAPTERS, DEFAULT_AGENTS
 
-STATES = ("success", "failed", "in_progress", "immature")
+STATES = ("success", "failed", "in_progress", "immature", "unverified")
 CHECKS_BASES = ("historical", "current_policy", "all_visible", "unknown")
 LINKS = ("deliverable_id", "tool_reference", "project_time_weak", "ambiguous", "unallocated",
     "unassigned", "other")
@@ -65,7 +65,7 @@ def judge(deliverable: Deliverable, outcomes: Outcomes, days=7):
         return {"state": "in_progress", "first_pass_success": False, "closed_at": None,
             "reason": "missing_pr",
             "attempt_prs": sorted(set([*deliverable.prs, *[p for r in results for p in r[4]]]))}
-    state = next((s for s in ("failed", "in_progress", "immature")
+    state = next((s for s in ("failed", "in_progress", "immature", "unverified")
         if any(r[0] == s for r in results)), "success")
     if state == "success" and deliverable.human == "n":
         state, reason = "in_progress", "human_acceptance_pending"
@@ -357,9 +357,16 @@ def _assess_attempt(pr, outcomes, days, explicit_follows, superseded, attempt):
         result = attempt(follow)
         results.append(result)
         descendants.extend([follow.id, *result[4]])
-    if pr.checks != "green":
-        reason = "checks_none" if pr.checks_reason == "no_checks" else pr.checks_reason
+    reason = "checks_none" if pr.checks_reason == "no_checks" else pr.checks_reason
+    unverified = (pr.checks == "unknown" and pr.checks_capture_complete
+        and reason in ("checks_missing_required", "checks_none"))
+    if pr.checks != "green" and not unverified:
         return "in_progress", False, pr.merged_at, reason, descendants
+    # Missing historical checks cannot improve. Disturbances still disprove
+    # this merge, and a later repair cannot turn it into verified success.
+    if unverified and (reverts or fixes or any(p.merged_at for p in follows)):
+        return "failed", False, pr.merged_at, (
+            "reverted" if reverts else "follow_up_fix"), descendants
     # A merged repair following every revert can recover eventual success.
     if reverts and not any(p.merged_at and p.merged_at > max(reverts) for p in repairs):
         return "failed", False, pr.merged_at, "reverted", descendants
@@ -382,6 +389,11 @@ def _assess_attempt(pr, outcomes, days, explicit_follows, superseded, attempt):
     if any(r[0] == "immature" for r in results):
         return "immature", False, max(r[2] for r in results
             if r[2]), "follow_up_window_open", descendants
+    if unverified:
+        return "unverified", False, pr.merged_at, reason, descendants
+    if any(r[0] == "unverified" for r in results):
+        return "unverified", False, max(r[2] for r in results if r[2]), next(
+            r[3] for r in results if r[0] == "unverified"), descendants
     return "success", not (follows or reverts
         or fixes), max([pr.merged_at,
             *[r[2] for r in results if r[2]]]), "accepted", descendants

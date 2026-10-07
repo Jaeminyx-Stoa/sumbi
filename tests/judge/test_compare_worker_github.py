@@ -82,10 +82,42 @@ class WorkerCompareTests(unittest.TestCase):
                 "interval_95": None, "interval_method": "not_applicable_census"})
         self.assertEqual(report["arms"]["before"]["n"], 10)
         self.assertEqual(report["arms"]["after"]["n"], 12)
+        self.assertEqual(report["arms"]["before"]["candidate_state_reasons"]["in_progress"],
+            {"repository_unreadable": 2})
+        self.assertTrue(all(row["reason"] != "repository_unreadable"
+            for arm in report["arms"].values() for row in arm["units"]))
+        self.assertEqual(report["arms"]["before"]["success_rate"]["denominator"], 10)
+        self.assertEqual(report["arms"]["before"]["cost"]["total"]["numerator"], 1000)
+        self.assertEqual(report["excluded_worker_spend"]["observed_total"], 200)
         self.assertEqual(report["coverage"]["incomplete_reasons"], [])
         self.assertIn("before_excluded_or_unlinked", report["verdict"]["reasons"])
         self.assertEqual(report["verdict"]["proposal"], "withhold")
         self.assertNotIn(denied, json.dumps(report))
+
+    def test_unverified_rows_retain_costs_and_reach_a_verdict(self):
+        for reason in ("checks_missing_required", "checks_none"):
+            raw = json.loads(self.recording.read_text(encoding="utf-8"))
+            for entry in raw["pulls"]:
+                snapshot = entry["checks_at_merge"] or entry["current_policy_evidence"]["results"]
+                snapshot["statuses"] = [] if entry["response"]["number"] in (101, 801) else (
+                    snapshot["statuses"])
+                if reason == "checks_none":
+                    snapshot["required"] = []
+                    entry.update(checks_at_merge=None,
+                        current_policy_evidence={"required": [], "results": snapshot})
+            save(self.recording, raw)
+            with self.subTest(reason=reason):
+                report = self.compare()
+                self.assertEqual(report["verdict"]["proposal"], "adopt")
+                self.assertEqual(report["coverage"]["incomplete_reasons"], [])
+                for arm, spend in (("before", 1200), ("after", 600)):
+                    row = report["arms"][arm]
+                    self.assertEqual(row["state_reasons"]["unverified"], {reason: 1})
+                    self.assertEqual(row["success_rate"]["numerator"], 11)
+                    self.assertEqual(row["success_rate"]["denominator"], 12)
+                    self.assertEqual(row["cost"]["total"]["numerator"], spend)
+                    self.assertEqual(report["exclusions"][arm]["share"]["numerator"], 0)
+                    self.assertIn(f"{arm} candidate unverified: {reason} 1", text_summary(report))
 
     def test_weak_branch_links_are_excluded_and_block_share(self):
         def weak(rows):
