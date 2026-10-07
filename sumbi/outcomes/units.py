@@ -45,6 +45,9 @@ class Unit:
     excluded_state: str | None = None
     checks_basis: tuple[str, ...] = ()
     start_scope: str | None = None
+    # An outcome can be missing without dropping a fixed worker from costs/rates.
+    # This only contributes to the common weak/unlinked completeness gate.
+    retained_unlinked: bool = False
 
     def __getitem__(self, key):
         if key not in ("state", "tokens", "elapsed_seconds"):

@@ -152,7 +152,8 @@ def assign_arms(candidates, applied_at, gap, source, flags):
         arms[arm] = sorted(retained, key=lambda u: u.order_key)
         counts = Counter(r["reason"] for r in excluded)
         share = fraction(len(excluded), len(rows))
-        risky = fraction(sum(r["reason"] != "no_change" for r in excluded), len(rows))
+        risky = fraction(sum(r["reason"] != "no_change" for r in excluded)
+            + sum(u.retained_unlinked for u in retained), len(rows))
         exclusions[arm] = {"share": share,
             **({"risky_share": risky} if source.risky_exclusions else {}),
             "counts": dict(sorted(counts.items())
@@ -388,6 +389,11 @@ def summary_intro(report, local):
         lines.append(
             f"Excluded dispatch overhead: {report['dispatch_overhead']['sessions']} "
             f"sessions; observed tokens {report['dispatch_overhead']['observed_total']}")
+    if report.get("outcome_source") == "worker-github":
+        lines.extend(["Outcome source: worker-github",
+            "Cost proposal scope: retained worker sessions only",
+            f"Excluded dispatch overhead: {report['dispatch_overhead']['sessions']} sessions; "
+            f"observed tokens {report['dispatch_overhead']['observed_total']}"])
     return lines
 
 
@@ -427,6 +433,8 @@ def summary_footer(report, local):
                 f"{arm} {r['success_rate']['numerator']}/{r['success_rate']['denominator']}; "
                 f"Wilson 95% {text_interval(r['success_rate']['wilson_95'])}" for arm,
                 r in row["arms"].items()))
+    if report.get("outcome_source") == "worker-github":
+        return lines
     share = report["coverage"]["unattributed_lifetime_share"]
     lines.append(
         f"Unattributed lifetime tokens: {share['numerator']}/{share['denominator']}; share "

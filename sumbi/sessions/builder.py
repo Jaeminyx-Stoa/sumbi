@@ -12,6 +12,7 @@ from sumbi.core.records import Coverage
 from sumbi.core.time import Window
 from sumbi.core.values import label
 from sumbi.events import schema as e
+from sumbi.events.authorship import result_refs
 from sumbi.events.references import branch, branch_query, tool_refs
 from sumbi.events.tool_paths import tool_evidence
 from sumbi.sessions.session import Session
@@ -33,6 +34,8 @@ class _State:
     invalid: bool = False
     token_invalid: bool = False
     explicit: bool = False
+    native_start_seen: bool = False
+    worker_links: bool = False
 
 
 def own_context_at_start(history, started_at, own_start):
@@ -73,6 +76,9 @@ def _metadata(state, metadata, when, window, coverage):
 
 def _start(state, event, when, order, window, coverage, links):
     session = state.session
+    if event.provenance != "sumbi-events-v1" and not state.native_start_seen:
+        session.dispatch_kind = event.dispatch_kind
+        state.native_start_seen = True
     if event.provenance == "first-observed-cwd":
         if when is not None and (session.start_at is None or when < session.start_at):
             session.start_at = when
@@ -123,8 +129,15 @@ def _tool_evidence(state, evidence, when, order, links, *, apply=True, fallback=
         paths.extend(operands)
         if links:
             identity = _source_identity(item, evidence, fallback)
-            state.tool_names[identity] = item.name, branch_query(item.name, arguments)
-            refs.update(tool_refs(item.name, arguments))
+            if (state.worker_links and at and item.tool_call_id
+                and item.name == "CommandExecution" and isinstance(arguments, dict)):
+                session.deliverable_events.append((at, order, "execution_refs",
+                    (item.tool_call_id, result_refs(arguments.get("aggregated_output",
+                        arguments.get("output"))))))
+            own_refs = tool_refs(item.name, arguments, worker=state.worker_links)
+            operation = next((v for k, v in own_refs if k == "branch_operation"), None)
+            state.tool_names[identity] = item.name, branch_query(item.name, arguments), operation
+            refs.update(own_refs)
     if links:
         for item in evidence.outputs:
             output = e.thaw(item.output)
@@ -132,8 +145,12 @@ def _tool_evidence(state, evidence, when, order, links, *, apply=True, fallback=
                 output = "\n".join(b.get("text", "") for b in output
                     if isinstance(b, dict) and b.get("type") == "text")
             identity = _source_identity(item, evidence, fallback)
-            name, query = state.tool_names.get(identity, (None, False))
-            refs.update(tool_refs(name, output, output=True, query=query))
+            name, query, operation = state.tool_names.get(identity, (None, False, None))
+            if state.worker_links and at and item.tool_call_id:
+                session.deliverable_events.append((at, order, "execution_refs",
+                    (item.tool_call_id, result_refs(output))))
+            refs.update(tool_refs(name, output, output=True, query=query,
+                worker=state.worker_links, operation=operation))
     if apply and evidence.apply:
         session.tool_paths(at, order, cwd or (evidence.cwd if paths else None), paths)
         if links and at and (refs or evidence.include_empty_refs):
@@ -199,7 +216,8 @@ def paired_execution(state, event, identity, when, fallback):
             started_for_cwd = started
     if state.explicit and command in (None, "", []):
         session.local_evidence_gaps["command_content_unknown"] += 1
-    session.execution(identity, when, command, code, started_at=started, cwd=cwd)
+    error = None if event.deferred or launch and launch.deferred else event.error
+    session.execution(identity, when, command, code, started_at=started, cwd=cwd, error=error)
     if event.infer_cwd:
         if pending:
             state.pending_cwds[identity] = (started_for_cwd if event.pairing == "interval"
@@ -318,6 +336,7 @@ def immutable_dispatch(state, coverage):
         session.start_evidence = event.provenance
         session.emitter_agent, session.parent_raw_id = event.agent, event.parent_session_id
         session.is_worker = event.role == "worker"
+        session.dispatch_kind = "subagent" if session.is_worker else "interactive"
     elif signatures:
         coverage.unknown("conflicting_session_start")
         state.invalid = True
@@ -434,7 +453,8 @@ def _state(states, record):
 
 
 def build(records: Iterable[e.Record], window: Window, coverage: Coverage, *,
-    local_review: bool = False, collect_links: bool = False) -> list[Session]:
+    local_review: bool = False, collect_links: bool = False,
+    worker_links: bool = False) -> list[Session]:
     """Fold a translator stream; all accounting and feature decisions live here."""
     states = {}
     records = iter(records)
@@ -454,6 +474,7 @@ def build(records: Iterable[e.Record], window: Window, coverage: Coverage, *,
                     _diagnostic(None, event, coverage)
             continue
         session = state.session
+        state.worker_links = worker_links
         for metadata in record.before_dedup:
             _metadata(state, metadata, record.timestamp, window, coverage)
         if not state.explicit:
@@ -488,7 +509,8 @@ def _prepend(first, records):
     yield from records
 
 
-def collect(adapter, home, window, coverage, *, local_review=False, collect_links=False):
+def collect(adapter, home, window, coverage, *, local_review=False, collect_links=False,
+    worker_links=False):
     """Collection seam for callers that need sessions rather than observations."""
     return build(adapter.collect(home, coverage), window, coverage,
-        local_review=local_review, collect_links=collect_links)
+        local_review=local_review, collect_links=collect_links, worker_links=worker_links)

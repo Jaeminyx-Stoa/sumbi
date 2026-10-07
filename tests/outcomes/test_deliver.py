@@ -340,8 +340,11 @@ class DeliverTests(unittest.TestCase):
         for field in ("head_sha", "completed_at"):
             raw = outcome_fixture()
             raw["pulls"][0]["checks_at_merge"]["check_runs"][0][field] = "e" * 40 if field == "head_sha" else time(3)
-            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "PR head"):
-                self.outcomes(raw)
+            with self.subTest(field=field):
+                outcomes = self.outcomes(raw)
+                self.assertEqual(judge(self.d(), outcomes)["reason"], "checks_missing_required")
+                reason = "check_not_on_head" if field == "head_sha" else "check_after_merge"
+                self.assertEqual(outcomes.evidence_gaps[reason], 1)
 
     def test_incomplete_observation_prevents_success(self):
         for key in ("pulls_complete", "commits_complete", "coverage_start"):

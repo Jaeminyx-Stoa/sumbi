@@ -1,5 +1,6 @@
 """Outcome interface and strict recorded GitHub REST response fixtures."""
 
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
@@ -8,6 +9,9 @@ import re
 from typing import Protocol
 
 from sumbi.outcomes.github.ledger import REPO, utc
+from sumbi.events.references import branch
+from sumbi.outcomes.github.evidence import at_merge, verdict
+from sumbi.outcomes.github.policy import policy_checks
 
 SHA = r"[0-9a-fA-F]{40}"
 FIX = re.compile(
@@ -38,6 +42,7 @@ class PullRequest:
     observed_checks: str = "unknown"
     checks_basis: str = "unknown"
     checks_reason: str = "checks_policy_unreadable"
+    head_ref: str | None = None
 
 
 @dataclass(frozen=True)
@@ -53,12 +58,15 @@ class Outcomes(Protocol):
 
     def pull(self, identity: str) -> PullRequest | None: ...
     def observation(self, repo: str) -> Observation | None: ...
+    def branch_pulls(self, repo: str, head_ref: str) -> list[str]: ...
     def disturbances(self, pull: PullRequest, days: float) -> tuple[list[PullRequest],
         list[datetime]]: ...
 
 
 class FixtureOutcomes:
     def __init__(self, directory: Path):
+        self.evidence_gaps, self._gap_keys = Counter(), set()
+        self._evidence_identity = None
         self.pulls = {}
         self.observations = {}
         self.commits = {}
@@ -75,7 +83,7 @@ class FixtureOutcomes:
         except (OSError, UnicodeError, json.JSONDecodeError, TypeError, KeyError, AttributeError):
             raise ValueError("Outcomes: malformed or unreadable repository fixture") from None
 
-    def _load(self, raw):
+    def _load(self, raw, *, defer_policy=False):
         if not isinstance(raw, dict) or set(raw) != {"repository", "coverage_start", "observed_at",
             "pulls_complete", "commits_complete", "pulls", "commits"}:
             raise ValueError("Outcomes: expected documented repository fixture fields")
@@ -93,189 +101,113 @@ class FixtureOutcomes:
             raw["commits_complete"])
         if not isinstance(raw["pulls"], list) or not isinstance(raw["commits"], list):
             raise ValueError("Outcomes: pulls and commits must be arrays")
+        seen = set()
         for entry in raw["pulls"]:
-            if (not isinstance(entry, dict) or not {"response", "checks_at_merge"} <= set(entry)
-                or set(entry) - {"response", "checks_at_merge", "observed_checks_at_merge",
-                    "current_policy_evidence"}):
-                raise ValueError("Outcomes: each pull needs response and checks_at_merge")
-            pr = entry["response"]
-            number = pr["number"]
-            if type(number) is not int or number <= 0 or pr["state"] not in ("open",
-                "closed") or type(pr["merged"]) is not bool:
-                raise ValueError("Outcomes: invalid PR number, state or merged flag")
-            identity = repo + "#" + str(number)
-            if identity in self.pulls:
-                raise ValueError("Outcomes: duplicate PR")
-            created = utc(pr["created_at"], "Outcomes PR created_at")
-            closed = utc(pr["closed_at"],
-                "Outcomes PR closed_at") if pr["closed_at"] is not None else None
-            merged = utc(pr["merged_at"],
-                "Outcomes PR merged_at") if pr["merged_at"] is not None else None
-            head, merge = pr["head"]["sha"], pr["merge_commit_sha"]
-            if (not isinstance(head, str) or not re.fullmatch(SHA, head)
-                or (merge is not None
-                    and (not isinstance(merge, str) or not re.fullmatch(SHA, merge)))
-                or bool(merged) != pr["merged"]
-                or (merged and (not merge or pr["state"] != "closed"))
-                or (pr["state"] == "closed") != bool(closed)
-                or created >= end
-                or any(t and (t < created or t >= end) for t in (closed, merged))
-                or (merged and closed < merged)):
-                raise ValueError("Outcomes: inconsistent PR timestamps or SHA evidence")
-            if not isinstance(pr["title"], str) or (pr["body"] is not None
-                and not isinstance(pr["body"], str)):
-                raise ValueError("Outcomes: PR title/body must be strings or null body")
-            checks = self._checks(entry["checks_at_merge"], head, merged)
-            basis = "historical" if entry["checks_at_merge"] is not None else "unknown"
-            reason = ("" if checks == "green" else "checks_red" if checks == "red"
-                else "checks_missing_required")
-            if basis == "unknown":
-                checks, basis, reason = self._policy_checks(
-                    entry.get("current_policy_evidence"), merged, (head, merge))
-            observed = entry.get("observed_checks_at_merge", "unknown")
-            if observed not in ("unknown", "green", "red"):
-                raise ValueError("Outcomes: invalid observed check label")
-            self.pulls[identity] = PullRequest(identity, pr["state"], created, closed, merged,
-                head.lower(), merge.lower() if merge else None,
-                checks, pr["title"], pr["body"] or "", observed,
-                basis, reason)
-        commits = []
-        for commit in raw["commits"]:
+            self._load_pull(entry, repo, end, seen, defer_policy)
+        self._load_commits(repo, raw["commits"], start, end)
+
+    def _load_pull(self, entry, repo, end, seen, defer_policy):
+        if (not isinstance(entry, dict) or not {"response", "checks_at_merge"} <= set(entry)
+            or set(entry) - {"response", "checks_at_merge", "observed_checks_at_merge",
+                "current_policy_evidence"}):
+            raise ValueError("Outcomes: each pull needs response and checks_at_merge")
+        pr = entry["response"]
+        number = pr["number"]
+        if type(number) is not int or number <= 0 or pr["state"] not in ("open",
+            "closed") or type(pr["merged"]) is not bool:
+            raise ValueError("Outcomes: invalid PR number, state or merged flag")
+        identity = repo + "#" + str(number)
+        if identity in seen:
+            raise ValueError("Outcomes: duplicate PR")
+        seen.add(identity)
+        created = utc(pr["created_at"], "Outcomes PR created_at")
+        closed = utc(pr["closed_at"],
+            "Outcomes PR closed_at") if pr["closed_at"] is not None else None
+        merged = utc(pr["merged_at"],
+            "Outcomes PR merged_at") if pr["merged_at"] is not None else None
+        head, merge = pr["head"]["sha"], pr["merge_commit_sha"]
+        head_ref = pr["head"].get("ref")
+        if head_ref is not None and not isinstance(head_ref, str):
+            raise ValueError("Outcomes: invalid PR head ref")
+        if head_ref is not None and branch(head_ref) is None:
+            self._evidence_identity = identity
+            self._gap("head_ref_unsupported", head_ref)
+            head_ref = None
+        if (not isinstance(head, str) or not re.fullmatch(SHA, head)
+            or merge is not None and (not isinstance(merge, str) or not re.fullmatch(SHA, merge))):
+            raise ValueError("Outcomes: invalid PR SHA")
+        temporal_gap = (bool(merged) != pr["merged"]
+            or merged and (not merge or pr["state"] != "closed")
+            or (pr["state"] == "closed") != bool(closed)
+            or created >= end or any(t and (t < created or t >= end) for t in (closed, merged))
+            or merged and (not closed or closed < merged))
+        if not isinstance(pr["title"], str) or (pr["body"] is not None
+            and not isinstance(pr["body"], str)):
+            raise ValueError("Outcomes: PR title/body must be strings or null body")
+        self._evidence_identity = identity
+        checks = self._checks(entry["checks_at_merge"], head, merged, self._gap)
+        basis = "historical" if entry["checks_at_merge"] is not None else "unknown"
+        reason = ("" if checks == "green" else "checks_red" if checks == "red"
+            else "checks_missing_required")
+        if basis == "unknown":
+            checks, basis, reason = self._policy_checks(
+                entry.get("current_policy_evidence"), merged, (head, merge),
+                (lambda reason, item: None) if defer_policy else self._gap)
+        elif "current_policy_evidence" in entry:
+            self._policy_checks(entry["current_policy_evidence"], merged, (head, merge), self._gap)
+        observed = entry.get("observed_checks_at_merge", "unknown")
+        if observed not in ("unknown", "green", "red"):
+            raise ValueError("Outcomes: invalid observed check label")
+        if temporal_gap:
+            self._gap("pr_evidence_inconsistent", pr)
+            o = self.observations[repo]
+            self.observations[repo] = Observation(o.start, o.until, False, o.commits_complete)
+            return
+        self.pulls[identity] = PullRequest(identity, pr["state"], created, closed, merged,
+            head.lower(), merge.lower() if merge else None,
+            checks, pr["title"], pr["body"] or "", observed,
+            basis, reason, head_ref)
+
+    def branch_pulls(self, repo, head_ref):
+        """Enumerate exact heads without exposing branch text in public reports."""
+        return sorted(p.id for p in self.pulls.values()
+            if p.id.rsplit("#", 1)[0] == repo and p.head_ref == head_ref)
+
+    def _load_commits(self, repo, rows, start, end):
+        commits, seen = [], set()
+        self._evidence_identity = repo
+        for commit in rows:
             if not re.fullmatch(SHA,
                 commit["sha"]) or not isinstance(commit["commit"]["message"], str):
                 raise ValueError("Outcomes: invalid commit evidence")
+            if commit["sha"].lower() in seen:
+                raise ValueError("Outcomes: duplicate commit ID")
+            seen.add(commit["sha"].lower())
             when = utc(commit["commit"]["committer"]["date"], "Outcomes commit date")
             if not start <= when < end:
-                raise ValueError("Outcomes: commit outside declared coverage")
+                self._gap("commit_outside_coverage", commit)
+                continue
             commits.append((when, commit["commit"]["message"]))
         self.commits[repo] = commits
 
+    def _gap(self, reason, item):
+        key = self._evidence_identity, reason, json.dumps(item, sort_keys=True)
+        if key not in self._gap_keys:
+            self._gap_keys.add(key)
+            self.evidence_gaps[reason] += 1
+
     @staticmethod
-    def _checks(snapshot, head, merged):
+    def _checks(snapshot, head, merged, gap=lambda reason, item: None):
         if snapshot is None:
             return "unknown"
-        if not merged or not isinstance(snapshot, dict) or set(snapshot) != {"head_sha",
-            "captured_at", "required", "check_runs", "statuses"}:
-            raise ValueError("Outcomes: invalid checks_at_merge snapshot")
-        if snapshot["head_sha"] != head or utc(snapshot["captured_at"],
-            "Outcomes checks captured_at") != merged:
-            raise ValueError("Outcomes: checks snapshot must identify merge time and PR head")
-        required = snapshot["required"]
-        if not isinstance(required, list) or any(not isinstance(n, str) or not n
-            for n in required) or len(set(required)) != len(required):
-            raise ValueError("Outcomes: required checks must be an explicit unique name list")
-        if not isinstance(snapshot["check_runs"], list) or not isinstance(snapshot["statuses"],
-            list):
-            raise ValueError("Outcomes: check_runs and statuses must be arrays")
-        latest = {}
-        for check in snapshot["check_runs"]:
-            name = check["name"]
-            if (not isinstance(name, str) or not name
-                or check["status"] not in ("queued", "in_progress", "completed")
-                or (check["status"] == "completed") != bool(check["completed_at"])
-                or check["conclusion"] not in (None, "success", "failure", "neutral",
-                    "cancelled", "skipped", "timed_out", "action_required", "stale",
-                    "startup_failure")):
-                raise ValueError("Outcomes: invalid check-run state")
-            start = utc(check["started_at"], "Outcomes check started_at")
-            end = utc(check["completed_at"],
-                "Outcomes check completed_at") if check["completed_at"] else None
-            if check["head_sha"] != head or start > merged or (end
-                and (end < start or end > merged)):
-                raise ValueError("Outcomes: check evidence is not at merge on the PR head")
-            status = ("green" if check["status"] == "completed" and end
-                and check["conclusion"] in ("success", "neutral", "skipped") else "red")
-            if name in latest and latest[name][0] == start and latest[name][1] != status:
-                raise ValueError("Outcomes: conflicting check evidence")
-            if name not in latest or start >= latest[name][0]:
-                latest[name] = start, status
-        latest_statuses = {}
-        for status in snapshot["statuses"]:
-            when = utc(status["updated_at"], "Outcomes status updated_at")
-            if when > merged or status["sha"] != head:
-                raise ValueError("Outcomes: status evidence is not at merge on the PR head")
-            name = status["context"]
-            if not isinstance(name, str) or not name or status["state"] not in ("success",
-                "pending", "failure", "error"):
-                raise ValueError("Outcomes: invalid commit status")
-            value = "green" if status["state"] == "success" else "red"
-            if (name in latest_statuses and latest_statuses[name][0] == when
-                and latest_statuses[name][1] != value):
-                raise ValueError("Outcomes: conflicting commit statuses")
-            if name not in latest_statuses or when >= latest_statuses[name][0]:
-                latest_statuses[name] = when, value
-        for name, (when, value) in latest_statuses.items():
-            if name in latest:
-                value = "green" if value == latest[name][1] == "green" else "red"
-            latest[name] = when, value
-        if any(n not in latest for n in required):
-            return "unknown"
-        return "green" if all(latest[n][1] == "green" for n in required) else "red"
+        clean, valid = at_merge(snapshot, head, merged, gap)
+        if snapshot["required"] is None:
+            gap("policy_incomplete", snapshot)
+        return verdict(clean) if valid else "unknown"
 
-    @classmethod
-    def _policy_checks(cls, evidence, merged, shas):
-        """Judge current requirements separately from authoritative snapshots.
-
-        Names match exactly. Latest attempts are independent per name and app;
-        a status sharing an unpinned name must also pass.
-        """
-        if evidence is None:
-            return "unknown", "unknown", "checks_policy_unreadable" if merged else "not_merged"
-        if not merged or not isinstance(evidence, dict) or set(evidence) != {"required", "results"}:
-            raise ValueError("Outcomes: invalid policy check evidence")
-        required, snapshot = evidence["required"], evidence["results"]
-        if required is not None and (not isinstance(required, list) or any(
-            not isinstance(r, dict) or set(r) != {"context", "app_id"}
-            or not isinstance(r["context"], str) or not r["context"]
-            or (r["app_id"] is not None and (type(r["app_id"]) is not int or r["app_id"] <= 0))
-            for r in required)):
-            raise ValueError("Outcomes: invalid policy requirements")
-        values = {}
-        if snapshot is not None:
-            if not isinstance(snapshot, dict) or snapshot.get("head_sha") not in shas:
-                raise ValueError("Outcomes: policy results must identify the head or merge SHA")
-            sha = snapshot["head_sha"]
-            # Validate the same timing and state contract as historical evidence.
-            if not isinstance(snapshot.get("check_runs"),
-                list) or not isinstance(snapshot.get("statuses"), list):
-                raise ValueError("Outcomes: policy results need arrays")
-            cls._checks({**snapshot, "check_runs": [], "statuses": []}, sha, merged)
-            if snapshot["required"]:
-                raise ValueError("Outcomes: policy results cannot declare historical requirements")
-            groups = {}
-            for run in snapshot["check_runs"]:
-                app_id = run.get("app", {}).get("id")
-                if app_id is not None and (type(app_id) is not int or app_id <= 0):
-                    raise ValueError("Outcomes: invalid check app ID")
-                groups.setdefault((run["name"], app_id), []).append(run)
-            for (name, app_id), runs in groups.items():
-                values[(name, app_id, "check")] = cls._checks(
-                    {**snapshot, "required": [name], "check_runs": runs, "statuses": []}, sha,
-                    merged)
-            for name in {s["context"] for s in snapshot["statuses"]}:
-                values[(name, None, "status")] = cls._checks(
-                    {**snapshot, "required": [name], "check_runs": [],
-                        "statuses": [s for s in snapshot["statuses"] if s["context"] == name]},
-                    sha, merged)
-        if required is None:
-            return "unknown", "unknown", "checks_policy_unreadable"
-        basis = "current_policy" if required else "all_visible"
-        if not required:
-            verdicts = list(values.values())
-            if not verdicts:
-                return "unknown", basis, "no_checks"
-        else:
-            verdicts = []
-            for requirement in required:
-                name, app_id = requirement["context"], requirement["app_id"]
-                matches = [value for (n, app, kind), value in values.items() if n == name
-                    and (app_id is None or (kind == "check" and app == app_id))]
-                verdicts.append("red" if "red" in matches else "green" if matches else "unknown")
-        if "red" in verdicts:
-            return "red", basis, "checks_red"
-        if "unknown" in verdicts:
-            return "unknown", basis, "checks_missing_required"
-        return "green", basis, ""
+    @staticmethod
+    def _policy_checks(evidence, merged, shas, gap=lambda reason, item: None):
+        return policy_checks(evidence, merged, shas, gap)
 
     def pull(self, identity):
         return self.pulls.get(identity)

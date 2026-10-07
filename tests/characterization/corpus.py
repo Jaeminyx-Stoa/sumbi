@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from sumbi.cli import main
 from support import IsolatedTemporaryDirectory
+from worker_github_fixtures import build_round
 from .normalizers import Normalizer
 
 DIRECTORY = Path(__file__).resolve().parent
@@ -119,6 +120,12 @@ def prepare(root, case):
             "utc_time": "2030-01-02T01:00:01Z"}) + "\n")
     elif setup == "register-existing":
         save(root / "published-registration.json", '{"existing": "synthetic sentinel"}\n')
+    elif setup.startswith("worker-github"):
+        build_round(root)
+        if setup == "worker-github-withhold":
+            data = json.loads(registration.read_text(encoding="utf-8"))
+            data["sample_size_per_arm"] = 13
+            save(registration, json.dumps(data, indent=2) + "\n")
     return {"home": str(home), "repository": str(repo), "fixture": str(fixture),
             "registration": str(registration)}
 

@@ -433,7 +433,10 @@ synthetic data. Cache/record flags require `--outcomes github`.
 `Outcomes` is the adapter interface (`pull`, `observation`, `disturbances`), separate
 from judgment. `FixtureOutcomes` reads every top-level `*.json` in its directory.
 Each file covers one unique repository and uses this wrapper around GitHub REST
-response objects. Unknown wrapper fields and inconsistent evidence are rejected.
+response objects. Structural validation rejects malformed JSON, missing documented
+fields, wrong types, invalid labels or identifier formats, and duplicate IDs.
+Evidence semantics are evaluated separately and never raise: unusable evidence
+is discarded with counted reasons in worker GitHub `coverage.evidence_gaps`.
 No fixture filename or response prose is emitted.
 
 ```json
@@ -452,18 +455,28 @@ The empty `response` above is a shape placeholder. A PR response needs `number`,
 `state` (`open`/`closed`), `created_at`, nullable `closed_at`, boolean `merged`,
 nullable `merged_at`, `head.sha`, nullable `merge_commit_sha`, `title` and nullable
 `body`. SHAs are full 40-character hex IDs. Merged PRs must be closed, and timestamp
-order must be consistent. Recorded changes precede the exclusive `observed_at`.
+order must be consistent to qualify as evidence. Inconsistent PRs are excluded
+with `pr_evidence_inconsistent`, and the repository's PR capture becomes incomplete.
+Recorded changes precede the exclusive `observed_at` to qualify as evidence.
+String head refs outside the bounded link recognizer are omitted with
+`head_ref_unsupported`; a wrong-type ref remains a structural error.
 Each commit response needs `sha`, `commit.message`, and `commit.committer.date`,
-within `[coverage_start, observed_at)`.
+within `[coverage_start, observed_at)`. Out-of-window commits are excluded with
+`commit_outside_coverage`. Observation bounds themselves must define a nonempty
+interval; invalid interval declarations remain structural errors.
 PR entries may also carry `observed_checks_at_merge` (`green`, `red`, or
 `unknown`); it is diagnostic and never substitutes for `checks_at_merge`.
 Live recordings additionally retain `current_policy_evidence`, an object with
 exactly `required` and `results`. `required` is null for unreadable policy or an
 array of `{ "context": "test", "app_id": null }` requirements (empty for
 `all_visible`). `results` is null when no pre-merge results exist, or the snapshot
-shape below with `required: []`, the selected head or merge SHA, and check-run
+shape below with `required: []`, a head or merge SHA, and check-run
 `app.id` fields. This evidence is evaluated on replay and never promoted to
-`historical`. Raw policy cache/record pages retain only the enforcement, context
+`historical`. `results` may also be an ordered array of snapshots, retaining both
+merge-SHA and head-SHA query results. The first usable source supplies the verdict;
+a pre-merge attempt that completed late blocks substitution by another SHA.
+All candidates receive structural validation and semantic diagnostics, including
+those not selected. Raw policy cache/record pages retain only the enforcement, context
 and app fields used by the adapter, plus rule types to preserve pagination.
 Denied-policy responses retain a normalized null; the plan exception retains an
 empty rule array. Response error prose is discarded.
@@ -473,16 +486,49 @@ or an object with exactly `head_sha`, `captured_at`, `required`, `check_runs` an
 `statuses`. `captured_at` equals `merged_at` and `head_sha` equals the PR head.
 `required` is the unique list of historically required check names/contexts. An
 explicit empty list means no checks were required; null does not mean that.
-Check-run REST objects need `name`, `head_sha`, `started_at`, nullable
+Check-run REST objects need `name`, `head_sha`, nullable `started_at`, nullable
 `completed_at`, `status`, and nullable `conclusion`. Commit status objects need
-`context`, `sha`, `updated_at`, and `state`. All evidence must be for this head
-and at or before merge. The latest check attempt by start time and latest commit
-status by update time win; conflicting ties fail validation. If both check and
-status use the same required name, both must pass. Completed `success`, `neutral`
+`context`, `sha`, `updated_at`, and `state`.
+Optional numeric REST `id` fields must be positive and unique within each result
+array when present. They are retained for structural duplicate detection.
+All evidence must be for this head and at or before merge. The latest check
+attempt by start time and latest commit status by update time win; conflicting
+ties discard the affected name/app's evidence at that time and earlier, so an
+older green result cannot hide a conflict. Newer reliable evidence still qualifies.
+If both check and status use the same required name, both must pass.
+Completed `success`, `neutral`
 and `skipped` checks qualify; commit statuses require `success`. Missing required
 results are unknown, never green. Present-day checks cannot stand in for checks
 at merge. Current policy supplies a separately labeled weaker basis, never an
 authoritative historical list.
+
+Checks after merge or on another SHA are excluded with `check_after_merge` or
+`check_not_on_head`; incomplete or contradictory check state/timing uses
+`check_incomplete`. Statuses use `status_after_merge`, `status_not_on_head`, and
+`conflicting_status_evidence`; check conflicts use `conflicting_check_evidence`.
+Snapshot identity/time mismatches use `snapshot_not_on_head` and
+`snapshot_not_at_merge`. Null or partial policy uses `policy_incomplete`; policy
+for an unmerged PR uses `policy_not_at_merge`. Missing documented fixture fields
+remain structural errors, even inside evidence that would be excluded.
+Unknown historical requirements are not an empty requirement list. The remaining
+evidence follows the existing verdict rules; when a required result has no usable
+evidence left, `checks_missing_required` prevents success. Counts are deduplicated per
+PR and item, including repeated live access and recorded replay. Counter keys
+are fixed labels; check names, repository names, command output and response
+prose remain local-only.
+
+Live pagination and result-count gaps use `pulls_capture_incomplete`,
+`pagination_incomplete`, `checks_capture_incomplete`, and `checks_unreadable`.
+An unreadable check/status endpoint affects only its PR's evidence. Partial policy
+captures remain unknown. Incomplete checks cannot qualify as at-merge evidence; incomplete
+PR/commit captures prevent success under the existing coverage rules. Live and
+recorded adapters share the same structural and semantic evidence validator.
+Authentication, unsafe destinations, malformed or oversized responses, and
+invalid configuration still fail fast. Rate-limit and transient request failures
+retain their existing retry/fail behavior. Owner-discovered non-rate-limit 403/404
+repositories retain the counted `repository_unreadable` exclusion; explicit
+repositories still fail fast. Worker judgment catches temporal overflow and
+cyclic repairs as `judgment_conflicts`, but never swallows structural errors.
 
 The completeness flags attest that all PRs and commits in the declared interval
 were captured (including pagination). They do not infer completeness from a
@@ -678,7 +724,7 @@ not authenticate its timestamp or prevent an owner from editing it retrospective
   ID and applied time. It does **not** provide margin, sample size, windows, or
   a full registration. Register these before application; do not treat an
   intervention record written later as independent proof of pre-registration.
-- `outcome_source` is `github` or `local-verify` and applies identically to both
+- `outcome_source` is `github`, `local-verify` or `worker-github` and applies identically to both
   arms. Legacy registrations without it mean `github`; local comparisons require
   it explicitly. The CLI rejects a source override that differs from registration.
 - Margin is strictly between 0 and 100 **absolute percentage points** of success
@@ -899,6 +945,154 @@ labels must be public-safe categories. Acceptance, notes, branches, prompts,
 commands, outcome prose, paths, host names and prediction conditions are absent.
 Use a local salt before sharing. See the authored
 [round calculations and verdict cases](../tests/fixtures/compare/ROUND.md).
+
+## Worker GitHub: fixed dispatches without a ledger
+
+`worker-github` measures dispatched worker sessions against remote PR outcomes.
+It requires no per-deliverable ledger. Scope uses repeatable `--repo owner/name`
+and/or `--repo-owner OWNER` options, independent of the dispatcher's checkout location:
+
+```sh
+sumbi deliver --outcome-source worker-github --repo example/sample \
+  --outcomes recorded-outcomes --home local-log-home \
+  --since 2030-01-01T00:00:00Z --until 2030-01-15T00:00:00Z \
+  --json out/worker-deliver.json
+sumbi compare --registration worker-registration.json --repo example/sample \
+  --outcomes recorded-outcomes --home local-log-home --json out/worker-compare.json
+```
+
+`--repo-owner example` measures every repository under that owner named by a
+fixed worker's own strong push or creation evidence. Repeat it for multiple owners;
+matching is case-insensitive. Repositories are captured lazily as evidence appears,
+without listing all repositories under an owner. `--repo` remains an additional
+explicit scope and permits the existing cwd-origin path. Owner scope alone does
+not admit repositories from cwd origins, weak branches or URL mentions. The owner
+option is documented here without changing existing general command help output.
+
+The registration explicitly names `"outcome_source": "worker-github"` and uses
+the same M2 windows, predictions, margin, sample size, confounders and follow-up
+days. A differing CLI override is rejected. Use `--outcomes github` for the
+existing read-only live adapter with optional `--cache DIR` and `--record DIR`.
+Its authentication, destination protection, checks-basis ladder, pagination,
+observation-time cache semantics and private recording rules still apply.
+`--ledger`, local verification options and project matching rules are rejected;
+`--repo` and `--repo-owner` define the remote scope. JSON and summary routing follow
+the existing delivery/comparison commands.
+
+Units are fixed from their own start metadata before live outcome collection:
+Claude subagent streams and Codex subagent headers retain the existing worker
+rule; a top-level Codex header additionally qualifies only when both
+`source == "exec"` and `originator == "codex_exec"`. The local `dispatch_kind`
+labels are `subagent`, `noninteractive_exec`, `interactive` and `unknown`.
+Later or inherited headers cannot upgrade an interactive session into a worker.
+These additional labels do not change existing collection or local-verification
+outputs. Interactive and unrecognized top-level sessions are dispatcher overhead.
+
+A unit enters remote scope when its start cwd's locally queried git origin
+matches a measured repository, or its own successful push or PR-creation result
+names one. Result evidence establishes scope even when the local cwd belongs to
+another repository. A sibling worktree or clone with the same origin is in scope;
+no physical checkout-root equivalence is required for remote PR acceptance. An unavailable
+cwd can still be scoped by a successful measured push or PR creation, including
+a push whose branch has no recorded PR yet. Plain references and command intent
+cannot establish scope. Unconfirmed repositories and missing starts are counted
+separately; missing starts block comparison.
+No parent's cwd, references, costs or outcome are inherited by a child.
+
+Links require own-session authorship from normalized command executions that
+started and completed inside the worker lifetime and exited zero, with the
+explicit non-error Claude result exception below. PR URLs that
+are read, viewed, quoted or listed in inputs, outputs or briefs cannot link work.
+Every linked PR retains its strongest own-session evidence:
+
+| Evidence label | Strength and meaning |
+| --- | --- |
+| `pr_created` | Strongest: a successful command containing `gh pr create` prints a PR URL, or a recognized API create response names the PR. |
+| `pushed_branch` | Strong: a successful command's git push result block names the remote repository and changed destination branch. |
+| `pr_created_output` | Strong: an explicitly non-error Claude result without an exit code prints a PR URL for a creation command. |
+| `pushed_branch_output` | Strong: an explicitly non-error Claude result without an exit code contains an accepted push ref line and its remote. |
+| `committed_branch` | Strong: a successful commit result naming its branch. |
+| `cwd_branch` | Weak: structured cwd/context branch or a literal current-branch query only. |
+
+Push results pair each `To <remote URL>` block with every changed ref line in
+that block. New branches, updates and forced updates can link; rejected,
+remote-rejected, deleted, tag and up-to-date lines cannot. Push intent or a zero
+exit without a changed ref result cannot link. SSH, WSL and PowerShell wrappers,
+including encoded scripts, need no shell evaluation: the readable result names
+the repository and destination branch. PR creation recognizes `gh pr create`
+anywhere in the command text, including quoted wrapper scripts, then requires
+a printed PR URL on its own output line. Nonzero exits and error results cannot
+supply authorship. Envelope-less Claude Bash results with `is_error: false`
+can supply only push and creation authorship: push blocks must include an
+accepted changed ref line, and creation still requires the command and printed
+URL. Unknown error state, deferred/background executions and interrupted results
+cannot use this exception. The exit code remains unknown; this exception never
+supplies a successful local-verification outcome or commit authorship.
+Output truncation can hide result evidence and leave
+work unlinked. Command output stays local-only and is never published.
+
+Branches match exact PR `head.ref` values in measured repositories using each
+push result's remote, or the execution cwd's origin for commit results. Successful
+pushes or commits can advance a PR created before dispatch; such links have role `continued`.
+New PRs have role `constituent`. Actions after PR closure and conflicting
+creation, repository or execution evidence are excluded and counted as coverage
+gaps. Older PR mentions are counted separately. Per-unit judgment conflicts
+also become coverage gaps; configuration errors still fail fast. The worker's
+pushed branch can match a PR opened later by the main session without borrowing
+the main session's evidence. A failed constituent cannot be dropped. If any
+link is only weak, the unit counts as unlinked for comparison and is excluded
+with that reason.
+
+Recorded fixtures may include `response.head.ref`; older fixtures without it
+still support successful PR-creation links. The live worker capture retains that field
+and uses a separate cache namespace so old cached pages cannot silently omit
+branch evidence. Private recordings preserve refs; public reports contain only
+pseudonymous branch, PR, repository and session IDs, evidence labels and counts.
+They never emit branch text, PR numbers, origins, cwd paths or tool operands.
+
+Worker states use the existing constituent checks and disturbance evidence,
+with dispatch-level failure rules:
+
+- `success`: every constituent merged green and its follow-up capture is mature
+  and complete, with no detected revert or merged fix in the window.
+- `failed`: closed unmerged work, red merge checks, a detected revert, a merged
+  follow-up fix or a fix commit inside the follow-up window. A later repair
+  cannot recover the original worker dispatch into success.
+- `immature`: merged work with an open or incomplete follow-up capture.
+- `in_progress`: an open PR, missing PR/check evidence or pending repair.
+- `no_pr`: known edits or strong authorship without a linked PR, including conservatively incomplete
+  edit evidence. It remains non-success in retained success and cost denominators.
+- `no_change`: neither recognized edits nor strong authorship, excluded but counted.
+  Strong push, creation and continued links prove changes even when remote edits
+  never invoke a local edit tool. Weak cwd-branch evidence alone does not.
+
+Delivery JSON includes `state_reasons`, a reason-count mapping per state; text
+prints rows such as `in_progress: checks_missing_required 2`. Comparison arms
+include retained `state_reasons` and all-candidate `candidate_state_reasons`;
+their text summary prints the candidate breakdown. Reasons are fixed labels,
+and repository IDs remain pseudonymous in both scope modes.
+
+Comparisons use the shared M2 engine: actual apply-time exposure gaps, endpoint
+exposure, per-agent metadata observability, agent/model/effort/version mixes,
+sample size, Wilson and Newcombe intervals, whole-worker bootstrap and the
+ordered coverage/comparability/success/cost verdict gates. Checks bases must be
+uniform across every retained merged attempt, including detected follow-ups.
+Missing PRs, incomplete repository capture, parse errors and missing required
+token evidence block coverage. The combined weak/unlinked and exposure-excluded
+share over 10% in either candidate arm blocks comparability. `no_pr` contributes
+to this gate while staying in denominators; overlapping reasons count once.
+The reported `risky_share` includes retained `no_pr` units as well as risky
+exclusions. Exclusions whose reason is `no_change` do not contribute; exposure
+gap exclusions still do. A no-change share shift over 0.2 blocks comparison.
+
+All cost estimates and proposals use retained worker sessions only, including
+failed and no-PR workers' full observed lifetime tokens. Time is dispatch to the
+worker's last observed activity, labeled `observed_worker_span`, rather than
+PR acceptance or human waiting time. Dispatcher overhead and excluded worker
+spend appear separately. An adopt proposal concerns worker costs only.
+Shell edits are invisible, missing/deleted logs are undetectable, branch reuse
+is conservative, and disturbance patterns are bounded evidence rather than
+semantic review. Sources cannot be mixed between arms.
 
 ## Local verification: fixed worker-session outcomes
 

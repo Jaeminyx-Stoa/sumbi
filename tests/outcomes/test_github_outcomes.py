@@ -78,6 +78,21 @@ class GitHubTests(unittest.TestCase):
         self.assertEqual(pr.state, "closed")
         self.assertTrue(adapter.observation(REPO).pulls_complete)
 
+    def test_worker_capture_retains_heads_and_does_not_reuse_legacy_cache(self):
+        for path, response in self.routes.items():
+            if "/pulls" in path:
+                for pr in response if isinstance(response, list) else [response]:
+                    pr["head"]["ref"] = "synthetic-worker-" + str(pr["number"])
+        legacy = self.adapter()
+        self.assertIsNone(legacy.pull(REPO + "#1").head_ref)
+        requests = len(self.calls)
+        worker = self.adapter(head_refs=True, record=self.root / "record")
+        self.assertGreater(len(self.calls), requests)
+        self.assertEqual(worker.pull(REPO + "#1").head_ref, "synthetic-worker-1")
+        self.assertEqual(worker.branch_pulls(REPO, "synthetic-worker-1"), [REPO + "#1"])
+        replay = FixtureOutcomes(self.root / "record")
+        self.assertEqual(replay.branch_pulls(REPO, "synthetic-worker-1"), [REPO + "#1"])
+
     def test_token_precedence_environment(self):
         with patch("shutil.which", side_effect=AssertionError("No CLI lookup needed")):
             self.assertEqual(github_token(), "synthetic-token-canary")
@@ -232,7 +247,9 @@ class GitHubTests(unittest.TestCase):
     def test_completion_after_merge_cannot_supply_green(self):
         path = "/repos/example/sample/commits/" + f"{101:040x}" + "/check-runs"
         self.routes[path]["check_runs"][0]["completed_at"] = time(3)
-        self.assertEqual(self.adapter().pull(REPO + "#1").observed_checks, "red")
+        adapter = self.adapter()
+        self.assertEqual(adapter.pull(REPO + "#1").observed_checks, "unknown")
+        self.assertEqual(adapter.evidence_gaps["check_after_merge"], 1)
 
     def test_checks_started_after_merge_are_ignored(self):
         path = "/repos/example/sample/commits/" + f"{101:040x}" + "/check-runs"
@@ -384,11 +401,43 @@ class GitHubTests(unittest.TestCase):
         self.assertIsNotNone(adapter.pull(REPO + "#3"))
         self.assertEqual(len(adapter.pulls), 103)
 
-    def test_incomplete_check_capture_is_rejected(self):
+    def test_incomplete_check_capture_is_counted(self):
         path = "/repos/example/sample/commits/" + f"{101:040x}" + "/check-runs"
         self.routes[path]["total_count"] = 101
-        with self.assertRaisesRegex(ValueError, "capture is incomplete"):
-            self.adapter().pull(REPO + "#1")
+        adapter = self.adapter()
+        pr = adapter.pull(REPO + "#1")
+        self.assertEqual(pr.checks, "unknown")
+        self.assertEqual(adapter.evidence_gaps["checks_capture_incomplete"], 1)
+
+    def test_unreadable_check_results_are_local_gaps(self):
+        original = self.respond
+        for code in (403, 404):
+            def response(request, **kwargs):
+                if "/check-runs" in request.full_url:
+                    raise urllib.error.HTTPError(request.full_url, code, "Synthetic denial", {},
+                        io.BytesIO(b'{"message":"Not accessible"}'))
+                return original(request, **kwargs)
+            self.open.side_effect = response
+            with self.subTest(code=code):
+                adapter, pr = self.policy_pull()
+                self.assertEqual(pr.checks, "unknown")
+                self.assertEqual(adapter.evidence_gaps["checks_unreadable"], 2)
+
+    def test_incomplete_results_do_not_poison_another_pr(self):
+        bad = "/repos/example/sample/commits/" + f"{101:040x}" + "/check-runs"
+        self.routes[bad]["total_count"] = 101
+        good = copy.deepcopy(self.routes["/repos/example/sample/pulls"][0])
+        good.update(number=4, merge_commit_sha=f"{104:040x}")
+        good["head"] = {"sha": f"{4:040x}"}
+        self.routes["/repos/example/sample/pulls"].append(good)
+        for sha in (f"{104:040x}", f"{4:040x}"):
+            prefix = "/repos/example/sample/commits/" + sha
+            self.routes[prefix + "/check-runs"] = {"total_count": 0, "check_runs": []}
+            self.routes[prefix + "/statuses"] = [{"context": "test", "updated_at": time(2),
+                "state": "success"}]
+        adapter = self.adapter((1, 4))
+        self.assertEqual(adapter.pull(REPO + "#1").checks, "unknown")
+        self.assertEqual(adapter.pull(REPO + "#4").checks, "green")
 
     def policy_case(self, contexts=(), checks=(), rules=(), enabled=True, enforcement="non_admins"):
         self.routes["/repos/example/sample/branches/main"] = {"protected": enabled, "protection": {
@@ -424,7 +473,7 @@ class GitHubTests(unittest.TestCase):
 
     def test_classic_required_red_pending_missing(self):
         for changes, expected, reason in (({"conclusion": "failure"}, "red", "checks_red"),
-                ({"completed_at": time(3)}, "red", "checks_red"),
+                ({"completed_at": time(3)}, "unknown", "checks_missing_required"),
                 ({"status": "in_progress", "completed_at": None, "conclusion": None}, "red", "checks_red"),
                 ({"name": "optional"}, "unknown", "checks_missing_required")):
             with self.subTest(changes=changes):
@@ -605,12 +654,50 @@ class GitHubTests(unittest.TestCase):
         self.assertEqual(self.policy_pull()[1].checks_basis, "current_policy")
 
     def test_malformed_policy_cannot_become_all_visible(self):
-        for changes in ({"enforcement_level": "unsupported"}, {"enforcement_level": None}, {"contexts": None}):
+        for changes in ({"enforcement_level": "unsupported"}, {"contexts": None}):
             self.policy_case(contexts=["test"])
             checks = self.routes["/repos/example/sample/branches/main"]["protection"]["required_status_checks"]
             checks.update(changes)
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 self.policy_pull()
+
+    def test_partial_policy_is_counted_and_never_all_visible(self):
+        for key in ("enforcement_level", "contexts", "checks"):
+            self.policy_case(contexts=["test"])
+            del self.routes["/repos/example/sample/branches/main"]["protection"][
+                "required_status_checks"][key]
+            with self.subTest(key=key):
+                adapter, pr = self.policy_pull()
+                self.assertEqual((pr.checks, pr.checks_basis), ("unknown", "unknown"))
+                self.assertEqual(adapter.evidence_gaps["policy_incomplete"], 1)
+
+    def test_partial_ruleset_policy_is_unknown(self):
+        self.policy_case(rules=[{"type": "required_status_checks"}])
+        adapter, pr = self.policy_pull()
+        self.assertEqual((pr.checks, pr.checks_basis), ("unknown", "unknown"))
+        self.assertEqual(adapter.evidence_gaps["policy_incomplete"], 1)
+
+    def test_semantic_gaps_survive_live_recording_and_replay(self):
+        self.policy_case(contexts=["test"])
+        prefix = "/repos/example/sample/commits/" + f"{101:040x}"
+        original = copy.deepcopy(self.routes[prefix + "/check-runs"]["check_runs"][0])
+        self.routes[prefix + "/check-runs"] = {"total_count": 4, "check_runs": [
+            {**original, "name": "late", "completed_at": time(3)},
+            {**original, "name": "wrong", "head_sha": "e" * 40},
+            original, {**original, "conclusion": "failure"}]}
+        self.routes[prefix + "/statuses"] = [{"context": "late-status", "state": "success",
+            "updated_at": time(3)}]
+        adapter = self.adapter(record=self.root / "record")
+        pr = adapter.pull(REPO + "#1")
+        self.assertEqual(pr.checks, "unknown")
+        expected = {"check_after_merge": 1, "check_not_on_head": 1,
+            "conflicting_check_evidence": 1, "status_after_merge": 1}
+        self.assertEqual(adapter.evidence_gaps, expected)
+        for _ in range(3):
+            self.assertEqual(adapter.pull(REPO + "#1"), pr)
+        replay = FixtureOutcomes(self.root / "record")
+        self.assertEqual(replay.pull(REPO + "#1"), pr)
+        self.assertEqual(replay.evidence_gaps, expected)
 
     def test_ruleset_negative_app_id_cannot_remove_pin(self):
         self.policy_case(rules=[self.rule("test", -1)])

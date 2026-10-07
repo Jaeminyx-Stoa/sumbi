@@ -23,6 +23,10 @@ change automatically.
 Local verification additionally measures fixed dispatched-worker units using
 declared script exit evidence; its weaker acceptance and worker-only cost scope
 are explicit.
+Worker GitHub outcomes additionally join dispatched subagents and non-interactive
+launcher sessions to their own PR or branch evidence, without a deliverable
+ledger. Repeated `--repo owner/name` options scope remote repositories, including
+workers in sibling worktrees; dispatcher overhead remains separately reported.
 Any coding agent or wrapper can opt into L1 session measurement and L2 local
 worker outcomes by emitting [sumbi-events JSONL v1](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/docs/EVENTS.md). This does
 not imply a proprietary native integration or instruction-loading support for

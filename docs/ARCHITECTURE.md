@@ -49,6 +49,11 @@ its public projection omits commands, edits and private review text.
 GitHub joins session costs to a dispatch ledger and outside PR evidence; local
 verification selects dispatched workers and checks declared script executions
 after their last known edit. Their acceptance and cost scopes remain distinct.
+`worker_github/` fixes workers from start provenance and links their own bounded
+PR/branch references to remote GitHub outcomes without a ledger. It accepts
+other worktrees with a measured origin and reports dispatcher costs separately.
+Its comparison entry point is `judge/compare_worker_github.py`; constituent
+judgment and live/recorded adapters remain in `outcomes/github/`.
 
 `judge/compare.py` owns one engine: dispatch arms, exposure exclusions, metadata
 mixes, statistics and ordered verdicts. A source supplies measurement, coverage
@@ -92,3 +97,8 @@ entry point, registration validation and CLI selection, then cover its gates,
 public projection and CLI artifacts. Keep shared statistical and verdict policy
 in the engine. Tests mirror the package layers; cross-layer CLI cases and the
 characterization corpus exercise their composition.
+Worker GitHub demonstrates this extension: new source-specific units, link
+strength and coverage gates reuse the existing engine's exposure, metadata,
+statistics and verdict order. Native start labels remain local session evidence,
+and head-ref capture uses an opt-in live cache namespace to preserve existing
+GitHub recordings and public command artifacts.

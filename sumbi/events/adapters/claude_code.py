@@ -67,9 +67,13 @@ def _blocks(event, kind, blocks, when):
             source = SourceIdentity(freeze(block["tool_use_id"])) if block.get(
                 "tool_use_id") else None
             # Pairing and deferred-launch status are resolved by the builder.
+            result = mapping(event.get("toolUseResult"))
+            error = block.get("is_error")
             yield CommandExecution(identity, exit_code=bash_exit_code(event, block),
                 phase="end", pairing="launch", suffix=suffix, require_pair=True,
-                source_identity=source)
+                source_identity=source, error=error if type(error) is bool else None,
+                deferred=bool(result.get("interrupted") or result.get("backgroundTaskId")
+                    or result.get("taskId")))
             yield ToolEnd(identity, block.get("is_error") is True, suffix)
 
 
@@ -77,7 +81,8 @@ def _translate(event, when, parent, child):
     kind = event.get("type")
     cwd = event.get("cwd") if isinstance(event.get("cwd"), str) else None
     yield SessionStart(cwd, parent if child else None, "worker" if child else "orchestrator",
-        "claude-code", provenance="first-observed-cwd")
+        "claude-code", provenance="first-observed-cwd",
+        dispatch_kind="subagent" if child else "interactive")
     if event.get("version"):
         yield Metadata(cli_version=freeze(event["version"]), supplied=("cli_version",))
     message = mapping(event.get("message"))

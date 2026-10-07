@@ -28,6 +28,7 @@ class CommandExecution:
     exit_code: int | None
     started_at: datetime | None = None
     cwd: str | None = None
+    error: bool | None = None
 
 
 @dataclass
@@ -55,6 +56,7 @@ class Session:
     start_at: datetime | None = None
     start_cwd: str | None = None
     start_evidence: str | None = None
+    dispatch_kind: str = "unknown"
     is_worker: bool = False
     commands: dict[str, CommandExecution] = field(default_factory=dict)
     edits: dict[str, datetime] = field(default_factory=dict)
@@ -69,10 +71,10 @@ class Session:
         return "sumbi-events:" + pseudonym("agent", self.emitter_agent
             or "unknown") if self.agent == "sumbi-events" else self.agent
 
-    def execution(self, identity, when, command, code, *, started_at=None, cwd=None):
+    def execution(self, identity, when, command, code, *, started_at=None, cwd=None, error=None):
         if when is not None:
             self.commands[str(identity)] = CommandExecution(
-                self.agent, self.raw_id, when, command, code, started_at, cwd)
+                self.agent, self.raw_id, when, command, code, started_at, cwd, error)
         else:
             self.local_evidence_gaps["command_timestamp_missing"] += 1
 

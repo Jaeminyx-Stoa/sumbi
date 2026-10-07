@@ -60,6 +60,7 @@ class SessionStart:
     provenance: Literal["first-observed-cwd", "session-header",
         "sumbi-events-v1"] = "sumbi-events-v1"
     metadata: Metadata = Metadata()
+    dispatch_kind: Literal["subagent", "noninteractive_exec", "interactive", "unknown"] = "unknown"
 
 
 @dataclass(frozen=True)
@@ -178,6 +179,7 @@ class CommandExecution:
     require_pair: bool = False
     infer_cwd: bool = False
     source_identity: SourceIdentity | None = None
+    error: bool | None = None
 
 
 @dataclass(frozen=True)

@@ -17,6 +17,7 @@ from sumbi.outcomes.github.recorded import FixtureOutcomes
 from sumbi.outcomes.github import live as github_outcomes
 from sumbi.outcomes.github.ledger import read_ledger
 from sumbi.judge.compare_github import compare, text_summary as compare_summary
+from sumbi.cli.worker_github import run as run_workers
 
 
 def run(args, root, window, agents, rules, resolved, sources, registration=None):
@@ -25,6 +26,10 @@ def run(args, root, window, agents, rules, resolved, sources, registration=None)
         else "github")
     if args.command == "compare" and registration.outcome_source != source:
         root.error("Registration and both arms must use the same outcome source")
+    if source == "worker-github":
+        return run_workers(args, root, window, agents, rules, resolved, sources, registration)
+    if args.repo is not None or args.repo_owner is not None:
+        root.error("Remote repository options require worker-github outcome source")
     if source == "local-verify":
         return _run_local(args, root, window, agents, resolved, registration)
     if args.ledger is None or args.outcomes is None:
