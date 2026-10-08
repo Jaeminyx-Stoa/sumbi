@@ -16,6 +16,7 @@ from sumbi.events.authorship import result_refs
 from sumbi.events.references import branch, branch_query, tool_refs
 from sumbi.events.tool_paths import resolve_path, tool_evidence
 from sumbi.sessions.session import Session
+from sumbi.sessions.hook_denials import reason_key
 
 
 @dataclass
@@ -133,6 +134,8 @@ def _context(state, event, when, order, window, coverage, links):
 def _tool_evidence(state, evidence, when, order, links, *, apply=True, fallback=None):
     session = state.session
     at = evidence.at if evidence.own_time else when
+    if session.agent in ("codex", "claude-code"):
+        session.hook_calls.evidence(evidence, at, order, session.agent)
     paths, cwd, refs = [], None, set()
     for item in evidence.inputs:
         arguments = e.thaw(item.arguments)
@@ -288,6 +291,9 @@ def _fold(state, event, record, order, fallback, source_fallback, window, covera
         at = event.at if event.own_time else when
         start = isinstance(event, e.ToolStart)
         if start or event.count:
+            if session.agent in ("codex", "claude-code"):
+                session.hook_calls.endpoint(identity, at, order, start=start,
+                    error=None if start else event.error)
             session.count("tool_calls" if start else "tool_results", identity, at, window)
             if not start and event.error is True:
                 session.count("tool_errors", identity, at, window)
@@ -492,9 +498,10 @@ def _state(states, record):
 
 def build(records: Iterable[e.Record], window: Window, coverage: Coverage, *,
     local_review: bool = False, collect_links: bool = False,
-    worker_links: bool = False) -> list[Session]:
+    worker_links: bool = False, reason_salt: bytes | None = None) -> list[Session]:
     """Fold a translator stream; all accounting and feature decisions live here."""
     states = {}
+    hook_key = reason_salt if reason_salt is not None else reason_key()
     records = iter(records)
     first = next(records, None)
     if first is None:
@@ -539,6 +546,7 @@ def build(records: Iterable[e.Record], window: Window, coverage: Coverage, *,
                 local_review, collect_links)
     for state in states.values():
         _finish(state, window, coverage, collect_links)
+        state.session.hook_calls.finish(state.session.agent, hook_key)
     return [state.session for state in states.values()]
 
 
@@ -548,7 +556,8 @@ def _prepend(first, records):
 
 
 def collect(adapter, home, window, coverage, *, local_review=False, collect_links=False,
-    worker_links=False):
+    worker_links=False, reason_salt=None):
     """Collection seam for callers that need sessions rather than observations."""
     return build(adapter.collect(home, coverage), window, coverage,
-        local_review=local_review, collect_links=collect_links, worker_links=worker_links)
+        local_review=local_review, collect_links=collect_links, worker_links=worker_links,
+        reason_salt=reason_salt)

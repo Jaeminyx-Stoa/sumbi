@@ -100,7 +100,8 @@ def _translate(event, when, parent, child, spawn_depth=None):
         for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use")
     outputs = tuple(ToolOutput(key(b.get("tool_use_id")), freeze(b.get("content")),
         text_blocks=True,
-        source_identity=SourceIdentity(freeze(b.get("tool_use_id"))))
+        source_identity=SourceIdentity(freeze(b.get("tool_use_id"))),
+        error=(b.get("is_error") is True) if kind == "user" else None)
         for b in blocks if isinstance(b, dict) and b.get("type") == "tool_result")
     evidence = ToolEvidence(inputs, outputs, cwd, freeze(event.get("gitBranch")))
     usage = mapping(message.get("usage"))

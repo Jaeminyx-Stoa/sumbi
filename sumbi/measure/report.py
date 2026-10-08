@@ -10,6 +10,8 @@ from sumbi import SCHEMA_VERSION
 from sumbi.events.registry import ADAPTERS, DEFAULT_AGENTS, log_roots
 from sumbi.measure.attribution import Attributor, ProjectRule, RepositoryAttributor
 from sumbi.measure.delegation import measure as delegation, text_lines as delegation_text
+from sumbi.measure.hook_denials import measure as hooks, text_lines as hooks_text
+from sumbi.sessions.hook_denials import reason_key
 from sumbi.sessions.session import COUNT_KINDS, EVIDENCE_TYPES, TOKEN_KINDS
 from sumbi.core.records import Coverage
 from sumbi.core.time import Window
@@ -67,9 +69,11 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
     found_sessions = []
     coverage = {}
     reviews = []
+    hook_key = reason_key()
     for agent in agents if agents is not None else DEFAULT_AGENTS:
         measured = Coverage()
-        found = collect_sessions(ADAPTERS[agent], home, window, measured, local_review=local_review)
+        found = collect_sessions(ADAPTERS[agent], home, window, measured,
+            local_review=local_review, reason_salt=hook_key)
         found_sessions.extend(found)
         included = [s for s in found if s.in_window(window)]
         coverage[agent] = {**measured.as_dict(), "sessions_read": len(found),
@@ -113,7 +117,9 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
             "spend_basis": "reported_tokens", "verdict": "not_evaluated"},
         "sessions": sessions,
         "delegation": delegation(found_sessions, {s["id"]: s for s in sessions}, window,
-            attributor, idle_minutes, agents=by_agent)}
+            attributor, idle_minutes, agents=by_agent),
+        "hook_denials": hooks(found_sessions, {s["id"]: s for s in sessions}, window,
+            agents=by_agent, persistent_ids=salted)}
     if repository is not None:
         scanned = sum(c["sessions_in_window"] for c in coverage.values())
         report["scope"] = {"kind": "repository", "sessions_in_window": scanned,
@@ -179,6 +185,7 @@ def text_summary(report: dict) -> str:
         + "; ".join(f"{k} {v:.6f}" for k, v in report["coverage"]["evidence_shares"].items()))
     lines.append(f"Unattributed token share: {report['coverage']['unattributed_share']:.6f}")
     lines.extend(delegation_text(report["delegation"]))
+    lines.extend(hooks_text(report["hook_denials"]))
     return "\n".join(lines)
 
 

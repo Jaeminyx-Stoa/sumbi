@@ -58,10 +58,10 @@ def _input(identity, name, arguments, *, at=None, own_time=False):
         own_time=own_time, include_empty_refs=True, fallback_identity=True)
 
 
-def _output(identity, output):
+def _output(identity, output, error=False):
     source = SourceIdentity(freeze(identity)) if identity is not None else None
     return ToolEvidence(outputs=(ToolOutput(key(identity), freeze(output),
-        source_identity=source),),
+        source_identity=source, error=error),),
         include_empty_refs=True, fallback_identity=True)
 
 
@@ -141,7 +141,7 @@ def _event(payload, event, when):
                 phase="end", pairing="launch", command_supplied="command" in payload,
                 infer_cwd=True,
                 source_identity=source)
-        yield _output(identity, payload.get("output"))
+        yield _output(identity, payload.get("output"), exit_code(payload) not in (None, 0))
         yield ToolEnd(key(identity), exit_code(payload) not in (None, 0))
     elif subtype in ("item_completed", "item_started"):
         yield from _item(payload, subtype, identity, when)
@@ -182,7 +182,7 @@ def _response(payload, event):
             "request_user_input_async"):
             yield Counter("user_input_requests", key(identity))
     elif subtype in ("function_call_output", "custom_tool_call_output"):
-        yield _output(identity, payload.get("output"))
+        yield _output(identity, payload.get("output"), exit_code(payload) not in (None, 0))
         yield ToolEnd(key(identity), exit_code(payload) not in (None, 0))
     if subtype in ("message", "agent_message"):
         yield LocalText(freeze(payload.get("content")))

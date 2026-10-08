@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.2",
+  "schema_version": "1.3",
   "pseudonyms": {
     "salted": true,
     "algorithm": "hmac-sha256"
@@ -1375,6 +1375,160 @@
           "tool_results": 0,
           "tool_failure_rate": null
         }
+      }
+    ]
+  },
+  "hook_denials": {
+    "reason_ids": {
+      "algorithm": "hmac-sha256",
+      "key": "supplied",
+      "normalization": "first-clause-v1"
+    },
+    "summary": {
+      "measurement": "observed",
+      "sessions": 4,
+      "tool_calls": 2,
+      "sessions_with_denials": 0,
+      "denials": 0,
+      "timeouts": 0,
+      "denials_per_100_tool_calls": 0.0,
+      "timeouts_per_100_tool_calls": 0.0,
+      "inner_denials_in_exec": 0,
+      "denials_by_class": {
+        "command_form": 0,
+        "path_scope": 0,
+        "size_limit": 0,
+        "tool_not_allowed": 0,
+        "wait_timeout": 0,
+        "other": 0
+      },
+      "top_reason_ids": [],
+      "first_call_denials": {
+        "sessions": 0,
+        "denied_sessions": 0,
+        "share": null
+      },
+      "recovered": 0,
+      "unrecovered": 0
+    },
+    "by_agent": {
+      "sumbi-events:agent_9e260e54ae0e8fd149c80532": {
+        "measurement": "observed",
+        "sessions": 2,
+        "tool_calls": 2,
+        "sessions_with_denials": 0,
+        "denials": 0,
+        "timeouts": 0,
+        "denials_per_100_tool_calls": 0.0,
+        "timeouts_per_100_tool_calls": 0.0,
+        "inner_denials_in_exec": 0,
+        "denials_by_class": {
+          "command_form": 0,
+          "path_scope": 0,
+          "size_limit": 0,
+          "tool_not_allowed": 0,
+          "wait_timeout": 0,
+          "other": 0
+        },
+        "top_reason_ids": [],
+        "first_call_denials": {
+          "sessions": 0,
+          "denied_sessions": 0,
+          "share": null
+        },
+        "recovered": 0,
+        "unrecovered": 0
+      },
+      "sumbi-events:agent_dafcddd422574acb5f48fb2b": {
+        "measurement": "observed",
+        "sessions": 2,
+        "tool_calls": 0,
+        "sessions_with_denials": 0,
+        "denials": 0,
+        "timeouts": 0,
+        "denials_per_100_tool_calls": null,
+        "timeouts_per_100_tool_calls": null,
+        "inner_denials_in_exec": 0,
+        "denials_by_class": {
+          "command_form": 0,
+          "path_scope": 0,
+          "size_limit": 0,
+          "tool_not_allowed": 0,
+          "wait_timeout": 0,
+          "other": 0
+        },
+        "top_reason_ids": [],
+        "first_call_denials": {
+          "sessions": 0,
+          "denied_sessions": 0,
+          "share": null
+        },
+        "recovered": 0,
+        "unrecovered": 0
+      }
+    },
+    "by_project_and_agent": [
+      {
+        "bucket": "project",
+        "project_key": "project_e3db46d1b932ef2c778ba7cc",
+        "rule": null,
+        "agent": "sumbi-events:agent_9e260e54ae0e8fd149c80532",
+        "measurement": "observed",
+        "sessions": 2,
+        "tool_calls": 2,
+        "sessions_with_denials": 0,
+        "denials": 0,
+        "timeouts": 0,
+        "denials_per_100_tool_calls": 0.0,
+        "timeouts_per_100_tool_calls": 0.0,
+        "inner_denials_in_exec": 0,
+        "denials_by_class": {
+          "command_form": 0,
+          "path_scope": 0,
+          "size_limit": 0,
+          "tool_not_allowed": 0,
+          "wait_timeout": 0,
+          "other": 0
+        },
+        "top_reason_ids": [],
+        "first_call_denials": {
+          "sessions": 0,
+          "denied_sessions": 0,
+          "share": null
+        },
+        "recovered": 0,
+        "unrecovered": 0
+      },
+      {
+        "bucket": "project",
+        "project_key": "project_e3db46d1b932ef2c778ba7cc",
+        "rule": null,
+        "agent": "sumbi-events:agent_dafcddd422574acb5f48fb2b",
+        "measurement": "observed",
+        "sessions": 2,
+        "tool_calls": 0,
+        "sessions_with_denials": 0,
+        "denials": 0,
+        "timeouts": 0,
+        "denials_per_100_tool_calls": null,
+        "timeouts_per_100_tool_calls": null,
+        "inner_denials_in_exec": 0,
+        "denials_by_class": {
+          "command_form": 0,
+          "path_scope": 0,
+          "size_limit": 0,
+          "tool_not_allowed": 0,
+          "wait_timeout": 0,
+          "other": 0
+        },
+        "top_reason_ids": [],
+        "first_call_denials": {
+          "sessions": 0,
+          "denied_sessions": 0,
+          "share": null
+        },
+        "recovered": 0,
+        "unrecovered": 0
       }
     ]
   }

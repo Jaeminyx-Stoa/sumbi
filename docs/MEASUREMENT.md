@@ -280,6 +280,108 @@ Frictions use each member child's full in-window edit and tool evidence, which
 can repeat across project rows when a child spans projects. Paths, file names,
 prompts, descriptions and custom agent names never enter delegation output.
 
+## Hook denials
+
+Collect schema **1.3** adds `hook_denials` and corresponding text lines. Existing
+counts, token accounting, delegation, durations and outcome outputs retain their
+meanings. In particular, hook recognition never adds to `tool_errors`: those
+remain whatever the native adapter marks as errors. Hook observations are local
+session measurements and require no deliverable or pull request links.
+
+Only a native tool result paired to its own call ID can establish a hook failure.
+Codex recognizes an anchored `Command blocked by PreToolUse hook:` in string
+results or leading `input_text` blocks, including custom tool outputs. Code-mode
+`exec` output lists are inspected **per `input_text` item**, independently of the
+status header and intervening inner results. Each item can establish one denial:
+an anchored command-block prefix, `Script error:\n` immediately followed by that
+prefix, or JSON text with `status: rejected` and that prefix at the start of
+`reason`. A JSON object's top-level `result` may also be such a rejected object.
+Legacy `Script error:` wrappers with optional `Error:` remain supported. Several
+denial items in one output are counted separately, including caught denials
+under a `Script completed` header and uncaught denials after several inner results.
+A whole output string starting with `Tool call blocked by PreToolUse hook:` is
+a denial for any Codex tool, including non-exec tools.
+Claude Code recognizes `PreToolUse:<ToolName> hook error:` only when the tool
+name matches the paired call. Its anchored `PreToolUse hook did not respond
+before its timeout` is counted separately as a hook timeout. These explicit
+timeouts are not denials; a denied call whose reason mentions waiting remains
+a denial in the `wait_timeout` class. Text occurring later in source code,
+configuration, listings or quoted summaries does not establish a failure. A
+completed exec's later items that quote either prefix mid-text remain uncounted;
+source text and nested JSON fields are not searched for denial phrases.
+Unpaired results, mismatched call ID types and untimed results cannot count.
+
+Each local session retains paired observations with a fixed class and a salted
+`reason_id`, never reason text in public output. Classification is an English
+**keyword heuristic**, with the first matching row winning (case insensitive):
+
+| Class | Keywords or phrases |
+| --- | --- |
+| `wait_timeout` | timeout; timed out; slot wait; did not respond |
+| `size_limit` | size limit; too large; too big; maximum size; file size |
+| `path_scope` | path scope; outside; worktree; allowed path; allowed directory |
+| `tool_not_allowed` | tool not allowed; tool is not allowed; disallowed tool; forbidden tool; unsupported tool |
+| `command_form` | accepted:; command form; command format; use the form |
+| `other` | no match |
+
+The `first-clause-v1` normalization removes single-, double- and backtick-quoted
+operands, recognizable absolute, relative, home, drive and filename path tokens,
+and numbers. It uses the first clause, delimited by a semicolon, newline or
+sentence-ending punctuation followed by whitespace, then folds case and spaces.
+An accepted command after the first clause cannot change the ID. The normalized
+clause is hashed with HMAC-SHA256; only a prefixed truncated digest is emitted.
+The existing local salt options supply a stable key so an owner can match
+recurring reasons across collections and both agents. Without a supplied salt,
+one fresh ephemeral key is shared across the collection's adapters, and IDs
+cannot be matched across collections. `reason_ids` reports that key mode,
+algorithm and normalization version; it never reports the key.
+
+The section contains `summary`, `by_agent` and `by_project_and_agent`, using the
+same bucket, rule label and pseudonymous project key as existing collect groups.
+Sessions with billable allocations enter those groups; sessions without them
+use their existing session project candidate. Each project row uses its member
+sessions' full in-window tool observations, just as delegation friction does.
+A session spanning projects can repeat in several rows; project rows are not
+additive partitions of tool calls or failures.
+
+Each group exposes its session and tool-call denominators, `sessions_with_denials`,
+`denials`, `timeouts`, both rates per 100 tool calls, `inner_denials_in_exec`,
+`denials_by_class`, and
+`top_reason_ids` (at most ten, descending count with ID ties sorted). Rates are
+null with no tool calls. **One exec counts as one tool call** in the denominator,
+even when it runs several inner tool calls. `inner_denials_in_exec` counts denial
+items inside exec output lists, is included in `denials`, and appears beside the
+rates in text output. Whole-string tool-level blocks are not inner denials.
+Multiple inner denials can make the denial rate exceed 100 even without a window
+boundary effect. `first_call_denials` contains the number and share of
+denied sessions whose first observed denial preceded every successful paired
+tool result. Its denominator is sessions with an in-window denial; the share
+is null when there are none. Pre-window observations establish that session
+history, including an earlier successful result or first denial.
+
+`recovered` counts denials followed by a successful result of the same tool from
+one of the next three tool calls **started after the denial result** in that
+session. Failed, pending and other-tool calls consume that window. A call already
+running when the denial arrives cannot recover it. Every remaining denial is
+`unrecovered`, including denials near the scan cutoff. Calls and successful
+results at or after the excluded end cannot establish recovery. Successful means
+a paired result not marked as an error and not recognized as a hook failure,
+rejected result or failed exec envelope; it does not prove the task succeeded.
+For exec, the later output must have no denial items and its header item must
+not start with `Script failed`. A completed script with caught inner denials
+cannot recover an earlier denial. One qualifying later exec can recover each
+denial item from an earlier exec within the same three-call window.
+Denials and timeouts enter the window by their result timestamps, while tool-call
+denominators retain existing start-time accounting. Boundary rates may therefore
+exceed 100, or be null when a result arrives without an in-window start.
+
+Other hook events are invisible. Missing or truncated logs, unknown wrappers,
+unsupported languages and result text that exactly mimics a failure envelope
+can limit recognition; classification, operand removal and recovery are
+heuristics rather than proof of a blocked task or repaired harness. Reason text
+stays local in source logs, is never emitted, and is not copied into the optional
+local review file by this feature. Pseudonymization is not anonymization.
+
 ## Attribution and privacy
 
 Schema 1.1 allocates reported tokens per billable event, rather than assigning a
