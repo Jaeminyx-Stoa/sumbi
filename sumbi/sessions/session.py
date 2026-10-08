@@ -8,6 +8,7 @@ from sumbi.core.time import Window
 from sumbi.core.values import TOKEN_KINDS
 from sumbi.core.privacy import pseudonym
 from sumbi.events.tool_paths import resolve_path
+from sumbi.sessions.hook_denials import HookCalls
 
 
 EVIDENCE_TYPES = ("cwd", "tool_path", "previous_event", "unassigned")
@@ -71,6 +72,7 @@ class Session:
     model_history: list[tuple] = field(default_factory=list)
     model_request_status: str = "unknown"
     spawn_depth: int | None = None
+    hook_calls: HookCalls = field(default_factory=HookCalls)
 
     def public_agent(self):
         return "sumbi-events:" + pseudonym("agent", self.emitter_agent

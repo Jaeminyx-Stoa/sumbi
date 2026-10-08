@@ -114,6 +114,7 @@ class ToolOutput:
     output: Value = None
     text_blocks: bool = False
     source_identity: SourceIdentity | None = None
+    error: bool | None = None
 
 
 @dataclass(frozen=True)
