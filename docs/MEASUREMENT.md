@@ -127,6 +127,134 @@ Parallel session and operation durations are summed separately; none of these
 totals represent the time a person waited. Tool and request durations can overlap
 and must not be added to each other or to active time.
 
+## Delegation
+
+Collect schema **1.2** adds `delegation` and delegation text lines. Existing collect
+fields retain their meanings; deliver and compare schemas and outputs are unchanged.
+These measurements need no pull request or deliverable links and carry no price table.
+The section contains `summary`, `by_agent`, and `by_project_and_agent`. Agent labels
+follow collect's existing labels; open-event agent and model values retain their
+existing pseudonyms. Project rows use its billable-event allocations:
+the same bucket, rule label and pseudonymous project key as spend. Non-project
+keys are collapsed as in spend. A session can enter several project rows, so
+their session counts need not sum to the summary. A session without billable
+events uses its existing session project candidate for counts.
+
+**Volume.** A dispatched session has `parent_raw_id`, regardless of tool name or
+whether a result returns to its parent in the foreground or later in the background.
+`dispatched_sessions` counts included children; `dispatching_parent_sessions`
+counts their distinct included direct parents. A nested child can itself be a
+dispatching parent. `nesting_depth` counts children by depth, with roots at zero
+and direct children at one. A missing ancestor or cycle makes depth `unknown`.
+`parent_unobserved` counts children whose direct parent is missing or excluded
+from the selected window/scope. The child still contributes its own volume,
+tokens, model and friction evidence. A parent observed in another project still
+counts as a dispatcher; only its allocations to this project contribute tokens.
+
+The usual `[since, until)` rules apply: a session enters on an in-window event or
+overlapping paired interval; tokens use the selected request/snapshot timestamp,
+and counters and edit targets use their event timestamps. A partially overlapping
+parent or child contributes only its in-window tokens and counters. Pre-window
+requests can establish context at dispatch or the child's first context, even
+when that parent is `parent_unobserved` for volume. Post-window usage contributes
+no delegation tokens or request statistics. Whole-file de-duplication still selects
+the winning Claude streaming snapshot before assigning its window.
+
+**Token share.** `cost_share.dispatched` and `.parents` sum reported `new_input`,
+`cache_write`, `cache_read`, `output`, and `total` for children and their distinct
+direct parents. `total` excludes the reasoning subset, as elsewhere in collect.
+`dispatched_share` divides each child token kind by the same kind in the unique
+union of children and parents (`share_basis: unique_sessions_union`). A nested
+dispatcher appears in both descriptive sums but only once in the denominator.
+Kinds are never weighted by price. Missing kinds remain null; zero or unreported
+denominators yield null shares, including the empty window.
+
+**Context.** A request context is `new_input + cache_write + cache_read`, using
+reported components. Unreported cache kinds are omitted, rather than inferred.
+Claude uses one selected assistant `message.id`, despite repeated content-block
+usage. Codex uses `info.last_token_usage` on a `token_count` event. Its input
+already includes cached input: new input subtracts cached input, cache read
+retains it, and unsupported cache-write counters remain unreported under the
+existing adapter rules. These request observations are separate from billable
+cumulative deltas, so existing collect totals do not change. Exact record replays
+and consecutive unchanged cumulative vectors do not create extra request observations.
+Without per-turn observations, a cumulative delta is not treated as one context.
+
+`context.observed_sessions` counts children with request observations for every
+billable event in this group/window and observed input on each request.
+`context_unobserved` counts all other children, including those without any usage;
+these children are excluded from context statistics. For each observed child,
+average its in-window request contexts (only this project's requests for a project
+row). `session_average_median` is the ordinary median of these averages;
+`session_average_p90` is their nearest-rank 90th percentile, rank `ceil(0.9 * n)`.
+Neither statistic is weighted by tokens or request count. Empty samples yield null.
+
+`context.sensitivity` always reports strict thresholds 100000, 200000 and 400000.
+Each row's `total_tokens` sums reported request totals whose context exceeds that
+threshold; `share` divides by `context.request_total_tokens`, the reported totals
+of all requests in context-observed children. This mirrors idle-time sensitivity
+without selecting a preferred threshold. Per-request totals can differ from
+billable cumulative deltas, for example when a counter correction or reset occurs;
+the denominator is explicit and is not the full dispatched-token sum. Output is
+included in these request totals; reasoning is an output subset and is not added.
+
+**Concentration.** Rank all included children by their allocated reported `total`,
+including children without context observations. `top_decile_sessions` is
+`ceil(dispatched_sessions / 10)`, or zero for no children. `top_decile_total_tokens`
+is the sum for that many highest-spend children. `top_decile_share` divides it by
+all dispatched reported tokens. Ties do not change the token sum; no spend means
+a null share. Small cohorts may therefore have a decile larger than 10%.
+
+**Model request.** `model_request.by_request` splits child session counts and
+allocated `total_tokens` by `requested`, `unrequested` and `unknown`.
+Claude's `agent-<id>.meta.json` sidecar is inspected only for the `model` key:
+presence means requested, absence in a readable object means unrequested, and
+a missing, unreadable or malformed sidecar means unknown. No description,
+custom agent type, tool-use identifier, request shape or other sidecar text is
+retained or emitted. Conflicting statuses across resumed files mean unknown.
+Codex status remains unknown because its supported log shapes do not state whether
+the dispatch requested a model. An observed model does not imply it was requested.
+`by_observed_model_and_request` further splits those totals by the observed model
+in force at each billable event, with unknown for absent or ambiguous metadata.
+Each session counts once per model/status row it occupies, so a session using
+several models can appear in several rows; its tokens are split, never duplicated.
+Children without billable events use their observed session models for zero-token
+session counts, or unknown when no model was observed.
+
+**Delegation estimate.** `estimate.measurement` is `estimated`. Let P be the
+parent's last observed request context at or before the child's start, C_i the
+child's contexts in this group/window, and C_0 its first observed lifetime request
+context. Compute `inline_context = sum(P + C_i - C_0)` and
+`actual_context = sum(C_i)`. `median_inline_to_actual_context_ratio` is the median
+session ratio. `sessions_ratio_below_one` counts eligible children with ratio
+strictly below one; `share_ratio_below_one` divides by `observed_sessions`.
+`estimate.context_unobserved` counts skipped children: missing parent/start,
+missing or incomplete child requests, unobserved first child context or latest
+parent context, conflicting same-time parent contexts, or zero actual context.
+Empty estimates yield null median and share. A parent outside the window can
+supply P but contributes no parent spend. This ignores model price differences,
+output tokens and caching behaviour: it is a **context-volume estimate, not a
+cost estimate**, and does not establish whether the inline work would succeed.
+
+**Workaround friction.** `workaround_friction` uses recorded edit targets and the
+child's start cwd, resolved to its local checkout root when Git can identify one,
+otherwise to the normalized start cwd candidate. Containment uses a path-component
+boundary; Windows drive paths compare without case and POSIX paths preserve case.
+`sessions_all_edits_outside_checkout` counts children with at least one in-window
+edit target and every target known to be outside that checkout. No edits and
+unknown targets do not qualify. `edits_outside_checkout` counts outside target
+occurrences, one per de-duplicated edit ID/target, including multi-target changes.
+`script_edits_outside_checkout` counts those occurrences with extensions `.sh`,
+`.bash`, `.py`, `.ps1`, `.js`, `.mjs`, `.cmd` or `.bat` (case-insensitive).
+`edit_targets_unobserved` counts target occurrences with an unresolved target or
+start checkout. This measures tool edit operands, not proven filesystem changes;
+failed edit attempts can count, and arbitrary shell writes are not inferred.
+`tool_errors` and `tool_results` sum the existing in-window child counters;
+`tool_failure_rate` is errors/results, null when no results are observed.
+Frictions use each member child's full in-window edit and tool evidence, which
+can repeat across project rows when a child spans projects. Paths, file names,
+prompts, descriptions and custom agent names never enter delegation output.
+
 ## Attribution and privacy
 
 Schema 1.1 allocates reported tokens per billable event, rather than assigning a

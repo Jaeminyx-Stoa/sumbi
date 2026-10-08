@@ -10,6 +10,7 @@ from sumbi.events.schema import (
     Record, SessionStart, Context, Metadata, Tokens, TokenUsage, ToolEvidence,
     ToolInput, ToolOutput, ToolStart, ToolEnd, CommandExecution, FileEdit,
     Counter, Request, SessionEnd, Resume, LocalText, Diagnostic, SourceIdentity, freeze,
+    RequestUsage,
 )
 from .common import key, record_identity
 
@@ -106,6 +107,7 @@ def _event(payload, event, when):
         yield Diagnostic("event_msg:" + str(subtype))
     if subtype == "token_count":
         total = mapping(mapping(payload.get("info")).get("total_token_usage"))
+        yield from _request_usage(payload, total, when)
         if total:
             values = {k: integer(total.get(k)) for k in FIELDS}
             if (when is None or any(values[k] is None for k in FIELDS[:3])
@@ -147,6 +149,20 @@ def _event(payload, event, when):
         yield SessionEnd("observed")
     elif subtype in ("error", "request_user_input"):
         yield Counter("api_errors" if subtype == "error" else "user_input_requests", key(identity))
+
+
+def _request_usage(payload, total, when):
+    """Per-turn input follows the adapter's existing inclusive-cache rule."""
+    last = mapping(mapping(payload.get("info")).get("last_token_usage"))
+    values = {k: integer(last.get(k)) for k in FIELDS}
+    if (when is None or any(values[k] is None for k in FIELDS[:3])
+        or values["cached_input_tokens"] > values["input_tokens"]):
+        return
+    yield RequestUsage(Tokens(
+        new_input=values["input_tokens"] - values["cached_input_tokens"],
+        cache_read=values["cached_input_tokens"], output=values["output_tokens"],
+        reasoning_output=values["reasoning_output_tokens"]),
+        tuple(integer(total.get(k)) for k in FIELDS) if total else None)
 
 
 def _response(payload, event):

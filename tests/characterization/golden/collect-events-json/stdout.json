@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.1",
+  "schema_version": "1.2",
   "pseudonyms": {
     "salted": true,
     "algorithm": "hmac-sha256"
@@ -866,5 +866,516 @@
         }
       }
     }
-  ]
+  ],
+  "delegation": {
+    "summary": {
+      "volume": {
+        "dispatched_sessions": 2,
+        "dispatching_parent_sessions": 2,
+        "parent_unobserved": 0,
+        "nesting_depth": {
+          "1": 2
+        }
+      },
+      "cost_share": {
+        "measurement": "observed",
+        "dispatched": {
+          "new_input": 200,
+          "cache_write": 0,
+          "cache_read": 40,
+          "output": 20,
+          "total": 260
+        },
+        "parents": {
+          "new_input": 60,
+          "cache_write": 0,
+          "cache_read": 0,
+          "output": 20,
+          "total": 80
+        },
+        "dispatched_share": {
+          "new_input": 0.7692307692307693,
+          "cache_write": null,
+          "cache_read": 1.0,
+          "output": 0.5,
+          "total": 0.7647058823529411
+        },
+        "share_basis": "unique_sessions_union"
+      },
+      "context": {
+        "measurement": "observed",
+        "observed_sessions": 0,
+        "context_unobserved": 2,
+        "session_average_median": null,
+        "session_average_p90": null,
+        "request_total_tokens": 0,
+        "sensitivity": {
+          "100000": {
+            "total_tokens": 0,
+            "share": null
+          },
+          "200000": {
+            "total_tokens": 0,
+            "share": null
+          },
+          "400000": {
+            "total_tokens": 0,
+            "share": null
+          }
+        }
+      },
+      "estimate": {
+        "measurement": "estimated",
+        "observed_sessions": 0,
+        "context_unobserved": 2,
+        "median_inline_to_actual_context_ratio": null,
+        "sessions_ratio_below_one": 0,
+        "share_ratio_below_one": null
+      },
+      "concentration": {
+        "top_decile_sessions": 1,
+        "top_decile_total_tokens": 130,
+        "top_decile_share": 0.5
+      },
+      "model_request": {
+        "by_observed_model_and_request": [
+          {
+            "model": "model_99051c601e033380bf6cd425",
+            "request": "unknown",
+            "sessions": 2,
+            "total_tokens": 260
+          }
+        ],
+        "by_request": {
+          "requested": {
+            "sessions": 0,
+            "total_tokens": 0
+          },
+          "unrequested": {
+            "sessions": 0,
+            "total_tokens": 0
+          },
+          "unknown": {
+            "sessions": 2,
+            "total_tokens": 260
+          }
+        }
+      },
+      "workaround_friction": {
+        "sessions_all_edits_outside_checkout": 0,
+        "edits_outside_checkout": 0,
+        "script_edits_outside_checkout": 0,
+        "edit_targets_unobserved": 2,
+        "tool_errors": 0,
+        "tool_results": 2,
+        "tool_failure_rate": 0.0
+      }
+    },
+    "by_agent": {
+      "sumbi-events:agent_9e260e54ae0e8fd149c80532": {
+        "volume": {
+          "dispatched_sessions": 2,
+          "dispatching_parent_sessions": 2,
+          "parent_unobserved": 0,
+          "nesting_depth": {
+            "1": 2
+          }
+        },
+        "cost_share": {
+          "measurement": "observed",
+          "dispatched": {
+            "new_input": 200,
+            "cache_write": 0,
+            "cache_read": 40,
+            "output": 20,
+            "total": 260
+          },
+          "parents": {
+            "new_input": 60,
+            "cache_write": 0,
+            "cache_read": 0,
+            "output": 20,
+            "total": 80
+          },
+          "dispatched_share": {
+            "new_input": 0.7692307692307693,
+            "cache_write": null,
+            "cache_read": 1.0,
+            "output": 0.5,
+            "total": 0.7647058823529411
+          },
+          "share_basis": "unique_sessions_union"
+        },
+        "context": {
+          "measurement": "observed",
+          "observed_sessions": 0,
+          "context_unobserved": 2,
+          "session_average_median": null,
+          "session_average_p90": null,
+          "request_total_tokens": 0,
+          "sensitivity": {
+            "100000": {
+              "total_tokens": 0,
+              "share": null
+            },
+            "200000": {
+              "total_tokens": 0,
+              "share": null
+            },
+            "400000": {
+              "total_tokens": 0,
+              "share": null
+            }
+          }
+        },
+        "estimate": {
+          "measurement": "estimated",
+          "observed_sessions": 0,
+          "context_unobserved": 2,
+          "median_inline_to_actual_context_ratio": null,
+          "sessions_ratio_below_one": 0,
+          "share_ratio_below_one": null
+        },
+        "concentration": {
+          "top_decile_sessions": 1,
+          "top_decile_total_tokens": 130,
+          "top_decile_share": 0.5
+        },
+        "model_request": {
+          "by_observed_model_and_request": [
+            {
+              "model": "model_99051c601e033380bf6cd425",
+              "request": "unknown",
+              "sessions": 2,
+              "total_tokens": 260
+            }
+          ],
+          "by_request": {
+            "requested": {
+              "sessions": 0,
+              "total_tokens": 0
+            },
+            "unrequested": {
+              "sessions": 0,
+              "total_tokens": 0
+            },
+            "unknown": {
+              "sessions": 2,
+              "total_tokens": 260
+            }
+          }
+        },
+        "workaround_friction": {
+          "sessions_all_edits_outside_checkout": 0,
+          "edits_outside_checkout": 0,
+          "script_edits_outside_checkout": 0,
+          "edit_targets_unobserved": 2,
+          "tool_errors": 0,
+          "tool_results": 2,
+          "tool_failure_rate": 0.0
+        }
+      },
+      "sumbi-events:agent_dafcddd422574acb5f48fb2b": {
+        "volume": {
+          "dispatched_sessions": 0,
+          "dispatching_parent_sessions": 0,
+          "parent_unobserved": 0,
+          "nesting_depth": {}
+        },
+        "cost_share": {
+          "measurement": "observed",
+          "dispatched": {
+            "new_input": null,
+            "cache_write": null,
+            "cache_read": null,
+            "output": null,
+            "total": 0
+          },
+          "parents": {
+            "new_input": null,
+            "cache_write": null,
+            "cache_read": null,
+            "output": null,
+            "total": 0
+          },
+          "dispatched_share": {
+            "new_input": null,
+            "cache_write": null,
+            "cache_read": null,
+            "output": null,
+            "total": null
+          },
+          "share_basis": "unique_sessions_union"
+        },
+        "context": {
+          "measurement": "observed",
+          "observed_sessions": 0,
+          "context_unobserved": 0,
+          "session_average_median": null,
+          "session_average_p90": null,
+          "request_total_tokens": 0,
+          "sensitivity": {
+            "100000": {
+              "total_tokens": 0,
+              "share": null
+            },
+            "200000": {
+              "total_tokens": 0,
+              "share": null
+            },
+            "400000": {
+              "total_tokens": 0,
+              "share": null
+            }
+          }
+        },
+        "estimate": {
+          "measurement": "estimated",
+          "observed_sessions": 0,
+          "context_unobserved": 0,
+          "median_inline_to_actual_context_ratio": null,
+          "sessions_ratio_below_one": 0,
+          "share_ratio_below_one": null
+        },
+        "concentration": {
+          "top_decile_sessions": 0,
+          "top_decile_total_tokens": 0,
+          "top_decile_share": null
+        },
+        "model_request": {
+          "by_observed_model_and_request": [],
+          "by_request": {
+            "requested": {
+              "sessions": 0,
+              "total_tokens": 0
+            },
+            "unrequested": {
+              "sessions": 0,
+              "total_tokens": 0
+            },
+            "unknown": {
+              "sessions": 0,
+              "total_tokens": 0
+            }
+          }
+        },
+        "workaround_friction": {
+          "sessions_all_edits_outside_checkout": 0,
+          "edits_outside_checkout": 0,
+          "script_edits_outside_checkout": 0,
+          "edit_targets_unobserved": 0,
+          "tool_errors": 0,
+          "tool_results": 0,
+          "tool_failure_rate": null
+        }
+      }
+    },
+    "by_project_and_agent": [
+      {
+        "bucket": "project",
+        "project_key": "project_e3db46d1b932ef2c778ba7cc",
+        "rule": null,
+        "agent": "sumbi-events:agent_9e260e54ae0e8fd149c80532",
+        "volume": {
+          "dispatched_sessions": 2,
+          "dispatching_parent_sessions": 2,
+          "parent_unobserved": 0,
+          "nesting_depth": {
+            "1": 2
+          }
+        },
+        "cost_share": {
+          "measurement": "observed",
+          "dispatched": {
+            "new_input": 200,
+            "cache_write": 0,
+            "cache_read": 40,
+            "output": 20,
+            "total": 260
+          },
+          "parents": {
+            "new_input": 60,
+            "cache_write": 0,
+            "cache_read": 0,
+            "output": 20,
+            "total": 80
+          },
+          "dispatched_share": {
+            "new_input": 0.7692307692307693,
+            "cache_write": null,
+            "cache_read": 1.0,
+            "output": 0.5,
+            "total": 0.7647058823529411
+          },
+          "share_basis": "unique_sessions_union"
+        },
+        "context": {
+          "measurement": "observed",
+          "observed_sessions": 0,
+          "context_unobserved": 2,
+          "session_average_median": null,
+          "session_average_p90": null,
+          "request_total_tokens": 0,
+          "sensitivity": {
+            "100000": {
+              "total_tokens": 0,
+              "share": null
+            },
+            "200000": {
+              "total_tokens": 0,
+              "share": null
+            },
+            "400000": {
+              "total_tokens": 0,
+              "share": null
+            }
+          }
+        },
+        "estimate": {
+          "measurement": "estimated",
+          "observed_sessions": 0,
+          "context_unobserved": 2,
+          "median_inline_to_actual_context_ratio": null,
+          "sessions_ratio_below_one": 0,
+          "share_ratio_below_one": null
+        },
+        "concentration": {
+          "top_decile_sessions": 1,
+          "top_decile_total_tokens": 130,
+          "top_decile_share": 0.5
+        },
+        "model_request": {
+          "by_observed_model_and_request": [
+            {
+              "model": "model_99051c601e033380bf6cd425",
+              "request": "unknown",
+              "sessions": 2,
+              "total_tokens": 260
+            }
+          ],
+          "by_request": {
+            "requested": {
+              "sessions": 0,
+              "total_tokens": 0
+            },
+            "unrequested": {
+              "sessions": 0,
+              "total_tokens": 0
+            },
+            "unknown": {
+              "sessions": 2,
+              "total_tokens": 260
+            }
+          }
+        },
+        "workaround_friction": {
+          "sessions_all_edits_outside_checkout": 0,
+          "edits_outside_checkout": 0,
+          "script_edits_outside_checkout": 0,
+          "edit_targets_unobserved": 2,
+          "tool_errors": 0,
+          "tool_results": 2,
+          "tool_failure_rate": 0.0
+        }
+      },
+      {
+        "bucket": "project",
+        "project_key": "project_e3db46d1b932ef2c778ba7cc",
+        "rule": null,
+        "agent": "sumbi-events:agent_dafcddd422574acb5f48fb2b",
+        "volume": {
+          "dispatched_sessions": 0,
+          "dispatching_parent_sessions": 0,
+          "parent_unobserved": 0,
+          "nesting_depth": {}
+        },
+        "cost_share": {
+          "measurement": "observed",
+          "dispatched": {
+            "new_input": null,
+            "cache_write": null,
+            "cache_read": null,
+            "output": null,
+            "total": 0
+          },
+          "parents": {
+            "new_input": null,
+            "cache_write": null,
+            "cache_read": null,
+            "output": null,
+            "total": 0
+          },
+          "dispatched_share": {
+            "new_input": null,
+            "cache_write": null,
+            "cache_read": null,
+            "output": null,
+            "total": null
+          },
+          "share_basis": "unique_sessions_union"
+        },
+        "context": {
+          "measurement": "observed",
+          "observed_sessions": 0,
+          "context_unobserved": 0,
+          "session_average_median": null,
+          "session_average_p90": null,
+          "request_total_tokens": 0,
+          "sensitivity": {
+            "100000": {
+              "total_tokens": 0,
+              "share": null
+            },
+            "200000": {
+              "total_tokens": 0,
+              "share": null
+            },
+            "400000": {
+              "total_tokens": 0,
+              "share": null
+            }
+          }
+        },
+        "estimate": {
+          "measurement": "estimated",
+          "observed_sessions": 0,
+          "context_unobserved": 0,
+          "median_inline_to_actual_context_ratio": null,
+          "sessions_ratio_below_one": 0,
+          "share_ratio_below_one": null
+        },
+        "concentration": {
+          "top_decile_sessions": 0,
+          "top_decile_total_tokens": 0,
+          "top_decile_share": null
+        },
+        "model_request": {
+          "by_observed_model_and_request": [],
+          "by_request": {
+            "requested": {
+              "sessions": 0,
+              "total_tokens": 0
+            },
+            "unrequested": {
+              "sessions": 0,
+              "total_tokens": 0
+            },
+            "unknown": {
+              "sessions": 0,
+              "total_tokens": 0
+            }
+          }
+        },
+        "workaround_friction": {
+          "sessions_all_edits_outside_checkout": 0,
+          "edits_outside_checkout": 0,
+          "script_edits_outside_checkout": 0,
+          "edit_targets_unobserved": 0,
+          "tool_errors": 0,
+          "tool_results": 0,
+          "tool_failure_rate": null
+        }
+      }
+    ]
+  }
 }

@@ -1,6 +1,7 @@
 """Claude Code records translated into immutable normalized observations."""
 
 from pathlib import Path
+import json
 import re
 
 from sumbi.core.records import Coverage, records
@@ -8,7 +9,7 @@ from sumbi.core.values import integer, mapping, timestamp
 from sumbi.events.schema import (
     Record, SessionStart, Context, Metadata, Tokens, TokenUsage, ToolEvidence,
     ToolInput, ToolOutput, ToolStart, ToolEnd, CommandExecution, FileEdit,
-    Counter, Request, LocalText, Diagnostic, SourceIdentity, freeze,
+    Counter, Request, LocalText, Diagnostic, SourceIdentity, freeze, ModelRequest,
 )
 from .common import key, record_identity
 
@@ -138,21 +139,45 @@ def collect(home: Path, coverage: Coverage):
     for path in dict.fromkeys(files):
         parts = path.relative_to(root).parts
         child = "subagents" in parts
-        index = parts.index("subagents") if child else None
+        indices = [i for i, part in enumerate(parts) if part == "subagents"]
+        index = indices[-1] if child else None
         parent_hint = parts[index - 1] if child else path.stem
         agent_hint = (parts[index + 1] if child
             else path.stem).removesuffix(".jsonl").removeprefix("agent-")
         raw_id = None
         parent = None
+        status = _model_request(root, parts, index, path) if child else "unknown"
         for event in records(path, coverage):
             if raw_id is None:
                 child = child or (path.stem.startswith("agent-")
                     and event.get("isSidechain") is True)
                 parent = str(event.get("sessionId") or parent_hint)
+                if len(indices) > 1 and ":subagent:" not in parent:
+                    for ancestor in indices[:-1]:
+                        parent += ":subagent:" + parts[ancestor + 1].removeprefix("agent-")
                 raw_id = parent + ":subagent:" + str(event.get("agentId")
                     or agent_hint) if child else parent
+                if child and index is None:
+                    status = _model_request(root, parts, index, path)
             when = timestamp(event.get("timestamp"))
             yield Record("claude-code", raw_id, when, record_identity(event),
-                tuple(_translate(event, when, parent, child)),
+                (ModelRequest(status), *tuple(_translate(event, when, parent, child))),
                 timestamp_supplied="timestamp" in event, fallback_id=key(event.get("uuid") or None),
                 parent_session_id=parent if child else None, worker=child)
+
+
+def _model_request(root, parts, index, path):
+    """Inspect only model presence; do not retain any sidecar values or text."""
+    if index is not None:
+        stem = parts[index + 1].removesuffix(".jsonl")
+        path = root.joinpath(*parts[:index + 1], stem + ".meta.json")
+    else:
+        path = path.with_suffix(".meta.json")
+    try:
+        with path.open(encoding="utf-8") as stream:
+            metadata = json.load(stream)
+        if not isinstance(metadata, dict):
+            return "unknown"
+        return "requested" if "model" in metadata else "unrequested"
+    except (OSError, ValueError, UnicodeError):
+        return "unknown"

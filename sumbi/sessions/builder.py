@@ -36,6 +36,8 @@ class _State:
     explicit: bool = False
     native_start_seen: bool = False
     worker_links: bool = False
+    request_records: list = field(default_factory=list)
+    dispatch_model_statuses: set = field(default_factory=set)
 
 
 def own_context_at_start(history, started_at, own_start):
@@ -53,6 +55,13 @@ def own_context_at_start(history, started_at, own_start):
 
 def _metadata(state, metadata, when, window, coverage):
     session = state.session
+    if when is not None and ("model" in metadata.supplied or metadata.selection == "context"):
+        value = e.thaw(metadata.model)
+        if state.explicit:
+            model = pseudonym("model", value) if isinstance(value, str) and value else "unknown"
+        else:
+            model = label(value, "model") if value else "unknown"
+        session.model_history.append((when, model))
     if metadata.selection == "context":
         state.native_metadata.append((when, metadata.model, metadata.effort))
         return
@@ -244,7 +253,12 @@ def _fold(state, event, record, order, fallback, source_fallback, window, covera
         or fallback) + (getattr(event, "suffix", "") if not (
             getattr(event, "tool_call_id", None)
             or getattr(event, "identity", None)) else "")
-    if isinstance(event, e.SessionStart):
+    if isinstance(event, e.ModelRequest):
+        state.dispatch_model_statuses.add(event.status)
+    elif isinstance(event, e.RequestUsage):
+        if when is not None:
+            state.request_records.append((when, order, event))
+    elif isinstance(event, e.SessionStart):
         _start(state, event, when, order, window, coverage, links)
     elif isinstance(event, e.Context):
         _context(state, event, when, order, window, coverage, links)
@@ -395,11 +409,13 @@ def _finish(state, window, coverage, links):
         (_, when), values, order, cwd, paths, command_cwd, own_branch, refs = snapshot
         session.tool_paths(when, order, command_cwd or (cwd if paths else None), paths)
         session.usage(when, order, values, cwd=cwd, paths=paths)
+        session.request_usage.append((when, order, values))
         if links:
             session.deliverable_events.append((when, order, "own", (own_branch, refs)))
         if window.contains(when):
             session.add_tokens(values)
     cumulative_usage_deltas(state, window, coverage)
+    _request_usage(state)
     if state.explicit:
         session.token_evidence_incomplete = state.token_invalid
         cwds = {}
@@ -415,6 +431,19 @@ def _finish(state, window, coverage, links):
         _explicit_metadata(state, window, coverage)
         if state.invalid:
             session.local_evidence_gaps["open_event_evidence_incomplete"] += 1
+
+
+def _request_usage(state):
+    """Keep native request records without treating cumulative deltas as contexts."""
+    previous = None
+    for when, order, event in sorted(state.request_records, key=lambda entry: (entry[0], entry[1])):
+        if event.cumulative is not None and event.cumulative == previous:
+            continue
+        previous = event.cumulative
+        state.session.request_usage.append((when, order, event.tokens.as_dict()))
+    statuses = state.dispatch_model_statuses
+    if len(statuses) == 1:
+        state.session.model_request_status = next(iter(statuses))
 
 
 def _open_records(records, states, coverage):

@@ -518,14 +518,14 @@ class CliTests(SyntheticHome):
         self.assertEqual(result, 0)
         self.assertEqual(stderr, "")
         self.assertIn("Reported tokens (observed): 263", stdout)
-        self.assertEqual(json.loads(output.read_text())["schema_version"], "1.1")
+        self.assertEqual(json.loads(output.read_text())["schema_version"], "1.2")
         self.assertIn("Harness friction: synthetic local note", review.read_text())
         self.assertNotIn("Harness friction:", stdout)
 
     def test_stdout_json_keeps_text_summary_on_stderr(self):
         result, stdout, stderr = self.invoke(["--json", "-", "--agents", "codex"])
         self.assertEqual(result, 0)
-        self.assertEqual(json.loads(stdout)["schema_version"], "1.1")
+        self.assertEqual(json.loads(stdout)["schema_version"], "1.2")
         self.assertIn("Sessions in window: 0", stderr)
         self.assertEqual(list(json.loads(stdout)["by_agent"]), ["codex"])
 

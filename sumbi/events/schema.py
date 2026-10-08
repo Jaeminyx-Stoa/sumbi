@@ -143,6 +143,22 @@ class TokenUsage:
 
 
 @dataclass(frozen=True)
+class RequestUsage:
+    """One native request, separate from cumulative billable accounting."""
+
+    tokens: Tokens
+    # A cumulative vector lets the builder discard repeated turn snapshots.
+    cumulative: tuple[int | None, ...] | None = None
+
+
+@dataclass(frozen=True)
+class ModelRequest:
+    """Dispatch metadata status only; arbitrary sidecar text is never retained."""
+
+    status: Literal["requested", "unrequested", "unknown"]
+
+
+@dataclass(frozen=True)
 class ToolStart:
     tool_call_id: str | None
     suffix: str = ""
@@ -233,7 +249,7 @@ class Diagnostic:
 
 Event: TypeAlias = (SessionStart | Context | TokenUsage | ToolStart | ToolEnd |
     CommandExecution | FileEdit | Counter | Request | SessionEnd |
-    Resume | LocalText | Metadata | ToolEvidence | Diagnostic)
+    Resume | LocalText | Metadata | ToolEvidence | Diagnostic | RequestUsage | ModelRequest)
 
 
 @dataclass(frozen=True)
