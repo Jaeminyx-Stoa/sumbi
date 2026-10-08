@@ -7,7 +7,7 @@ import hmac
 import secrets
 
 from sumbi.core.privacy import current_key
-from sumbi.events.hook_denials import content_text, failed_envelope, recognize
+from sumbi.events.hook_denials import candidate_output, failed_envelope, recognize_all
 from sumbi.events.schema import thaw
 
 
@@ -34,9 +34,7 @@ class HookCalls:
                 self.inputs.setdefault(key, (when, (order, index), item.name, item.tool_call_id))
         for index, item in enumerate(evidence.outputs):
             if item.tool_call_id is not None:
-                text = content_text(thaw(item.output), agent)
-                candidate = (text if text and text.startswith(("Command blocked by PreToolUse",
-                    "PreToolUse", "Script error:", "{")) else None)
+                candidate = candidate_output(thaw(item.output), agent)
                 self.outputs.setdefault(_identity(item),
                     (when, (order, index), item.error, candidate))
 
@@ -51,25 +49,25 @@ class HookCalls:
                 end = self.ends.get(call_id)
                 output = (*end, None) if end else None
             if output is None or (output[0], output[1]) < (at, order):
-                result, denial = None, None
+                result, denials = None, []
             else:
                 ended, end_order, error, text = output
-                denial = recognize(text, agent, tool) if error is not None else None
-                success = (error is False and denial is None
+                denials = recognize_all(text, agent, tool) if error is not None else []
+                success = (error is False and not denials
                     and not failed_envelope(text, agent, tool))
                 result = (ended, end_order, success)
-            if denial is not None:
-                category, normalized, timeout = denial
+            hashed = []
+            for category, normalized, timeout, inner in denials:
                 digest = hmac.new(key, normalized.encode("utf-8", errors="surrogatepass"),
                     hashlib.sha256).hexdigest()[:24]
-                denial = category, "reason_" + digest, timeout
-            self.observations.append((at, order, tool, result, denial))
+                hashed.append((category, "reason_" + digest, timeout, inner))
+            self.observations.append((at, order, tool, result, hashed))
         for identity, (at, order, _) in self.starts.items():
             if identity not in observed:
                 end = self.ends.get(identity)
                 result = ((*end[:2], end[2] is False)
                     if end and end[:2] >= (at, order) else None)
-                self.observations.append((at, order, None, result, None))
+                self.observations.append((at, order, None, result, []))
         self.inputs.clear()
         self.outputs.clear()
         self.starts.clear()
@@ -81,17 +79,18 @@ class HookCalls:
         points = [(c[0], c[1]) for c in calls]
         successful = [result[:2] for _, _, _, result, _ in calls
             if result and result[2] and result[0] < window.until]
-        failures = [(tool, result, denial) for _, _, tool, result, denial in calls
-            if denial and result and window.contains(result[0])]
-        first = min((result[:2] for _, _, _, result, denial in calls
-            if denial and not denial[2] and result[0] < window.until), default=None)
+        failures = [(tool, result, denial) for _, _, tool, result, denials in calls
+            if result and window.contains(result[0]) for denial in denials]
+        first = min((result[:2] for _, _, _, result, denials in calls
+            if result and result[0] < window.until and any(not d[2] for d in denials)),
+            default=None)
         first_call = first is not None and not any(point < first for point in successful)
-        for tool, result, (category, reason_id, timeout) in failures:
+        for tool, result, (category, reason_id, timeout, inner) in failures:
             index = bisect_right(points, result[:2])
             following = calls[index:index + 3]
             recovered = any(c[2] == tool and c[3] and c[3][2]
                 and c[0] < window.until and c[3][0] < window.until for c in following)
-            yield category, reason_id, timeout, recovered, first_call
+            yield category, reason_id, timeout, recovered, first_call, inner
 
 
 def reason_key():

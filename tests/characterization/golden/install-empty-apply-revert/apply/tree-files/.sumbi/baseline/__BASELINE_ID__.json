@@ -626,6 +626,7 @@
       "timeouts": 0,
       "denials_per_100_tool_calls": null,
       "timeouts_per_100_tool_calls": null,
+      "inner_denials_in_exec": 0,
       "denials_by_class": {
         "command_form": 0,
         "path_scope": 0,
@@ -653,6 +654,7 @@
         "timeouts": 0,
         "denials_per_100_tool_calls": null,
         "timeouts_per_100_tool_calls": null,
+        "inner_denials_in_exec": 0,
         "denials_by_class": {
           "command_form": 0,
           "path_scope": 0,
@@ -679,6 +681,7 @@
         "timeouts": 0,
         "denials_per_100_tool_calls": null,
         "timeouts_per_100_tool_calls": null,
+        "inner_denials_in_exec": 0,
         "denials_by_class": {
           "command_form": 0,
           "path_scope": 0,

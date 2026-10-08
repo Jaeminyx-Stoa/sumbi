@@ -16,6 +16,11 @@ from sumbi.measure.report import collect, text_summary
 
 WINDOW = Window(timestamp("2030-01-01T00:00:00Z"), timestamp("2030-01-02T00:00:00Z"))
 BLOCKED = "Command blocked by PreToolUse hook: "
+TOOL_BLOCKED = "Tool call blocked by PreToolUse hook: "
+
+
+def exec_output(header, *items):
+    return [{"type": "input_text", "text": text} for text in (header, *items)]
 
 
 def at(second):
@@ -118,8 +123,8 @@ class HookDenialTests(unittest.TestCase):
                    json.dumps({"status": "rejected", "reason": "quoted: " + quoted}),
                    json.dumps({"status": "accepted", "reason": quoted}),
                    [{"type": "input_text", "text": "source code:"},
-                    {"type": "input_text", "text": quoted}],
-                   [{"type": "image", "text": ""}, {"type": "input_text", "text": quoted}]]
+                    {"type": "input_text", "text": "print('" + quoted + "')"}],
+                   [{"type": "image", "text": quoted}]]
         records = []
         for index, output in enumerate(outputs):
             records += codex_call(index * 2 + 1, str(index), output, name="exec")
@@ -318,6 +323,100 @@ class HookDenialTests(unittest.TestCase):
         self.assertEqual(report["hook_denials"]["summary"]["denials"], 1)
         self.assertIn("Hook denials all", result.stderr)
         self.assertNotIn("synthetic private reason", result.stdout + result.stderr)
+
+    def test_exec_denial_items_and_tool_level_block(self):
+        shapes = [
+            exec_output("Script failed\nOutput:\n", "synthetic inner result",
+                        "synthetic second result", "Script error:\n" + BLOCKED + "command form"),
+            exec_output("Script completed\nOutput:\n", BLOCKED + "path scope",
+                        BLOCKED + "size limit"),
+            exec_output("Script completed\nOutput:\n", json.dumps({"status": "rejected",
+                        "reason": BLOCKED + "tool not allowed"})),
+            exec_output("Script completed\nOutput:\n", json.dumps({"label": "synthetic",
+                        "result": {"status": "rejected", "reason": BLOCKED + "slot wait"}})),
+        ]
+        records = []
+        for index, output in enumerate(shapes):
+            records += codex_call(index * 2 + 1, "shape-" + str(index), output, name="functions.exec")
+        records += codex_call(9, "retry", exec_output("Script completed\nOutput:\n",
+                             "synthetic result"), name="functions.exec")
+        records += codex_call(11, "tool-block", TOOL_BLOCKED + "synthetic constraint",
+                             name="request_user_input_async")
+        self.save("codex", records)
+        report = self.report(rules=[ProjectRule("sample", paths=[str(self.checkout)])])
+        group = report["hook_denials"]["summary"]
+        self.assertEqual((group["denials"], group["inner_denials_in_exec"],
+                          group["tool_calls"]), (6, 5, 6))
+        self.assertEqual(group["denials_per_100_tool_calls"], 100)
+        self.assertEqual((group["recovered"], group["unrecovered"]), (4, 2))
+        self.assertEqual(group["denials_by_class"], {key: 1 for key in
+                         ("command_form", "path_scope", "size_limit", "tool_not_allowed",
+                          "wait_timeout", "other")})
+        for row in [report["hook_denials"]["by_agent"]["codex"],
+                    *report["hook_denials"]["by_project_and_agent"]]:
+            self.assertEqual(row["inner_denials_in_exec"], 5)
+        public = json.dumps(report) + text_summary(report)
+        self.assertIn("inner_denials_in_exec 5", public)
+        for private in (BLOCKED, TOOL_BLOCKED, "synthetic inner result", "synthetic constraint"):
+            self.assertNotIn(private, public)
+
+    def test_exec_completed_quotes_and_invalid_objects_are_not_denials(self):
+        output = exec_output("Script completed\nOutput:\n",
+            "file contents:\n" + BLOCKED + "synthetic",
+            "script source: print('" + BLOCKED + "synthetic')",
+            "quoted phrase: " + TOOL_BLOCKED + "synthetic",
+            json.dumps({"status": "rejected", "reason": "quoted: " + BLOCKED + "synthetic"}),
+            json.dumps({"result": {"status": "accepted", "reason": BLOCKED + "synthetic"}}),
+            json.dumps({"nested": {"result": {"status": "rejected",
+                        "reason": BLOCKED + "synthetic"}}}),
+            '{"status":"rejected",',
+            "Script error:\nsource code:\n" + BLOCKED + "synthetic")
+        self.save("codex", codex_call(1, "quotes", output, name="exec") +
+                  codex_call(3, "tool-quote", "quoted: " + TOOL_BLOCKED + "synthetic", name="sleep"))
+        group = self.report()["hook_denials"]["summary"]
+        self.assertEqual((group["denials"], group["inner_denials_in_exec"]), (0, 0))
+
+    def test_two_identical_caught_denials_share_one_exec_denominator(self):
+        self.save("codex", codex_call(1, "caught", exec_output("Script completed\nOutput:\n",
+                  BLOCKED + "synthetic", BLOCKED + "synthetic"), name="exec"))
+        group = self.report()["hook_denials"]["summary"]
+        self.assertEqual((group["denials"], group["inner_denials_in_exec"],
+                          group["tool_calls"]), (2, 2, 1))
+        self.assertEqual(group["denials_per_100_tool_calls"], 200)
+        self.assertEqual(group["top_reason_ids"][0]["count"], 2)
+        self.assertEqual(group["unrecovered"], 2)
+
+    def test_exec_recovery_requires_nonfailed_header_and_no_denial_items(self):
+        records = codex_call(1, "denied", exec_output("Script completed\nOutput:\n",
+                             BLOCKED + "synthetic"), name="exec")
+        records += codex_call(3, "failed-header", exec_output("Script failed\nOutput:\n",
+                             "synthetic failure"), name="exec")
+        records += codex_call(5, "caught", exec_output("Script completed\nOutput:\n",
+                             BLOCKED + "synthetic"), name="exec")
+        records += codex_call(7, "third", exec_output("Script completed\nOutput:\n",
+                             "quoted: " + BLOCKED + "synthetic"), name="exec")
+        self.save("codex", records)
+        group = self.report()["hook_denials"]["summary"]
+        self.assertEqual((group["recovered"], group["unrecovered"]), (2, 0))
+        self.assertEqual(group["first_call_denials"]["sessions"], 1)
+
+    def test_failed_exec_header_cannot_recover_before_cutoff(self):
+        records = codex_call(1, "denied", exec_output("Script failed\nOutput:\n",
+                             "Script error:\n" + BLOCKED + "synthetic"), name="exec")
+        records += codex_call(3, "failed", exec_output("Script failed\nOutput:\n",
+                             "synthetic failure"), name="exec")
+        self.save("codex", records)
+        group = self.report()["hook_denials"]["summary"]
+        self.assertEqual((group["recovered"], group["unrecovered"]), (0, 1))
+
+    def test_tool_block_prefix_for_any_tool_is_not_an_inner_denial(self):
+        records = []
+        for index, name in enumerate(("request_user_input_async", "spawn_agent", "sleep", "exec")):
+            records += codex_call(index * 2 + 1, "tool-" + str(index),
+                                 TOOL_BLOCKED + "synthetic", name=name)
+        self.save("codex", records)
+        group = self.report()["hook_denials"]["summary"]
+        self.assertEqual((group["denials"], group["inner_denials_in_exec"]), (4, 0))
 
 
 if __name__ == "__main__":

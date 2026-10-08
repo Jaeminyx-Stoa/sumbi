@@ -104,31 +104,31 @@ Delegation project sample project_e3db46d1b932ef2c778ba7cc codex (observed): dis
 Delegation estimate measures context volume; it ignores model prices, output tokens and caching behaviour.
 Delegation shares use the unique union of children and direct parents; nested dispatchers enter that denominator once.
 Hook denials all (observed): sessions 0; denials 0; timeouts 0
-  Per 100 tool calls: denials 0; timeouts 0
+  Per 100 tool calls: denials 0; timeouts 0; inner_denials_in_exec 0
   Denials by class: command_form 0; path_scope 0; size_limit 0; tool_not_allowed 0; wait_timeout 0; other 0
   Top reason IDs: none
   First-call denials: sessions 0; denied sessions 0; share unobserved
   Recovery: recovered 0; unrecovered 0
 Hook denials claude-code (observed): sessions 0; denials 0; timeouts 0
-  Per 100 tool calls: denials 0; timeouts 0
+  Per 100 tool calls: denials 0; timeouts 0; inner_denials_in_exec 0
   Denials by class: command_form 0; path_scope 0; size_limit 0; tool_not_allowed 0; wait_timeout 0; other 0
   Top reason IDs: none
   First-call denials: sessions 0; denied sessions 0; share unobserved
   Recovery: recovered 0; unrecovered 0
 Hook denials codex (observed): sessions 0; denials 0; timeouts 0
-  Per 100 tool calls: denials 0; timeouts 0
+  Per 100 tool calls: denials 0; timeouts 0; inner_denials_in_exec 0
   Denials by class: command_form 0; path_scope 0; size_limit 0; tool_not_allowed 0; wait_timeout 0; other 0
   Top reason IDs: none
   First-call denials: sessions 0; denied sessions 0; share unobserved
   Recovery: recovered 0; unrecovered 0
 Hook denials project sample project_e3db46d1b932ef2c778ba7cc claude-code (observed): sessions 0; denials 0; timeouts 0
-  Per 100 tool calls: denials 0; timeouts 0
+  Per 100 tool calls: denials 0; timeouts 0; inner_denials_in_exec 0
   Denials by class: command_form 0; path_scope 0; size_limit 0; tool_not_allowed 0; wait_timeout 0; other 0
   Top reason IDs: none
   First-call denials: sessions 0; denied sessions 0; share unobserved
   Recovery: recovered 0; unrecovered 0
 Hook denials project sample project_e3db46d1b932ef2c778ba7cc codex (observed): sessions 0; denials 0; timeouts 0
-  Per 100 tool calls: denials 0; timeouts 0
+  Per 100 tool calls: denials 0; timeouts 0; inner_denials_in_exec 0
   Denials by class: command_form 0; path_scope 0; size_limit 0; tool_not_allowed 0; wait_timeout 0; other 0
   Top reason IDs: none
   First-call denials: sessions 0; denied sessions 0; share unobserved

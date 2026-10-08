@@ -1213,6 +1213,7 @@
       "timeouts": 0,
       "denials_per_100_tool_calls": 0.0,
       "timeouts_per_100_tool_calls": 0.0,
+      "inner_denials_in_exec": 0,
       "denials_by_class": {
         "command_form": 0,
         "path_scope": 0,
@@ -1240,6 +1241,7 @@
         "timeouts": 0,
         "denials_per_100_tool_calls": 0.0,
         "timeouts_per_100_tool_calls": 0.0,
+        "inner_denials_in_exec": 0,
         "denials_by_class": {
           "command_form": 0,
           "path_scope": 0,
@@ -1266,6 +1268,7 @@
         "timeouts": 0,
         "denials_per_100_tool_calls": 0.0,
         "timeouts_per_100_tool_calls": 0.0,
+        "inner_denials_in_exec": 0,
         "denials_by_class": {
           "command_form": 0,
           "path_scope": 0,
@@ -1298,6 +1301,7 @@
         "timeouts": 0,
         "denials_per_100_tool_calls": 0.0,
         "timeouts_per_100_tool_calls": 0.0,
+        "inner_denials_in_exec": 0,
         "denials_by_class": {
           "command_form": 0,
           "path_scope": 0,
@@ -1328,6 +1332,7 @@
         "timeouts": 0,
         "denials_per_100_tool_calls": 0.0,
         "timeouts_per_100_tool_calls": 0.0,
+        "inner_denials_in_exec": 0,
         "denials_by_class": {
           "command_form": 0,
           "path_scope": 0,

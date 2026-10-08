@@ -8,17 +8,18 @@ from sumbi.measure.delegation import identity
 
 def _group(entries):
     classes, reasons = Counter(), Counter()
-    denials = timeouts = recovered = affected = first_call = calls = 0
+    denials = timeouts = recovered = affected = first_call = calls = inner_denials = 0
     for row, events in entries:
         calls += row["counts"]["tool_calls"]
         denied = [event for event in events if not event[2]]
         affected += bool(denied)
         first_call += bool(denied) and denied[0][4]
-        for category, reason_id, timeout, recovery, _ in events:
+        for category, reason_id, timeout, recovery, _, inner in events:
             if timeout:
                 timeouts += 1
             else:
                 denials += 1
+                inner_denials += inner
                 classes[category] += 1
                 reasons[reason_id] += 1
                 recovered += recovery
@@ -26,6 +27,7 @@ def _group(entries):
         "sessions_with_denials": affected, "denials": denials, "timeouts": timeouts,
         "denials_per_100_tool_calls": denials * 100 / calls if calls else None,
         "timeouts_per_100_tool_calls": timeouts * 100 / calls if calls else None,
+        "inner_denials_in_exec": inner_denials,
         "denials_by_class": {key: classes[key] for key in CLASSES},
         "top_reason_ids": [{"reason_id": key, "count": value} for key, value in
             sorted(reasons.items(), key=lambda item: (-item[1], item[0]))[:10]],
@@ -64,7 +66,8 @@ def _text(name, group):
     return [f"Hook denials {name} (observed): sessions {group['sessions_with_denials']}; "
         f"denials {group['denials']}; timeouts {group['timeouts']}",
         "  Per 100 tool calls: denials " + _display(group['denials_per_100_tool_calls'])
-        + "; timeouts " + _display(group['timeouts_per_100_tool_calls']),
+        + "; timeouts " + _display(group['timeouts_per_100_tool_calls'])
+        + "; inner_denials_in_exec " + str(group['inner_denials_in_exec']),
         "  Denials by class: " + "; ".join(f"{k} {v}"
             for k, v in group["denials_by_class"].items()),
         "  Top reason IDs: " + ("; ".join(f"{r['reason_id']} {r['count']}"

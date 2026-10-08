@@ -290,15 +290,25 @@ session measurements and require no deliverable or pull request links.
 
 Only a native tool result paired to its own call ID can establish a hook failure.
 Codex recognizes an anchored `Command blocked by PreToolUse hook:` in string
-results or leading `input_text` blocks, including custom tool outputs. An `exec`
-result may wrap it immediately after `Script error:` (with optional `Error:`).
-JSON text with `status: rejected` may carry it at the start of its `reason`.
+results or leading `input_text` blocks, including custom tool outputs. Code-mode
+`exec` output lists are inspected **per `input_text` item**, independently of the
+status header and intervening inner results. Each item can establish one denial:
+an anchored command-block prefix, `Script error:\n` immediately followed by that
+prefix, or JSON text with `status: rejected` and that prefix at the start of
+`reason`. A JSON object's top-level `result` may also be such a rejected object.
+Legacy `Script error:` wrappers with optional `Error:` remain supported. Several
+denial items in one output are counted separately, including caught denials
+under a `Script completed` header and uncaught denials after several inner results.
+A whole output string starting with `Tool call blocked by PreToolUse hook:` is
+a denial for any Codex tool, including non-exec tools.
 Claude Code recognizes `PreToolUse:<ToolName> hook error:` only when the tool
 name matches the paired call. Its anchored `PreToolUse hook did not respond
 before its timeout` is counted separately as a hook timeout. These explicit
 timeouts are not denials; a denied call whose reason mentions waiting remains
 a denial in the `wait_timeout` class. Text occurring later in source code,
-configuration, listings or quoted summaries does not establish a failure.
+configuration, listings or quoted summaries does not establish a failure. A
+completed exec's later items that quote either prefix mid-text remain uncounted;
+source text and nested JSON fields are not searched for denial phrases.
 Unpaired results, mismatched call ID types and untimed results cannot count.
 
 Each local session retains paired observations with a fixed class and a salted
@@ -335,9 +345,15 @@ A session spanning projects can repeat in several rows; project rows are not
 additive partitions of tool calls or failures.
 
 Each group exposes its session and tool-call denominators, `sessions_with_denials`,
-`denials`, `timeouts`, both rates per 100 tool calls, `denials_by_class`, and
+`denials`, `timeouts`, both rates per 100 tool calls, `inner_denials_in_exec`,
+`denials_by_class`, and
 `top_reason_ids` (at most ten, descending count with ID ties sorted). Rates are
-null with no tool calls. `first_call_denials` contains the number and share of
+null with no tool calls. **One exec counts as one tool call** in the denominator,
+even when it runs several inner tool calls. `inner_denials_in_exec` counts denial
+items inside exec output lists, is included in `denials`, and appears beside the
+rates in text output. Whole-string tool-level blocks are not inner denials.
+Multiple inner denials can make the denial rate exceed 100 even without a window
+boundary effect. `first_call_denials` contains the number and share of
 denied sessions whose first observed denial preceded every successful paired
 tool result. Its denominator is sessions with an in-window denial; the share
 is null when there are none. Pre-window observations establish that session
@@ -351,6 +367,10 @@ running when the denial arrives cannot recover it. Every remaining denial is
 results at or after the excluded end cannot establish recovery. Successful means
 a paired result not marked as an error and not recognized as a hook failure,
 rejected result or failed exec envelope; it does not prove the task succeeded.
+For exec, the later output must have no denial items and its header item must
+not start with `Script failed`. A completed script with caught inner denials
+cannot recover an earlier denial. One qualifying later exec can recover each
+denial item from an earlier exec within the same three-call window.
 Denials and timeouts enter the window by their result timestamps, while tool-call
 denominators retain existing start-time accounting. Boundary rates may therefore
 exceed 100, or be null when a result arrives without an in-window start.
