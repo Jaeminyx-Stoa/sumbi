@@ -18,6 +18,40 @@ KEYWORDS = (
 CODEX_PREFIX = "Command blocked by PreToolUse hook:"
 TOOL_PREFIX = "Tool call blocked by PreToolUse hook:"
 CLAUDE_TIMEOUT = "PreToolUse hook did not respond before its timeout"
+TRUNCATED_HEADER = re.compile(
+    r"\AWarning: truncated output \(original token count: [0-9]+\)\r?\n"
+    r"Total output lines: [0-9]+\r?\n\r?\n")
+
+
+def _prefixed_reason(text):
+    if isinstance(text, str):
+        for prefix in (CODEX_PREFIX, TOOL_PREFIX):
+            if text.startswith(prefix):
+                return _reason(text[len(prefix):].strip(), False)
+    return None
+
+
+def _rejected_reason(value):
+    if isinstance(value, dict) and value.get("status") == "rejected":
+        for key in ("reason", "value"):
+            denial = _prefixed_reason(value.get(key))
+            if denial is not None:
+                return denial
+    return None
+
+
+def _exec_json_reason(value):
+    """Inspect the object and its immediate values, without recursive searching."""
+    if not isinstance(value, dict):
+        return None
+    denial = _rejected_reason(value)
+    if denial is not None:
+        return denial
+    for item in value.values():
+        denial = _prefixed_reason(item) or _rejected_reason(item)
+        if denial is not None:
+            return denial
+    return None
 
 
 def content_text(value, agent):
@@ -50,16 +84,19 @@ def recognize(value, agent, tool):
             text = text[len("Script error:"):].lstrip()
             if text.startswith("Error: "):
                 text = text[len("Error: "):]
+        if tool.split(".")[-1] == "exec":
+            denial = _prefixed_reason(text)
+            if denial is not None:
+                return denial
         if text.startswith("{"):
             try:
                 rejected = json.loads(text)
             except (ValueError, TypeError):
                 return None
+            if tool.split(".")[-1] == "exec":
+                return _exec_json_reason(rejected)
             if not isinstance(rejected, dict) or rejected.get("status") != "rejected":
-                rejected = (rejected.get("result") if isinstance(rejected, dict)
-                    and tool.split(".")[-1] == "exec" else None)
-                if not isinstance(rejected, dict) or rejected.get("status") != "rejected":
-                    return None
+                return None
             text = rejected.get("reason")
         if not isinstance(text, str) or not text.startswith(CODEX_PREFIX):
             return None
@@ -93,12 +130,16 @@ def recognize_all(value, agent, tool):
             if not isinstance(item, dict) or item.get("type") != "input_text":
                 continue
             text = item.get("text")
-            # The tool-level prefix applies to a whole output string only.
-            if not isinstance(text, str) or text.startswith(TOOL_PREFIX):
+            if not isinstance(text, str):
                 continue
-            denial = recognize(text, agent, tool)
-            if denial is not None:
-                denials.append((*denial, True))
+            header = TRUNCATED_HEADER.match(text)
+            texts = text[header.end():].splitlines() if header else [text]
+            for printed in texts:
+                if header and not printed.startswith((CODEX_PREFIX, TOOL_PREFIX, "{")):
+                    continue
+                denial = recognize(printed, agent, tool)
+                if denial is not None:
+                    denials.append((*denial, True))
         return denials
     denial = recognize(value, agent, tool)
     return [(*denial, False)] if denial is not None else []
@@ -106,7 +147,8 @@ def recognize_all(value, agent, tool):
 
 def candidate_output(value, agent):
     """Keep only anchored candidates and failure headers until call pairing."""
-    prefixes = (CODEX_PREFIX, TOOL_PREFIX, "PreToolUse", "Script error:", "Script failed", "{")
+    prefixes = (CODEX_PREFIX, TOOL_PREFIX, "PreToolUse", "Script error:", "Script failed", "{",
+        "Warning: truncated output (original token count:")
     if agent == "codex" and isinstance(value, list):
         return [{"type": item.get("type"), "text": item["text"]
             if isinstance(item.get("text"), str) and item["text"].startswith(prefixes)
