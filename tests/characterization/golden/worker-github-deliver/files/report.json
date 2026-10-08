@@ -1429,7 +1429,9 @@
       }
     ],
     "missing_prs": 0,
-    "evidence_gaps": {},
+    "evidence_gaps": {
+      "edit_target_unknown": 16
+    },
     "link_evidence_counts": {
       "pushed_branch": 24
     }
@@ -1440,6 +1442,7 @@
     "deleted_logs_undetectable",
     "last_observed_time_is_not_acceptance",
     "continued_pr_requires_authorship",
-    "repairs_fail_original_dispatch"
+    "repairs_fail_original_dispatch",
+    "unrelated_later_session_may_ship_work"
   ]
 }

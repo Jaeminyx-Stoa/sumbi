@@ -58,7 +58,9 @@ def _blocks(event, kind, blocks, when):
                     deferred=args.get("run_in_background", False) is not False,
                     source_identity=source)
             if name in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
-                yield FileEdit(identity, suffix)
+                target = args.get("file_path") or args.get("notebook_path")
+                yield FileEdit(identity, suffix,
+                    (target if isinstance(target, str) else None,), event.get("cwd"))
             yield ToolStart(identity, suffix)
             if name == "AskUserQuestion":
                 yield Counter("user_input_requests", identity, suffix)

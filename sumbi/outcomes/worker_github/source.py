@@ -39,7 +39,7 @@ class WorkerGitHubSource:
                 excluded_state=("repository_unreadable" if row["reason"] == "repository_unreadable"
                     else "no_change" if row["state"] == "no_change" else None),
                 checks_basis=tuple(row["checks_basis"]), start_scope=row["start_scope"],
-                retained_unlinked=row["state"] == "no_pr"))
+                retained_unlinked=row["state"] == "no_pr" and row["reason"] == "no_linked_pr"))
         return units, report
 
     def source_gates(self, arms, *, candidates, report, stage):

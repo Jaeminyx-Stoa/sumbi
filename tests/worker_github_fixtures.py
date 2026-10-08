@@ -90,6 +90,14 @@ def execution(command, output, cwd, *, day=1, identity="shell", start=3, end=11,
             "type": "function_call_output", "call_id": identity, "output": output}}]
 
 
+def file_change(changes, *, identity="edit", day=1, start=1, end=2):
+    """Current native edit item; operands are synthetic fixture paths only."""
+    return {"type": "event_msg", "timestamp": at(day, end).isoformat(), "payload": {
+        "type": "item_completed", "started_at_ms": int(at(day, start).timestamp() * 1000),
+        "completed_at_ms": int(at(day, end).timestamp() * 1000),
+        "item": {"type": "FileChange", "id": identity, "changes": changes}}}
+
+
 def claude_worker(home, identity, cwd, number, *, day=1, cost=100, seconds=100):
     rows = [{"type": "user", "sessionId": "main", "agentId": identity, "cwd": str(cwd),
         "timestamp": at(day).isoformat(), "message": {"content": "Synthetic dispatch"}},

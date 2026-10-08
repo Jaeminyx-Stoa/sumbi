@@ -13,7 +13,9 @@ from sumbi.measure.attribution import Attributor
 from sumbi.outcomes.github.deliver import judge
 from sumbi.outcomes.github.ledger import Deliverable
 from sumbi.outcomes.local_verify.workers import token_measurement
-from sumbi.outcomes.worker_github.links import (link_prs, public_links, references,
+from sumbi.outcomes.worker_github.chains import resolve_chain
+from sumbi.outcomes.worker_github.edits import EditScope
+from sumbi.outcomes.worker_github.links import (authorship, link_prs, public_links, references,
     repositories, repository_owners, start_repo)
 from sumbi.outcomes.worker_github.scope import capture
 from sumbi.sessions.builder import collect
@@ -38,12 +40,13 @@ def dispatched(session):
     return session.dispatch_kind in ("subagent", "noninteractive_exec")
 
 
-def worker_judgment(session, lifetime, links, outcomes, days, authored=False):
+def worker_judgment(session, lifetime, links, outcomes, days, authored=False, changed_edits=None):
     """Reuse constituent judgment, but a repair cannot recover this dispatch."""
-    edits = any(lifetime.contains(t) for t in session.edits.values())
+    edits = (any(lifetime.contains(t) for t in session.edits.values())
+        if changed_edits is None else changed_edits)
     incomplete = bool(session.local_evidence_gaps)
     changed = edits or incomplete or authored or any(
-        evidence != "cwd_branch" for evidence, _, _ in links.values())
+        link.strength == "strong" for link in links.values())
     if not links or not changed:
         return {"state": "no_pr" if changed else "no_change",
             "reason": "no_linked_pr" if changed else "no_known_edit",
@@ -69,12 +72,15 @@ def worker_judgment(session, lifetime, links, outcomes, days, authored=False):
     return result
 
 
-def worker_row(session, scan, links, outcomes, days, scope, gaps, authored=False):
+def worker_row(session, scan, links, outcomes, days, scope, gaps, authored=False,
+    chain_unshipped=False, changed_edits=None):
     lifetime = Window(session.start_at, scan.until)
     tokens, complete, observed = token_measurement(session, lifetime)
     judgment_incomplete = False
     try:
-        result = worker_judgment(session, lifetime, links, outcomes, days, authored)
+        result = worker_judgment(session, lifetime, links, outcomes, days, authored, changed_edits)
+        if result["state"] == "no_pr" and chain_unshipped:
+            result["reason"] = "chain_unshipped"
     except (OverflowError, RecursionError):
         # Malformed temporal evidence or cyclic repairs affect this unit only.
         gaps["judgment_conflicts"] += 1
@@ -90,7 +96,7 @@ def worker_row(session, scan, links, outcomes, days, scope, gaps, authored=False
         "last_at": latest.isoformat() if latest else None,
         "state": result["state"], "reason": result["reason"], "task_type": None,
         "links": public_links(session.id(), links),
-        "weak_link": any(evidence == "cwd_branch" for evidence, _, _ in links.values()),
+        "weak_link": any(link.strength == "weak" for link in links.values()),
         "prs": [pseudonym("pr", p) for p in result["attempt_prs"]],
         "missing_prs": sum(p is None for p in prs),
         "checks_basis": [p.checks_basis for p in prs if p and p.merged_at],
@@ -122,6 +128,9 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
             repos, owners, outcomes, fixed, lambda scan: sessions(home, scan, agents))
         units, overhead, excluded, gaps = [], [], Counter(), Counter()
         attributor = Attributor([])
+        edit_scope = EditScope(attributor, repos)
+        gap_memo = set()
+        index = {(s.agent, s.raw_id): s for s in found}
         for session in found:
             if not session.in_window(scan):
                 continue
@@ -135,8 +144,13 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
                 continue
             refs = references(session, lifetime)
             evidence_repos = set()
+            unit_gaps = gaps if session.id() in fixed else Counter()
+            own_gaps = Counter()
+            own = tuple(authorship(session, lifetime, own_gaps, gap_memo=gap_memo,
+                run_gaps=gaps if session.id() in fixed else None))
             links = link_prs(session, lifetime, refs, repos, origin_repo, outcomes,
-                attributor, gaps if session.id() in fixed else Counter(), evidence_repos)
+                attributor, unit_gaps, evidence_repos, authored_events=own,
+                gap_memo=gap_memo if session.id() in fixed else None)
             if not origin_repo and not evidence_repos:
                 excluded["repository_unconfirmed"] += 1
                 continue
@@ -146,15 +160,25 @@ def deliver_workers(home, window, repos, outcomes, *, agents=None, salt=None, fo
                     "tokens": tokens, "tokens_complete": complete, "observed_total": observed})
                 continue
             if session.id() in fixed:
+                changed_edits, known_edits = edit_scope.changes(session, lifetime, gaps)
+                unshipped = False
+                if not own:
+                    inherited, unshipped = resolve_chain(session, lifetime, index, repos,
+                        outcomes, attributor, gaps, evidence_repos=evidence_repos,
+                        gap_memo=gap_memo)
+                    links.update(inherited)
+                    unshipped &= not any(own_gaps[k] for k in (
+                        "authorship_exit_unknown", "link_conflicts"))
                 unreadable_only = bool(evidence_repos & outcomes.unreadable) and not (
                     evidence_repos - outcomes.unreadable) and not any(
-                    evidence != "cwd_branch" for evidence, _, _ in links.values())
+                    link.strength == "strong" for link in links.values())
                 if unreadable_only:
                     excluded["repository_unreadable"] += 1
                     links = {}
                 row = worker_row(session, scan, links, outcomes, follow_up_days,
                     "start_origin" if origin_repo else "own_reference", gaps,
-                    authored=bool(evidence_repos))
+                    authored=bool(evidence_repos), chain_unshipped=unshipped and known_edits,
+                    changed_edits=changed_edits)
                 if unreadable_only:
                     row.update(state="in_progress", reason="repository_unreadable")
                 units.append(row)
@@ -199,7 +223,8 @@ def worker_report(window, scan, repos, units, overhead, excluded, adapters, obse
                 for r in units for link in r["links"]).items()))},
         "limitations": ["worker_costs_exclude_dispatch_overhead", "shell_edits_invisible",
             "deleted_logs_undetectable", "last_observed_time_is_not_acceptance",
-            "continued_pr_requires_authorship", "repairs_fail_original_dispatch"]}
+            "continued_pr_requires_authorship", "repairs_fail_original_dispatch",
+            "unrelated_later_session_may_ship_work"]}
 
 
 def text_summary(report):

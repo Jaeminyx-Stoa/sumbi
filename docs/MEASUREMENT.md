@@ -998,7 +998,9 @@ sumbi compare --registration worker-registration.json --repo example/sample \
 ```
 
 `--repo-owner example` measures every repository under that owner named by a
-fixed worker's own strong push or creation evidence. Repeat it for multiple owners;
+fixed worker's own strong push or creation evidence, or a scoped ancestor's push
+or creation result. Ancestor discovery requires the worker's own start origin
+or repository evidence to match that result. Repeat it for multiple owners;
 matching is case-insensitive. Repositories are captured lazily as evidence appears,
 without listing all repositories under an owner. `--repo` remains an additional
 explicit scope and permits the existing cwd-origin path. Owner scope alone does
@@ -1033,13 +1035,13 @@ cwd can still be scoped by a successful measured push or PR creation, including
 a push whose branch has no recorded PR yet. Plain references and command intent
 cannot establish scope. Unconfirmed repositories and missing starts are counted
 separately; missing starts block comparison.
-No parent's cwd, references, costs or outcome are inherited by a child.
+Parent cwd and costs are never substituted for the child's own observations.
 
 Links require own-session authorship from normalized command executions that
 started and completed inside the worker lifetime and exited zero, with the
 explicit non-error Claude result exception below. PR URLs that
 are read, viewed, quoted or listed in inputs, outputs or briefs cannot link work.
-Every linked PR retains its strongest own-session evidence:
+Every linked PR retains its strongest evidence, with own authorship taking priority:
 
 | Evidence label | Strength and meaning |
 | --- | --- |
@@ -1048,7 +1050,31 @@ Every linked PR retains its strongest own-session evidence:
 | `pr_created_output` | Strong: an explicitly non-error Claude result without an exit code prints a PR URL for a creation command. |
 | `pushed_branch_output` | Strong: an explicitly non-error Claude result without an exit code contains an accepted push ref line and its remote. |
 | `committed_branch` | Strong: a successful commit result naming its branch. |
+| `ancestor_pr_created` | Below all own authorship: an ancestor creates the PR; strong only if its head branch matches the worker's own observed branch. |
+| `ancestor_pushed_branch` | Below ancestor creation: an ancestor pushes the branch; strong only if it matches the worker's own observed branch. |
 | `cwd_branch` | Weak: structured cwd/context branch or a literal current-branch query only. |
+
+A dispatched worker without any own observed authorship can link through its
+`parent_raw_id` chain, within the same agent's logs. Parents, grandparents and
+further ancestors qualify only with successful push or PR-creation results at
+or after the worker's start and before its observation cutoff. An ancestor's
+command may begin before dispatch when its recognized result completes within
+that lifetime. Only repositories touched by the worker's own start origin or
+repository evidence qualify; ancestry cannot supply the worker's scope. Commit
+authorship is never inherited. Own authorship wins even if it has no matching PR.
+
+The branch must be observed in the worker's own cwd/context; ancestor branch
+context cannot supply this proof. Missing or different branches, including a
+creation response with no captured head ref, make inherited links weak. A parent
+pushing several branches can therefore produce both strong and weak constituents,
+and the existing whole-unit weak exclusion still applies. Inherited constituents
+use the same checks, disturbances, maturity and `unverified` rules as own links.
+Coverage counts `ancestor_log_missing`, `ancestor_cycle` or
+`ancestor_depth_exceeded` when traversal cannot reach the root. The fixed bound
+is 64 ancestors. A dispatched subagent or noninteractive exec with no parent ID
+cannot establish a root and counts
+as `ancestor_log_missing`. Available evidence can still link a worker across a counted gap;
+the gap cannot prove non-shipping. No missing log or malformed chain raises an error.
 
 Push results pair each `To <remote URL>` block with every changed ref line in
 that block. New branches, updates and forced updates can link; rejected,
@@ -1100,11 +1126,60 @@ with dispatch-level failure rules:
   `checks_missing_required` or `checks_none`, with complete result capture and a
   mature, disturbance-free follow-up window. It is retained non-success and
   does not block comparison. Capture and access gaps remain pending as above.
-- `no_pr`: known edits or strong authorship without a linked PR, including conservatively incomplete
-  edit evidence. It remains non-success in retained success and cost denominators.
-- `no_change`: neither recognized edits nor strong authorship, excluded but counted.
-  Strong push, creation and continued links prove changes even when remote edits
-  never invoke a local edit tool. Weak cwd-branch evidence alone does not.
+- `no_pr`: in-scope repository edits or strong in-scope authorship without a linked PR,
+  including conservatively unknown edit targets or incomplete edit evidence.
+  It remains non-success in retained success and cost denominators.
+  Reason `no_linked_pr` keeps the existing unresolved-link meaning. Reason
+  `chain_unshipped` requires known in-scope worker edits, every ancestor through the root
+  present, no `local_evidence_gaps` in the worker or its ancestors, and no observed
+  push, PR-creation or commit authorship anywhere in that chain at or after
+  dispatch within the scan, even to another repository. Unknown or conflicting
+  authorship evidence, or successful authorship commands with missing results,
+  cannot prove non-shipping (`authorship_result_missing` is counted). This records observed
+  non-shipping only: a later, unrelated session could still ship the work.
+- `no_change`: neither in-scope repository edits nor strong in-scope authorship,
+  excluded but counted. Workers editing only scratch paths outside measured
+  checkouts or ignored paths inside them have no known repository change.
+  Successful in-scope commit, push and creation authorship and strong continued
+  links prove changes even when edits never invoke a local edit tool. Commit
+  scope uses the same command repository and cwd rules as `committed_branch`
+  links, including literal `git -C`; a matching PR or push is not required.
+  Out-of-scope commits do not prove a measured change. Weak cwd-branch evidence
+  alone does not.
+
+For `worker-github` only, adapters retain file edit targets as local-only evidence.
+Claude Code uses `Edit`, `Write`, `MultiEdit` and `NotebookEdit` file/notebook paths.
+Codex `apply_patch` uses add, update, delete and move headers, resolving relative
+paths against the call's working directory. Current Codex `item_completed`
+events with `item.type == "FileChange"` retain every path key from the
+`item.changes` mapping (`add`, `update` and `delete`) plus each non-null
+`move_path` destination. Empty or non-mapping `changes` stay unknown. Native
+multi-file items and older patches retain every target under the existing edit
+identity and timestamp. These operands never
+appear in public reports; `collect` and local verification keep their existing
+edit and output contracts.
+
+An edit is known in scope when the nearest existing ancestor directory belongs
+to a git checkout with a measured origin, using the same cached origin probes
+as worker-start scope, and read-only `git check-ignore` does not ignore its path.
+Missing or deleted paths are checked too. Sibling worktrees and clones qualify
+by origin; paths in unmeasured checkouts do not. Owner scope uses the repositories
+admitted by its existing authorship discovery rules, rather than admitting new
+repositories merely because an edit targets them.
+
+Coverage `evidence_gaps` counts `edit_outside_scope`, `edit_ignored` and
+`edit_target_unknown` once per edit per category, even when several targets have
+the same category. An edit with an unknown or unparsable target, an unreadable
+checkout or a failed git query still conservatively counts as a change. An edit
+with any known in-scope target also counts as a change. Unknown targets alone
+cannot establish `chain_unshipped`. Ignore queries are cached per target, and
+ancestor authorship diagnostics count each session/command once per run while
+remaining visible to every affected child's chain decision. A dispatched
+`subagent` or `noninteractive_exec` root without a linked dispatcher log is
+incomplete and cannot establish `chain_unshipped`. A `noninteractive_exec` root
+with no parent ID counts `dispatcher_unobserved`, including when it terminates
+a child's ancestor chain; a referenced but absent parent still counts
+`ancestor_log_missing`.
 
 Delivery JSON includes `state_reasons`, a reason-count mapping per state; text
 prints rows such as `unverified: checks_missing_required 2`. Comparison arms
@@ -1122,10 +1197,13 @@ ordered coverage/comparability/success/cost verdict gates. Checks bases must be
 uniform across every retained merged attempt, including detected follow-ups.
 Missing PRs, incomplete repository capture, parse errors and missing required
 token evidence block coverage. The combined weak/unlinked and exposure-excluded
-share over 10% in either candidate arm blocks comparability. `no_pr` contributes
-to this gate while staying in denominators; overlapping reasons count once.
-The reported `risky_share` includes retained `no_pr` units as well as risky
-exclusions. Exclusions whose reason is `no_change` do not contribute; exposure
+share over 10% in either candidate arm blocks comparability. Retained `no_pr`
+units with reason `no_linked_pr` contribute to this gate while staying in
+denominators; `chain_unshipped` units remain non-success in denominators and cost
+numerators without adding linking risk. Overlapping reasons count once.
+The reported `risky_share` includes retained `no_linked_pr` units as well as risky
+exclusions. Exposure exclusions still count for `chain_unshipped` workers.
+Exclusions whose reason is `no_change` do not contribute; exposure
 gap exclusions still do. A no-change share shift over 0.2 blocks comparison.
 `repository_unreadable` diagnostic units remain `in_progress` in candidate
 counts, but are excluded from retained arms with that reason. Their costs stay
@@ -1138,7 +1216,10 @@ failed, unverified and no-PR workers' full observed lifetime tokens. Time is dis
 worker's last observed activity, labeled `observed_worker_span`, rather than
 PR acceptance or human waiting time. Dispatcher overhead and excluded worker
 spend appear separately. An adopt proposal concerns worker costs only.
-Shell edits are invisible, missing/deleted logs are undetectable, branch reuse
+Shell-command edits remain invisible: invoking an edit through a shell does not
+create file-edit evidence. Scope and ignore checks inspect the current local
+checkout state rather than historical filesystem snapshots.
+Missing/deleted logs are undetectable, branch reuse
 is conservative, and disturbance patterns are bounded evidence rather than
 semantic review. Sources cannot be mixed between arms.
 
