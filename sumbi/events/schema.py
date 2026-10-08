@@ -61,6 +61,7 @@ class SessionStart:
         "sumbi-events-v1"] = "sumbi-events-v1"
     metadata: Metadata = Metadata()
     dispatch_kind: Literal["subagent", "noninteractive_exec", "interactive", "unknown"] = "unknown"
+    spawn_depth: int | None = None
 
 
 @dataclass(frozen=True)
@@ -140,6 +141,22 @@ class TokenUsage:
     # Some native snapshots report total input including cache reads. Retain
     # that observation to detect resets without changing new_input's v1 meaning.
     input_total: int | None = None
+
+
+@dataclass(frozen=True)
+class RequestUsage:
+    """One native request, separate from cumulative billable accounting."""
+
+    tokens: Tokens
+    # A cumulative vector lets the builder discard repeated turn snapshots.
+    cumulative: tuple[int | None, ...] | None = None
+
+
+@dataclass(frozen=True)
+class ModelRequest:
+    """Dispatch metadata status only; arbitrary sidecar text is never retained."""
+
+    status: Literal["requested", "unrequested", "unknown"]
 
 
 @dataclass(frozen=True)
@@ -233,7 +250,7 @@ class Diagnostic:
 
 Event: TypeAlias = (SessionStart | Context | TokenUsage | ToolStart | ToolEnd |
     CommandExecution | FileEdit | Counter | Request | SessionEnd |
-    Resume | LocalText | Metadata | ToolEvidence | Diagnostic)
+    Resume | LocalText | Metadata | ToolEvidence | Diagnostic | RequestUsage | ModelRequest)
 
 
 @dataclass(frozen=True)

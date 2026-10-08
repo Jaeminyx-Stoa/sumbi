@@ -9,6 +9,7 @@ from pathlib import Path
 from sumbi import SCHEMA_VERSION
 from sumbi.events.registry import ADAPTERS, DEFAULT_AGENTS, log_roots
 from sumbi.measure.attribution import Attributor, ProjectRule, RepositoryAttributor
+from sumbi.measure.delegation import measure as delegation, text_lines as delegation_text
 from sumbi.sessions.session import COUNT_KINDS, EVIDENCE_TYPES, TOKEN_KINDS
 from sumbi.core.records import Coverage
 from sumbi.core.time import Window
@@ -63,11 +64,13 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
     attributor = RepositoryAttributor(repository) if repository is not None else Attributor(
         rules or [])
     sessions = []
+    found_sessions = []
     coverage = {}
     reviews = []
     for agent in agents if agents is not None else DEFAULT_AGENTS:
         measured = Coverage()
         found = collect_sessions(ADAPTERS[agent], home, window, measured, local_review=local_review)
+        found_sessions.extend(found)
         included = [s for s in found if s.in_window(window)]
         coverage[agent] = {**measured.as_dict(), "sessions_read": len(found),
             "sessions_in_window": len(included)}
@@ -89,13 +92,14 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
     evidence_tokens = {e: sum(row["evidence_tokens"][e] for row in spend.values())
         for e in EVIDENCE_TYPES}
     salted = current_key() is not None
+    by_agent = _by_agent(sessions, coverage, idle_minutes)
     report = {"schema_version": SCHEMA_VERSION,
         "pseudonyms": {"salted": salted, "algorithm": "hmac-sha256" if salted else "sha256"},
         "window": {"since": window.since.isoformat().replace("+00:00", "Z"),
             "until": window.until.isoformat().replace("+00:00", "Z"),
             "bounds": "[since,until)"},
         "summary": summary,
-        "by_agent": _by_agent(sessions, coverage, idle_minutes),
+        "by_agent": by_agent,
         "coverage": {"adapters": coverage, "sessions_in_window": len(sessions),
             "spend": sorted(spend.values(),
                 key=lambda r: (r["bucket"], r["project_key"] or "")),
@@ -107,7 +111,9 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
             "evidence_shares": {e: n / all_tokens if all_tokens else 0.0 for e,
                 n in evidence_tokens.items()},
             "spend_basis": "reported_tokens", "verdict": "not_evaluated"},
-        "sessions": sessions}
+        "sessions": sessions,
+        "delegation": delegation(found_sessions, {s["id"]: s for s in sessions}, window,
+            attributor, idle_minutes, agents=by_agent)}
     if repository is not None:
         scanned = sum(c["sessions_in_window"] for c in coverage.values())
         report["scope"] = {"kind": "repository", "sessions_in_window": scanned,
@@ -172,6 +178,7 @@ def text_summary(report: dict) -> str:
     lines.append("Evidence token shares: "
         + "; ".join(f"{k} {v:.6f}" for k, v in report["coverage"]["evidence_shares"].items()))
     lines.append(f"Unattributed token share: {report['coverage']['unattributed_share']:.6f}")
+    lines.extend(delegation_text(report["delegation"]))
     return "\n".join(lines)
 
 

@@ -28,3 +28,78 @@ Spend unassigned: 0 tokens (observed); share 0.000000
 Unassigned token share: 0.000000
 Evidence token shares: cwd 1.000000; tool_path 0.000000; previous_event 0.000000; unassigned 0.000000
 Unattributed token share: 0.000000
+Delegation all (observed): dispatched 1; dispatching parents 1; parent unobserved 0
+  Nesting depth: 1 1
+  dispatched: new_input 1; cache_write 0; cache_read 2; output 3; total 6
+  parents: new_input 13; cache_write 25; cache_read 37; output 14; total 89
+  dispatched_share: new_input 0.0714286; cache_write 0; cache_read 0.0512821; output 0.176471; total 0.0631579
+  Session average context: median 3; p90 3; observed 1; unobserved 0
+  Context request total tokens: 6
+  Context sensitivity (strictly above): 100000 total tokens 0 share 0; 200000 total tokens 0 share 0; 400000 total tokens 0 share 0
+  Top decile: sessions 1; total tokens 6; share 1
+  Model request requested: sessions 0; total tokens 0
+  Model request unrequested: sessions 0; total tokens 0
+  Model request unknown: sessions 1; total tokens 6
+  Model model-a (unknown): sessions 1; total tokens 6
+  Inline/actual context (estimated): median 20; observed 1; unobserved 0; sessions below one 0; share 0
+  Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
+Delegation claude-code (observed): dispatched 1; dispatching parents 1; parent unobserved 0
+  Nesting depth: 1 1
+  dispatched: new_input 1; cache_write 0; cache_read 2; output 3; total 6
+  parents: new_input 13; cache_write 25; cache_read 37; output 14; total 89
+  dispatched_share: new_input 0.0714286; cache_write 0; cache_read 0.0512821; output 0.176471; total 0.0631579
+  Session average context: median 3; p90 3; observed 1; unobserved 0
+  Context request total tokens: 6
+  Context sensitivity (strictly above): 100000 total tokens 0 share 0; 200000 total tokens 0 share 0; 400000 total tokens 0 share 0
+  Top decile: sessions 1; total tokens 6; share 1
+  Model request requested: sessions 0; total tokens 0
+  Model request unrequested: sessions 0; total tokens 0
+  Model request unknown: sessions 1; total tokens 6
+  Model model-a (unknown): sessions 1; total tokens 6
+  Inline/actual context (estimated): median 20; observed 1; unobserved 0; sessions below one 0; share 0
+  Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
+Delegation codex (observed): dispatched 0; dispatching parents 0; parent unobserved 0
+  Nesting depth: none
+  dispatched: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total 0
+  parents: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total 0
+  dispatched_share: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total unobserved
+  Session average context: median unobserved; p90 unobserved; observed 0; unobserved 0
+  Context request total tokens: 0
+  Context sensitivity (strictly above): 100000 total tokens 0 share unobserved; 200000 total tokens 0 share unobserved; 400000 total tokens 0 share unobserved
+  Top decile: sessions 0; total tokens 0; share unobserved
+  Model request requested: sessions 0; total tokens 0
+  Model request unrequested: sessions 0; total tokens 0
+  Model request unknown: sessions 0; total tokens 0
+  Inline/actual context (estimated): median unobserved; observed 0; unobserved 0; sessions below one 0; share unobserved
+  Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
+Delegation project sample project_e3db46d1b932ef2c778ba7cc claude-code (observed): dispatched 1; dispatching parents 1; parent unobserved 0
+  Nesting depth: 1 1
+  dispatched: new_input 1; cache_write 0; cache_read 2; output 3; total 6
+  parents: new_input 13; cache_write 25; cache_read 37; output 14; total 89
+  dispatched_share: new_input 0.0714286; cache_write 0; cache_read 0.0512821; output 0.176471; total 0.0631579
+  Session average context: median 3; p90 3; observed 1; unobserved 0
+  Context request total tokens: 6
+  Context sensitivity (strictly above): 100000 total tokens 0 share 0; 200000 total tokens 0 share 0; 400000 total tokens 0 share 0
+  Top decile: sessions 1; total tokens 6; share 1
+  Model request requested: sessions 0; total tokens 0
+  Model request unrequested: sessions 0; total tokens 0
+  Model request unknown: sessions 1; total tokens 6
+  Model model-a (unknown): sessions 1; total tokens 6
+  Inline/actual context (estimated): median 20; observed 1; unobserved 0; sessions below one 0; share 0
+  Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
+Delegation project sample project_e3db46d1b932ef2c778ba7cc codex (observed): dispatched 0; dispatching parents 0; parent unobserved 0
+  Nesting depth: none
+  dispatched: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total 0
+  parents: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total 0
+  dispatched_share: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total unobserved
+  Session average context: median unobserved; p90 unobserved; observed 0; unobserved 0
+  Context request total tokens: 0
+  Context sensitivity (strictly above): 100000 total tokens 0 share unobserved; 200000 total tokens 0 share unobserved; 400000 total tokens 0 share unobserved
+  Top decile: sessions 0; total tokens 0; share unobserved
+  Model request requested: sessions 0; total tokens 0
+  Model request unrequested: sessions 0; total tokens 0
+  Model request unknown: sessions 0; total tokens 0
+  Inline/actual context (estimated): median unobserved; observed 0; unobserved 0; sessions below one 0; share unobserved
+  Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
+Delegation estimate measures context volume; it ignores model prices, output tokens and caching behaviour.
+Delegation shares use the unique union of children and direct parents; nested dispatchers enter that denominator once.

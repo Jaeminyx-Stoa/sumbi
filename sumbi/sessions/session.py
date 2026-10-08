@@ -67,6 +67,10 @@ class Session:
     emitter_agent: str | None = None
     token_evidence_incomplete: bool = False
     metadata_incomplete: dict[str, bool] = field(default_factory=dict)
+    request_usage: list[tuple] = field(default_factory=list)
+    model_history: list[tuple] = field(default_factory=list)
+    model_request_status: str = "unknown"
+    spawn_depth: int | None = None
 
     def public_agent(self):
         return "sumbi-events:" + pseudonym("agent", self.emitter_agent

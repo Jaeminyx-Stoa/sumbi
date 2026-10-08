@@ -26,3 +26,78 @@ Spend unassigned: 0 tokens (observed); share 0.000000
 Unassigned token share: 0.000000
 Evidence token shares: cwd 1.000000; tool_path 0.000000; previous_event 0.000000; unassigned 0.000000
 Unattributed token share: 0.000000
+Delegation all (observed): dispatched 2; dispatching parents 2; parent unobserved 0
+  Nesting depth: 1 2
+  dispatched: new_input 200; cache_write 0; cache_read 40; output 20; total 260
+  parents: new_input 60; cache_write 0; cache_read 0; output 20; total 80
+  dispatched_share: new_input 0.769231; cache_write unobserved; cache_read 1; output 0.5; total 0.764706
+  Session average context: median unobserved; p90 unobserved; observed 0; unobserved 2
+  Context request total tokens: 0
+  Context sensitivity (strictly above): 100000 total tokens 0 share unobserved; 200000 total tokens 0 share unobserved; 400000 total tokens 0 share unobserved
+  Top decile: sessions 1; total tokens 130; share 0.5
+  Model request requested: sessions 0; total tokens 0
+  Model request unrequested: sessions 0; total tokens 0
+  Model request unknown: sessions 2; total tokens 260
+  Model model_99051c601e033380bf6cd425 (unknown): sessions 2; total tokens 260
+  Inline/actual context (estimated): median unobserved; observed 0; unobserved 2; sessions below one 0; share unobserved
+  Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 2; tool_errors 0; tool_results 2; tool_failure_rate 0
+Delegation sumbi-events:agent_9e260e54ae0e8fd149c80532 (observed): dispatched 2; dispatching parents 2; parent unobserved 0
+  Nesting depth: 1 2
+  dispatched: new_input 200; cache_write 0; cache_read 40; output 20; total 260
+  parents: new_input 60; cache_write 0; cache_read 0; output 20; total 80
+  dispatched_share: new_input 0.769231; cache_write unobserved; cache_read 1; output 0.5; total 0.764706
+  Session average context: median unobserved; p90 unobserved; observed 0; unobserved 2
+  Context request total tokens: 0
+  Context sensitivity (strictly above): 100000 total tokens 0 share unobserved; 200000 total tokens 0 share unobserved; 400000 total tokens 0 share unobserved
+  Top decile: sessions 1; total tokens 130; share 0.5
+  Model request requested: sessions 0; total tokens 0
+  Model request unrequested: sessions 0; total tokens 0
+  Model request unknown: sessions 2; total tokens 260
+  Model model_99051c601e033380bf6cd425 (unknown): sessions 2; total tokens 260
+  Inline/actual context (estimated): median unobserved; observed 0; unobserved 2; sessions below one 0; share unobserved
+  Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 2; tool_errors 0; tool_results 2; tool_failure_rate 0
+Delegation sumbi-events:agent_dafcddd422574acb5f48fb2b (observed): dispatched 0; dispatching parents 0; parent unobserved 0
+  Nesting depth: none
+  dispatched: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total 0
+  parents: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total 0
+  dispatched_share: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total unobserved
+  Session average context: median unobserved; p90 unobserved; observed 0; unobserved 0
+  Context request total tokens: 0
+  Context sensitivity (strictly above): 100000 total tokens 0 share unobserved; 200000 total tokens 0 share unobserved; 400000 total tokens 0 share unobserved
+  Top decile: sessions 0; total tokens 0; share unobserved
+  Model request requested: sessions 0; total tokens 0
+  Model request unrequested: sessions 0; total tokens 0
+  Model request unknown: sessions 0; total tokens 0
+  Inline/actual context (estimated): median unobserved; observed 0; unobserved 0; sessions below one 0; share unobserved
+  Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
+Delegation project project_e3db46d1b932ef2c778ba7cc sumbi-events:agent_9e260e54ae0e8fd149c80532 (observed): dispatched 2; dispatching parents 2; parent unobserved 0
+  Nesting depth: 1 2
+  dispatched: new_input 200; cache_write 0; cache_read 40; output 20; total 260
+  parents: new_input 60; cache_write 0; cache_read 0; output 20; total 80
+  dispatched_share: new_input 0.769231; cache_write unobserved; cache_read 1; output 0.5; total 0.764706
+  Session average context: median unobserved; p90 unobserved; observed 0; unobserved 2
+  Context request total tokens: 0
+  Context sensitivity (strictly above): 100000 total tokens 0 share unobserved; 200000 total tokens 0 share unobserved; 400000 total tokens 0 share unobserved
+  Top decile: sessions 1; total tokens 130; share 0.5
+  Model request requested: sessions 0; total tokens 0
+  Model request unrequested: sessions 0; total tokens 0
+  Model request unknown: sessions 2; total tokens 260
+  Model model_99051c601e033380bf6cd425 (unknown): sessions 2; total tokens 260
+  Inline/actual context (estimated): median unobserved; observed 0; unobserved 2; sessions below one 0; share unobserved
+  Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 2; tool_errors 0; tool_results 2; tool_failure_rate 0
+Delegation project project_e3db46d1b932ef2c778ba7cc sumbi-events:agent_dafcddd422574acb5f48fb2b (observed): dispatched 0; dispatching parents 0; parent unobserved 0
+  Nesting depth: none
+  dispatched: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total 0
+  parents: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total 0
+  dispatched_share: new_input unobserved; cache_write unobserved; cache_read unobserved; output unobserved; total unobserved
+  Session average context: median unobserved; p90 unobserved; observed 0; unobserved 0
+  Context request total tokens: 0
+  Context sensitivity (strictly above): 100000 total tokens 0 share unobserved; 200000 total tokens 0 share unobserved; 400000 total tokens 0 share unobserved
+  Top decile: sessions 0; total tokens 0; share unobserved
+  Model request requested: sessions 0; total tokens 0
+  Model request unrequested: sessions 0; total tokens 0
+  Model request unknown: sessions 0; total tokens 0
+  Inline/actual context (estimated): median unobserved; observed 0; unobserved 0; sessions below one 0; share unobserved
+  Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
+Delegation estimate measures context volume; it ignores model prices, output tokens and caching behaviour.
+Delegation shares use the unique union of children and direct parents; nested dispatchers enter that denominator once.
