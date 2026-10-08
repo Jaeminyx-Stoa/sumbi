@@ -293,9 +293,17 @@ Codex recognizes an anchored `Command blocked by PreToolUse hook:` in string
 results or leading `input_text` blocks, including custom tool outputs. Code-mode
 `exec` output lists are inspected **per `input_text` item**, independently of the
 status header and intervening inner results. Each item can establish one denial:
-an anchored command-block prefix, `Script error:\n` immediately followed by that
-prefix, or JSON text with `status: rejected` and that prefix at the start of
-`reason`. A JSON object's top-level `result` may also be such a rejected object.
+either anchored block prefix, `Script error:\n` immediately followed by either
+prefix, or a JSON object with a qualifying top-level value. A qualifying value
+is a string starting with either prefix, or an object with `status: rejected`
+and a `reason` or `value` starting with either prefix. The JSON object itself
+may also have that rejected status and anchored `reason` or `value`. Any
+top-level key can carry a qualifying value; each JSON item counts at most once.
+An item starting with the exact `Warning: truncated output (original token
+count: N)\nTotal output lines: M\n\n` header is inspected per printed line after
+the header. Each line starting with either prefix, or containing a complete
+JSON object meeting the same top-level rules, counts once. Other multiline
+items are not split or searched. Header counts are not reported.
 Legacy `Script error:` wrappers with optional `Error:` remain supported. Several
 denial items in one output are counted separately, including caught denials
 under a `Script completed` header and uncaught denials after several inner results.
@@ -308,7 +316,9 @@ timeouts are not denials; a denied call whose reason mentions waiting remains
 a denial in the `wait_timeout` class. Text occurring later in source code,
 configuration, listings or quoted summaries does not establish a failure. A
 completed exec's later items that quote either prefix mid-text remain uncounted;
-source text and nested JSON fields are not searched for denial phrases.
+source text and deeper JSON fields are not searched for denial phrases.
+Indented, quoted, markdown and `FILE` lines with a later prefix remain uncounted,
+including after a truncation header.
 Unpaired results, mismatched call ID types and untimed results cannot count.
 
 Each local session retains paired observations with a fixed class and a salted
@@ -350,7 +360,7 @@ Each group exposes its session and tool-call denominators, `sessions_with_denial
 `top_reason_ids` (at most ten, descending count with ID ties sorted). Rates are
 null with no tool calls. **One exec counts as one tool call** in the denominator,
 even when it runs several inner tool calls. `inner_denials_in_exec` counts denial
-items inside exec output lists, is included in `denials`, and appears beside the
+items or printed lines inside exec output lists, is included in `denials`, and appears beside the
 rates in text output. Whole-string tool-level blocks are not inner denials.
 Multiple inner denials can make the denial rate exceed 100 even without a window
 boundary effect. `first_call_denials` contains the number and share of

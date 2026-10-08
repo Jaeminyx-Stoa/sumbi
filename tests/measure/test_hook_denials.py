@@ -121,7 +121,7 @@ class HookDenialTests(unittest.TestCase):
                    "file listing:\n" + quoted, "Subagent summary quoting: " + quoted,
                    "  " + quoted, "Script error: summary quoting " + quoted,
                    json.dumps({"status": "rejected", "reason": "quoted: " + quoted}),
-                   json.dumps({"status": "accepted", "reason": quoted}),
+                   json.dumps({"r": {"status": "accepted", "reason": quoted}}),
                    [{"type": "input_text", "text": "source code:"},
                     {"type": "input_text", "text": "print('" + quoted + "')"}],
                    [{"type": "image", "text": quoted}]]
@@ -417,6 +417,79 @@ class HookDenialTests(unittest.TestCase):
         self.save("codex", records)
         group = self.report()["hook_denials"]["summary"]
         self.assertEqual((group["denials"], group["inner_denials_in_exec"]), (4, 0))
+
+    def test_inner_tool_blocks_and_script_printed_json(self):
+        shapes = [
+            "Script error:\n" + TOOL_BLOCKED + "tool not allowed",
+            TOOL_BLOCKED + "tool not allowed",
+            json.dumps({"cmd": "read synthetic", "out": BLOCKED + "command form"}),
+            json.dumps({"file": "synthetic", "r": {"status": "rejected",
+                        "reason": BLOCKED + "path scope"}}),
+            json.dumps({"i": 0, "status": "rejected", "value": BLOCKED + "size limit"}),
+            json.dumps({"r": {"status": "rejected", "value": TOOL_BLOCKED + "slot wait"}}),
+            json.dumps({"status": "rejected", "reason": TOOL_BLOCKED + "synthetic"}),
+            # Multiple qualifying values still represent just one printed denial.
+            json.dumps({"out": BLOCKED + "synthetic", "other": TOOL_BLOCKED + "synthetic"}),
+            json.dumps({"status": "accepted", "out": TOOL_BLOCKED + "synthetic"}),
+        ]
+        self.save("codex", codex_call(1, "printed", exec_output("Script failed\nOutput:\n",
+                  *shapes), name="functions.exec") + codex_call(3, "retry",
+                  exec_output("Script completed\nOutput:\n", "synthetic"), name="functions.exec"))
+        report = self.report()
+        group = report["hook_denials"]["summary"]
+        self.assertEqual((group["denials"], group["inner_denials_in_exec"],
+                          group["tool_calls"], group["recovered"]), (9, 9, 2, 9))
+        self.assertEqual(group["first_call_denials"]["sessions"], 1)
+        self.assertEqual(report["summary"]["counts"]["tool_results"], 2)
+        self.assertNotIn("read synthetic", json.dumps(report) + text_summary(report))
+
+    def test_truncated_exec_counts_each_printed_line_once(self):
+        header = "Warning: truncated output (original token count: 123)\nTotal output lines: 45\n\n"
+        printed = [BLOCKED + "command form", TOOL_BLOCKED + "tool not allowed",
+                   json.dumps({"cmd": "read synthetic", "out": BLOCKED + "path scope"}),
+                   json.dumps({"file": "synthetic", "r": {"status": "rejected",
+                               "reason": BLOCKED + "size limit"}}),
+                   json.dumps({"i": 0, "status": "rejected", "value": BLOCKED + "slot wait"}),
+                   json.dumps({"out": BLOCKED + "synthetic", "value": BLOCKED + "synthetic"})]
+        records = codex_call(1, "denied", exec_output("Script completed\nOutput:\n",
+                             header + "\n".join(printed)), name="exec")
+        # A second truncated denial must not recover the first call's denials.
+        records += codex_call(3, "denied-again", exec_output("Script completed\nOutput:\n",
+                              header + TOOL_BLOCKED + "synthetic"), name="exec")
+        records += codex_call(5, "retry", exec_output("Script completed\nOutput:\n",
+                              header + "synthetic result"), name="exec")
+        self.save("codex", records)
+        group = self.report()["hook_denials"]["summary"]
+        self.assertEqual((group["denials"], group["inner_denials_in_exec"],
+                          group["tool_calls"], group["recovered"]), (7, 7, 3, 7))
+        self.assertEqual(group["first_call_denials"]["sessions"], 1)
+
+    def test_remaining_shapes_refuse_quotes_and_deeper_json(self):
+        quoted = BLOCKED + "synthetic"
+        negatives = [
+            "Script error:\nquoted: " + TOOL_BLOCKED + "synthetic",
+            "Script error:\nsource code:\n" + TOOL_BLOCKED + "synthetic",
+            "FILE synthetic\n\"" + quoted + "\"",
+            "print('" + quoted + "')",
+            "markdown: `" + quoted + "`",
+            json.dumps({"cmd": "read synthetic", "out": "quoted: " + quoted}),
+            json.dumps({"file": "synthetic", "r": {"status": "accepted", "reason": quoted}}),
+            json.dumps({"i": 0, "status": "rejected", "value": "quoted: " + quoted}),
+            json.dumps({"r": {"status": "rejected", "value": "quoted: " + TOOL_BLOCKED}}),
+            json.dumps({"r": {"nested": {"status": "rejected", "reason": quoted}}}),
+            json.dumps({"out": [quoted]}),
+            '{"out":',
+            "Script error:" + quoted,
+        ]
+        # The last shape is a supported item wrapper, but not a printed line rule.
+        output = exec_output("Script completed\nOutput:\n", *negatives[:-1],
+            "Warning: truncated output (original token count: 123)\nTotal output lines: 45\n\n"
+            + "\n".join(text.replace("\n", "\\n") for text in negatives),
+            "Warning: truncated output (original token count: 123)\n\n" + quoted,
+            "source contents:\n" + quoted)
+        self.save("codex", codex_call(1, "quotes", output, name="exec"))
+        group = self.report()["hook_denials"]["summary"]
+        self.assertEqual((group["denials"], group["inner_denials_in_exec"]), (0, 0))
 
 
 if __name__ == "__main__":
