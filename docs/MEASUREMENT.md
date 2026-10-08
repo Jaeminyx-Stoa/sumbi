@@ -1140,14 +1140,22 @@ with dispatch-level failure rules:
 - `no_change`: neither in-scope repository edits nor strong in-scope authorship,
   excluded but counted. Workers editing only scratch paths outside measured
   checkouts or ignored paths inside them have no known repository change.
-  Strong push, creation and continued links prove changes even when remote edits
-  never invoke a local edit tool. Weak cwd-branch evidence alone does not.
+  Successful in-scope commit, push and creation authorship and strong continued
+  links prove changes even when edits never invoke a local edit tool. Commit
+  scope uses the same command repository and cwd rules as `committed_branch`
+  links, including literal `git -C`; a matching PR or push is not required.
+  Out-of-scope commits do not prove a measured change. Weak cwd-branch evidence
+  alone does not.
 
 For `worker-github` only, adapters retain file edit targets as local-only evidence.
 Claude Code uses `Edit`, `Write`, `MultiEdit` and `NotebookEdit` file/notebook paths.
 Codex `apply_patch` uses add, update, delete and move headers, resolving relative
-paths against the call's working directory. Multi-file patches retain every
-target under the existing edit identity and timestamp. These operands never
+paths against the call's working directory. Current Codex `item_completed`
+events with `item.type == "FileChange"` retain every path key from the
+`item.changes` mapping (`add`, `update` and `delete`) plus each non-null
+`move_path` destination. Empty or non-mapping `changes` stay unknown. Native
+multi-file items and older patches retain every target under the existing edit
+identity and timestamp. These operands never
 appear in public reports; `collect` and local verification keep their existing
 edit and output contracts.
 
@@ -1168,7 +1176,10 @@ cannot establish `chain_unshipped`. Ignore queries are cached per target, and
 ancestor authorship diagnostics count each session/command once per run while
 remaining visible to every affected child's chain decision. A dispatched
 `subagent` or `noninteractive_exec` root without a linked dispatcher log is
-incomplete and cannot establish `chain_unshipped`.
+incomplete and cannot establish `chain_unshipped`. A `noninteractive_exec` root
+with no parent ID counts `dispatcher_unobserved`, including when it terminates
+a child's ancestor chain; a referenced but absent parent still counts
+`ancestor_log_missing`.
 
 Delivery JSON includes `state_reasons`, a reason-count mapping per state; text
 prints rows such as `unverified: checks_missing_required 2`. Comparison arms

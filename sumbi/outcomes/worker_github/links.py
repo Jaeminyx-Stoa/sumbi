@@ -141,7 +141,7 @@ def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps
                 link_conflict(gaps, session, execution, gap_memo)
                 continue
             scope = tuple(command_repos) if command_repos else (cwd_repo,) if cwd_repo else ()
-        if evidence_repos is not None and kind in ("push_result", "pr_created"):
+        if evidence_repos is not None:
             evidence_repos.update(r for r in scope if r in repos)
         evidence = {"pr_created": "pr_created", "push_result": "pushed_branch",
             "branch_committed": "committed_branch"}[kind]

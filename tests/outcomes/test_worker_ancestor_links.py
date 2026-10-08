@@ -252,16 +252,39 @@ class AncestorLinkTests(unittest.TestCase):
                 if code is None or expected in ("link_conflicts", "authorship_result_missing"):
                     self.assertTrue(all(r["reason"] == "no_linked_pr" for r in report["units"]))
 
+    def test_in_scope_commit_proves_change_with_only_shell_edits(self):
+        command = "python -c 'open(\"synthetic.py\", \"w\").write(\"pass\")' && git commit -m 'Synthetic change'"
+        self.codex("child", parent="missing", edit=False, command=command,
+            output="[unmatched abc1234] Synthetic change\n")
+        row = self.unit(self.report())
+        self.assertEqual((row["state"], row["reason"], row["links"]),
+            ("no_pr", "no_linked_pr", []))
+
+    def test_commit_scope_honors_git_directory_with_invisible_shell_edits(self):
+        other = self.root / "other"
+        repository(other)
+        subprocess.run(["git", "-C", str(other), "remote", "set-url", "origin",
+            "https://github.com/example/unmeasured.git"], check=True, capture_output=True)
+        for directory, expected in ((self.repo, "no_pr"), (other, "no_change")):
+            with self.subTest(scope=expected):
+                command = ("python -c 'open(\"synthetic.py\", \"w\").write(\"pass\")' && "
+                    f"git -C '{directory}' commit -m 'Synthetic change'")
+                self.codex("child", parent="missing", edit=False, command=command,
+                    output="[unmatched abc1234] Synthetic change\n")
+                row = self.unit(self.report())
+                self.assertEqual((row["state"], row["links"]), (expected, []))
+
     def test_dispatched_exec_without_linked_dispatcher_is_not_observed_root(self):
         rows = self.codex("child")
         rows[0]["payload"].update(source="exec", originator="codex_exec")
         stream(self.home / ".codex/sessions/rollout-child.jsonl", rows)
         report = self.report()
         self.assertEqual(self.unit(report)["reason"], "no_linked_pr")
-        self.assertEqual(report["coverage"]["evidence_gaps"], {"ancestor_log_missing": 1})
+        self.assertEqual(report["coverage"]["evidence_gaps"], {"dispatcher_unobserved": 1})
         self.codex("leaf", parent="child")
         report = self.report()
         self.assertTrue(all(r["reason"] == "no_linked_pr" for r in report["units"]))
+        self.assertEqual(report["coverage"]["evidence_gaps"], {"dispatcher_unobserved": 2})
 
     def test_repeated_ancestor_link_conflict_counts_the_command_once(self):
         self.codex("root", command="git push", output=push_output("worker-1"))

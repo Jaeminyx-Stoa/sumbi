@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from support import IsolatedTemporaryDirectory
-from worker_github_fixtures import (REPO, at, codex_worker, pull, push_output,
+from worker_github_fixtures import (REPO, at, codex_worker, file_change, pull, push_output,
     recording, repository, save, stream)
 from sumbi.core.records import Coverage
 from sumbi.core.paths import normalize_path
@@ -99,6 +99,53 @@ class WorkerEditScopeTests(unittest.TestCase):
             for name in ("added.py", "source.py", "moved.py", "deleted.py")))
         self.assertEqual(session.edits, {"edit": at(1, 2)})
         self.assertEqual(self.report()["states"]["no_pr"], 1)
+
+    def native_change(self, identity, changes):
+        rows = codex_worker(self.home, identity, self.repo, kind="subagent", edit=False)
+        rows.insert(2, file_change(changes))
+        stream(self.home / f".codex/sessions/rollout-{identity}.jsonl", rows)
+
+    def test_native_file_change_retains_all_paths_identity_and_timing(self):
+        changes = {
+            str(self.repo / "added.py"): {"type": "add"},
+            str(self.repo / "updated.py"): {"type": "update", "move_path": None},
+            str(self.repo / "source.py"): {"type": "update",
+                "move_path": str(self.repo / "moved.py")},
+            str(self.repo / "deleted.py"): {"type": "delete"}}
+        self.native_change("multi", changes)
+        coverage = Coverage()
+        session = collect(codex, self.home, self.window, coverage)[0]
+        expected = ("added.py", "updated.py", "source.py", "moved.py", "deleted.py")
+        self.assertEqual(session.edit_targets["edit"], tuple(
+            normalize_path(str(self.repo / name)) for name in expected))
+        self.assertEqual(session.edits, {"edit": at(1, 2)})
+        self.assertEqual(session.counts["tool_calls"], 1)
+        self.assertEqual(session.counts["tool_results"], 1)
+        self.assertEqual(session.intervals[("tool", "edit")], (at(1, 1), at(1, 2)))
+        self.assertEqual(coverage.unknown_record_types, {})
+
+    def test_native_scratch_is_no_change_and_tracked_path_proves_unshipped(self):
+        (self.repo / "tracked.py").write_text("pass\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.repo), "add", "tracked.py"],
+            check=True, capture_output=True)
+        codex_worker(self.home, "main", self.repo, kind="vscode", edit=False)
+        self.native_change("scratch", {str(self.root / "scratch" / "brief.txt"): {"type": "add"}})
+        self.native_change("tracked", {str(self.repo / "tracked.py"): {
+            "type": "update", "move_path": None}})
+        report = self.report()
+        self.assertEqual(report["state_reasons"]["no_change"], {"no_known_edit": 1})
+        self.assertEqual(report["state_reasons"]["no_pr"], {"chain_unshipped": 1})
+        self.assertEqual(report["coverage"]["evidence_gaps"], {"edit_outside_scope": 1})
+        for private in (str(self.root), REPO, "tracked.py", "brief.txt"):
+            self.assertNotIn(private, json.dumps(report))
+
+    def test_empty_and_non_mapping_native_changes_stay_unknown(self):
+        codex_worker(self.home, "main", self.repo, kind="vscode", edit=False)
+        for index, changes in enumerate(({}, None, [], "synthetic")):
+            self.native_change(str(index), changes)
+        report = self.report()
+        self.assertEqual(report["state_reasons"]["no_pr"], {"no_linked_pr": 4})
+        self.assertEqual(report["coverage"]["evidence_gaps"], {"edit_target_unknown": 4})
 
     def test_clone_worktree_and_unmeasured_checkout(self):
         clone = self.root / "clone"

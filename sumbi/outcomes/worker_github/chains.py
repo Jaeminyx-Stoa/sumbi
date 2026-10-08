@@ -26,7 +26,8 @@ def ancestor_chain(session, index, gaps):
         chain.append(current)
         seen.add(key)
     if current.dispatch_kind in ("subagent", "noninteractive_exec"):
-        gaps["ancestor_log_missing"] += 1
+        gaps["dispatcher_unobserved" if current.dispatch_kind == "noninteractive_exec"
+            else "ancestor_log_missing"] += 1
         return chain, False
     return chain, True
 

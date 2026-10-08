@@ -4,6 +4,18 @@ import json
 import re
 
 
+def file_change_targets(changes):
+    """Retain native edit paths and move destinations; absent maps stay unknown."""
+    if not isinstance(changes, dict) or not changes:
+        return (None,)
+    targets = []
+    for target, entry in changes.items():
+        targets.append(target)
+        if isinstance(entry, dict) and entry.get("move_path") is not None:
+            targets.append(entry["move_path"])
+    return tuple(targets)
+
+
 def patch_targets(arguments):
     """Extract every file header; malformed or unsupported patches stay unknown."""
     cwd = None

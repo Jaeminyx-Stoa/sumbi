@@ -5,7 +5,7 @@ import re
 
 from sumbi.core.records import Coverage, records
 from sumbi.core.values import epoch, integer, mapping, timestamp
-from sumbi.events.edit_targets import patch_targets
+from sumbi.events.edit_targets import file_change_targets, patch_targets
 from sumbi.events.schema import (
     Record, SessionStart, Context, Metadata, Tokens, TokenUsage, ToolEvidence,
     ToolInput, ToolOutput, ToolStart, ToolEnd, CommandExecution, FileEdit,
@@ -91,7 +91,7 @@ def _item(payload, subtype, identity, when):
             infer_cwd=True,
             source_identity=source)
     if kind == "FileChange" and subtype == "item_completed":
-        yield FileEdit(key(identity))
+        yield FileEdit(key(identity), targets=file_change_targets(item.get("changes")))
     if kind in ("CommandExecution", "FileChange"):
         yield _input(identity, kind, item, at=start or when, own_time=True)
     if kind == "AgentMessage":
