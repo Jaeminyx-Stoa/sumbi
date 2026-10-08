@@ -4,9 +4,12 @@ from collections import Counter
 from datetime import timedelta
 
 from sumbi.core.time import Window
+from sumbi.measure.attribution import Attributor
 from sumbi.outcomes.github.ledger import Deliverable
 from sumbi.outcomes.github.live import RepositoryUnreadable
 from sumbi.outcomes.worker_github.links import authorship
+from sumbi.outcomes.worker_github.chains import (ancestor_chain, chain_authorship,
+    touched_repositories)
 
 
 class ScopedOutcomes:
@@ -66,11 +69,24 @@ class ScopedOutcomes:
 
 def owned_repositories(found, scan, owners, fixed):
     repos = set()
+    index = {(s.agent, s.raw_id): s for s in found}
+    attributor = Attributor([])
     for session in found:
         if session.id() not in fixed:
             continue
         lifetime = Window(session.start_at, scan.until)
-        for kind, value, _, _ in authorship(session, lifetime, Counter()):
+        own = tuple(authorship(session, lifetime, Counter()))
+        events = list(own)
+        if not own:
+            ancestors, _ = ancestor_chain(session, index, Counter())
+            inherited = [e for s in ancestors for e in chain_authorship(s, lifetime, Counter())
+                if e[0] in ("push_result", "pr_created")]
+            candidates = {v[0] if k == "push_result" else v.rsplit("#", 1)[0]
+                for k, v, _, _ in inherited}
+            touched = touched_repositories(session, candidates, attributor)
+            events.extend(e for e in inherited if (e[1][0] if e[0] == "push_result"
+                else e[1].rsplit("#", 1)[0]) in touched)
+        for kind, value, _, _ in events:
             repo = value[0] if kind == "push_result" else (
                 value.rsplit("#", 1)[0] if kind == "pr_created" else None)
             if repo and repo.split("/", 1)[0] in owners:
@@ -80,7 +96,10 @@ def owned_repositories(found, scan, owners, fixed):
 
 def discovery_window(initial, window, fixed):
     """Late first authorship must be discoverable before any owner outcome exists."""
-    latest = max((t for s in initial if s.id() in fixed for t in s.times), default=window.until)
+    index = {(s.agent, s.raw_id): s for s in initial}
+    relevant = [member for s in initial if s.id() in fixed
+        for member in (s, *ancestor_chain(s, index, Counter())[0])]
+    latest = max((t for s in relevant for t in s.times), default=window.until)
     try:
         latest += timedelta(microseconds=1)
     except OverflowError:

@@ -1,14 +1,23 @@
-"""Own-session references and repository scope; private operands stay local."""
+"""Authorship references and repository scope; private operands stay local."""
 
 import re
+from typing import NamedTuple
 
 from sumbi.core.paths import execution_cwd, normalize_origin
 from sumbi.core.privacy import pseudonym
 from sumbi.events.authorship import actions, command_scope
 from sumbi.outcomes.github.ledger import REPO
 
-EVIDENCE = {"pr_created": 4, "pr_created_output": 4, "pushed_branch": 3,
-    "pushed_branch_output": 3, "committed_branch": 2, "cwd_branch": 1}
+EVIDENCE = {"pr_created": 6, "pr_created_output": 6, "pushed_branch": 5,
+    "pushed_branch_output": 5, "committed_branch": 4, "ancestor_pr_created": 3,
+    "ancestor_pushed_branch": 2, "cwd_branch": 1}
+
+
+class Link(NamedTuple):
+    evidence: str
+    branch: str | None
+    role: str
+    strength: str = "strong"
 
 
 def repositories(values, *, allow_empty=False):
@@ -50,7 +59,7 @@ def start_repo(session, attributor, repos):
     return start_repo_cwd(session.start_cwd, attributor, repos)
 
 
-def authorship(session, scan, gaps):
+def authorship(session, scan, gaps, *, completed_window=None):
     results = {}
     for at, _, kind, data in session.deliverable_events:
         if kind == "execution_refs" and scan.contains(at):
@@ -58,7 +67,7 @@ def authorship(session, scan, gaps):
             results.setdefault(identity, []).append((at, refs))
     for identity, execution in session.commands.items():
         action = actions(execution.command)
-        if not scan.contains(execution.at):
+        if not (completed_window or scan).contains(execution.at):
             continue
         output = {ref for at, refs in results.get(identity, [])
             if execution.started_at and execution.started_at <= at <= execution.at for ref in refs}
@@ -87,15 +96,17 @@ def authorship(session, scan, gaps):
 
 
 def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps,
-    evidence_repos=None):
+    evidence_repos=None, *, authored_events=None, dispatched_at=None):
     """Only completed authorship links; mentions and conflicts remain coverage."""
     links = {}
+    dispatched_at = dispatched_at or session.start_at
     for kind, value in refs:
         if kind == "pr" and value.rsplit("#", 1)[0] in repos:
             pr = outcomes.pull(value)
-            if pr and pr.created_at < session.start_at:
+            if pr and pr.created_at < dispatched_at:
                 gaps["pre_dispatch_pr_mentions"] += 1
-    for kind, value, execution, output in authorship(session, scan, gaps):
+    events = authorship(session, scan, gaps) if authored_events is None else authored_events
+    for kind, value, execution, output in events:
         if kind == "push_result":
             repository, value = value
             scope = (repository,)
@@ -131,17 +142,17 @@ def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps
             if kind == "pr_created" and scope and identity.rsplit("#", 1)[0] not in scope:
                 gaps["link_conflicts"] += 1
                 continue
-            continued = bool(pr and pr.created_at < session.start_at)
+            continued = bool(pr and pr.created_at < dispatched_at)
             if ((continued and kind == "pr_created")
                 or (pr and pr.closed_at and pr.closed_at < execution.at)
                 or (pr and kind == "pr_created" and pr.created_at > execution.at)):
                 gaps["link_conflicts"] += 1
                 continue
-            candidate = evidence, None if kind == "pr_created" else value, (
+            candidate = Link(evidence, None if kind == "pr_created" else value,
                 "continued" if continued else "constituent")
             if identity not in links or EVIDENCE[evidence] > EVIDENCE[links[identity][0]]:
                 links[identity] = candidate
-    weak_links(refs, repos, origin_repo, outcomes, session.start_at, links)
+    weak_links(refs, repos, origin_repo, outcomes, dispatched_at, links)
     return links
 
 
@@ -160,13 +171,13 @@ def weak_links(refs, repos, origin_repo, outcomes, dispatched_at, links):
             for identity in outcomes.branch_pulls(repo, name):
                 pr = outcomes.pull(identity)
                 if pr and pr.created_at >= dispatched_at:
-                    links.setdefault(identity, ("cwd_branch", name, "constituent"))
+                    links.setdefault(identity, Link("cwd_branch", name, "constituent", "weak"))
 
 
 def public_links(session_id, links):
     return [{"session_id": session_id, "pr_id": pseudonym("pr", identity),
         "repository_id": pseudonym("repository", identity.rsplit("#", 1)[0]),
         "branch_id": pseudonym("branch", name) if name else None,
-        "evidence": evidence, "strength": "weak" if evidence == "cwd_branch" else "strong",
+        "evidence": evidence, "strength": strength,
         "role": role}
-        for identity, (evidence, name, role) in sorted(links.items())]
+        for identity, (evidence, name, role, strength) in sorted(links.items())]

@@ -1982,7 +1982,8 @@
     "deleted_logs_undetectable",
     "last_observed_time_is_not_acceptance",
     "continued_pr_requires_authorship",
-    "repairs_fail_original_dispatch"
+    "repairs_fail_original_dispatch",
+    "unrelated_later_session_may_ship_work"
   ],
   "decision_order": [
     "coverage",
