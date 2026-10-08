@@ -1,6 +1,7 @@
 # sumbi design (draft 2)
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for implementation layers, data flow and extension points.
+See [CONVERGENCE.md](CONVERGENCE.md) for the proposed goal-convergence extension of invariant 1.
 
 sumbi seeds a sensible harness, watches the friction and waste in how coding agents work, and improves the harness itself, so that task success rises while the time and tokens per success fall. It is meant to be planted in any repository and to serve any coding agent. It generalizes two harness labs that were run by hand in 2026.
 
