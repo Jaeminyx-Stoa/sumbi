@@ -45,14 +45,14 @@ def touched_repositories(session, repos, attributor, *, evidence_repos=()):
 
 
 def inherited_links(session, lifetime, ancestors, repos, outcomes, attributor, gaps,
-    events):
+    events, gap_memo):
     """Keep ancestor evidence below own authorship; branch identity controls strength."""
     links = {}
     branches = {v for k, v in references(session, lifetime) if k in ("branch", "branch_observed")}
     for ancestor, authored in zip(ancestors, events):
         eligible = [e for e in authored if e[0] in ("push_result", "pr_created")]
         candidates = link_prs(ancestor, lifetime, set(), repos, None, outcomes, attributor,
-            gaps, authored_events=eligible, dispatched_at=session.start_at)
+            gaps, authored_events=eligible, dispatched_at=session.start_at, gap_memo=gap_memo)
         for identity, candidate in candidates.items():
             pr = outcomes.pull(identity)
             branch = candidate.branch or (pr.head_ref if pr else None)
@@ -89,5 +89,5 @@ def resolve_chain(session, lifetime, index, repos, outcomes, attributor, gaps, *
     unshipped = complete and not any(events)
     touched = touched_repositories(session, repos, attributor, evidence_repos=evidence_repos)
     links = inherited_links(session, lifetime, ancestors, tuple(sorted(touched)), outcomes,
-        attributor, gaps, events)
+        attributor, gaps, events, gap_memo)
     return links, unshipped

@@ -29,6 +29,8 @@ class Attributor:
         self.rules = rules
         self.cache: dict[str, tuple[str | None, str]] = {}
         self.roots: dict[str, str] = {}
+        # Local query health is separate from the stable attribution labels.
+        self.origin_queries: dict[str, str] = {}
 
     def repository_path(self, value: str) -> str:
         """Resolve an existing file/subdirectory to its local repository root."""
@@ -73,13 +75,13 @@ class Attributor:
         normalized = normalize_path(cwd)
         if normalized in self.cache:
             return self.cache[normalized]
-        origin, state = None, "path_only"
+        origin, state, query = None, "path_only", "unknown"
         try:
             if not normalized.startswith("//") and (os.name == "nt"
                 or not ntpath.splitdrive(cwd)[0]) and Path(cwd).is_dir():
                 options = dict(
                     capture_output=True, text=True, timeout=5,
-                    env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"},
+                    env={**os.environ, "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C"},
                 )
                 repo = subprocess.run(["git", "-C", cwd, "rev-parse", "--is-inside-work-tree"],
                     **options)
@@ -89,9 +91,14 @@ class Attributor:
                     if result.returncode == 0 and result.stdout.strip():
                         origin = normalize_origin(result.stdout)
                         state = "origin" if origin else "unsupported_origin"
+                        query = "checkout" if origin else "unknown"
+                elif repo.returncode == 128 and repo.stderr.strip() == (
+                    "fatal: not a git repository (or any of the parent directories): .git"):
+                    query = "outside"
         except (OSError, subprocess.TimeoutExpired, UnicodeError):
             state = "origin_unavailable"
         self.cache[normalized] = origin, state
+        self.origin_queries[normalized] = query
         return origin, state
 
     def link(self, cwd: str) -> dict:

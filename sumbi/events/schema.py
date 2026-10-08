@@ -186,6 +186,8 @@ class CommandExecution:
 class FileEdit:
     identity: str | None = None
     suffix: str = ""
+    targets: tuple[str | None, ...] = (None,)
+    cwd: str | None = None
 
 
 @dataclass(frozen=True)

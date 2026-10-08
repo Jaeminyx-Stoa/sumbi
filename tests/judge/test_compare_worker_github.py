@@ -72,8 +72,12 @@ class WorkerCompareTests(unittest.TestCase):
 
     def test_observed_unshipped_chains_are_non_success_without_linking_risk(self):
         codex_worker(self.home, "main", self.repo, kind="vscode", edit=False)
+        def known_edits(rows):
+            rows = unresolved_authorship(rows)
+            rows[2]["payload"]["input"] = "*** Begin Patch\n*** Add File: code.py\n+pass\n*** End Patch"
+            return rows
         for number in (101, 102):
-            self.edit_stream(number, unresolved_authorship)
+            self.edit_stream(number, known_edits)
         report = self.compare()
         arm = report["arms"]["before"]
         self.assertEqual(arm["state_reasons"]["no_pr"], {"chain_unshipped": 2})
@@ -82,6 +86,27 @@ class WorkerCompareTests(unittest.TestCase):
         self.assertEqual(arm["cost"]["total"]["numerator"], 1200)
         self.assertEqual(report["exclusions"]["before"]["risky_share"]["numerator"], 0)
         self.assertNotIn("before_excluded_or_unlinked", report["verdict"]["reasons"])
+
+    def test_scratch_only_claude_workers_do_not_add_linking_risk(self):
+        def scratch_only(rows):
+            rows = [r for r in rows if not r.get("toolUseResult")]
+            for row in rows:
+                content = row.get("message", {}).get("content", [])
+                if isinstance(content, list):
+                    row["message"]["content"] = [b for b in content if b.get("name") != "Bash"]
+                    for block in row["message"]["content"]:
+                        if block.get("name") == "Edit":
+                            block["input"]["file_path"] = str(self.root / "scratch" / "brief.txt")
+            return rows
+        # These synthetic dispatches exceed the gate if scratch edits count as changes.
+        for number in (100, 103, 800, 803):
+            self.edit_stream(number, scratch_only)
+        report = self.compare()
+        for arm in ("before", "after"):
+            self.assertEqual(report["arms"][arm]["candidate_states"]["no_change"], 2)
+            self.assertEqual(report["exclusions"][arm]["risky_share"]["numerator"], 0)
+            self.assertNotIn(arm + "_excluded_or_unlinked", report["verdict"]["reasons"])
+        self.assertEqual(report["coverage"]["evidence_gaps"]["edit_outside_scope"], 4)
 
     def test_unreadable_owner_workers_count_toward_risky_exclusion_share(self):
         denied = "example/second"

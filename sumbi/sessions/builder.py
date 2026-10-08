@@ -14,7 +14,7 @@ from sumbi.core.values import label
 from sumbi.events import schema as e
 from sumbi.events.authorship import result_refs
 from sumbi.events.references import branch, branch_query, tool_refs
-from sumbi.events.tool_paths import tool_evidence
+from sumbi.events.tool_paths import resolve_path, tool_evidence
 from sumbi.sessions.session import Session
 
 
@@ -280,6 +280,10 @@ def _fold(state, event, record, order, fallback, source_fallback, window, covera
         paired_execution(state, event, identity, when, source_fallback)
     elif isinstance(event, e.FileEdit):
         session.edit(identity, when)
+        cwd = execution_cwd(event.cwd) if event.cwd is not None else own_context_at_start(
+            state.contexts, when, session.start_at)
+        session.edit_targets[identity] = tuple(
+            resolve_path(target, cwd) for target in event.targets)
     elif isinstance(event, e.Counter):
         session.count(event.kind, identity, when, window)
     elif isinstance(event, e.Request):

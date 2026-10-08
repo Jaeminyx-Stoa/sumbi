@@ -68,6 +68,16 @@ def command_gap(gaps, reason, session, identity, memo=None, run_gaps=None):
         run_gaps[reason] += 1
 
 
+def link_conflict(gaps, session, execution, memo):
+    """A repeated ancestor command conflict is one run diagnostic."""
+    identity = next(key for key, value in session.commands.items() if value is execution)
+    key = session.agent, session.raw_id, identity, "link_conflicts"
+    if memo is None or key not in memo:
+        gaps["link_conflicts"] += 1
+        if memo is not None:
+            memo.add(key)
+
+
 def authorship(session, scan, gaps, *, completed_window=None, gap_memo=None, run_gaps=None):
     results = {}
     for at, _, kind, data in session.deliverable_events:
@@ -105,7 +115,7 @@ def authorship(session, scan, gaps, *, completed_window=None, gap_memo=None, run
 
 
 def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps,
-    evidence_repos=None, *, authored_events=None, dispatched_at=None):
+    evidence_repos=None, *, authored_events=None, dispatched_at=None, gap_memo=None):
     """Only completed authorship links; mentions and conflicts remain coverage."""
     links = {}
     dispatched_at = dispatched_at or session.start_at
@@ -124,11 +134,11 @@ def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps
         else:
             cwd, command_repos, valid = command_scope(execution.command, execution.cwd)
             if not valid:
-                gaps["link_conflicts"] += 1
+                link_conflict(gaps, session, execution, gap_memo)
                 continue
             cwd_repo = start_repo_cwd(cwd, attributor, repos)
             if command_repos and cwd_repo and cwd_repo not in command_repos:
-                gaps["link_conflicts"] += 1
+                link_conflict(gaps, session, execution, gap_memo)
                 continue
             scope = tuple(command_repos) if command_repos else (cwd_repo,) if cwd_repo else ()
         if evidence_repos is not None and kind in ("push_result", "pr_created"):
@@ -140,7 +150,7 @@ def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps
         identities = ([value] if kind == "pr_created" else
             [p for r in scope if r in repos for p in outcomes.branch_pulls(r, value)])
         if kind != "pr_created" and len({p.rsplit("#", 1)[0] for p in identities}) > 1:
-            gaps["link_conflicts"] += 1
+            link_conflict(gaps, session, execution, gap_memo)
             continue
         for identity in identities:
             if identity.rsplit("#", 1)[0] not in repos:
@@ -149,13 +159,13 @@ def link_prs(session, scan, refs, repos, origin_repo, outcomes, attributor, gaps
                 continue
             pr = outcomes.pull(identity)
             if kind == "pr_created" and scope and identity.rsplit("#", 1)[0] not in scope:
-                gaps["link_conflicts"] += 1
+                link_conflict(gaps, session, execution, gap_memo)
                 continue
             continued = bool(pr and pr.created_at < dispatched_at)
             if ((continued and kind == "pr_created")
                 or (pr and pr.closed_at and pr.closed_at < execution.at)
                 or (pr and kind == "pr_created" and pr.created_at > execution.at)):
-                gaps["link_conflicts"] += 1
+                link_conflict(gaps, session, execution, gap_memo)
                 continue
             candidate = Link(evidence, None if kind == "pr_created" else value,
                 "continued" if continued else "constituent")

@@ -5,6 +5,7 @@ import re
 
 from sumbi.core.records import Coverage, records
 from sumbi.core.values import epoch, integer, mapping, timestamp
+from sumbi.events.edit_targets import patch_targets
 from sumbi.events.schema import (
     Record, SessionStart, Context, Metadata, Tokens, TokenUsage, ToolEvidence,
     ToolInput, ToolOutput, ToolStart, ToolEnd, CommandExecution, FileEdit,
@@ -156,7 +157,8 @@ def _response(payload, event):
     if subtype in ("function_call", "custom_tool_call", "local_shell_call", "web_search_call"):
         name = payload.get("name", subtype)
         if str(payload.get("name", "")).split(".")[-1] == "apply_patch":
-            yield FileEdit(key(identity))
+            targets, cwd = patch_targets(payload.get("arguments", payload.get("input")))
+            yield FileEdit(key(identity), targets=targets, cwd=payload.get("cwd", cwd))
         yield _input(identity, name,
             payload.get("arguments", payload.get("input", payload.get("action"))))
         yield ToolStart(key(identity))

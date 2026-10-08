@@ -31,6 +31,8 @@ class AncestorLinkTests(unittest.TestCase):
     def codex(self, identity, parent=None, branch=None, start=0, **options):
         rows = codex_worker(self.home, identity, options.pop("cwd", self.repo),
             kind="subagent" if parent else "vscode", context_branch=branch, **options)
+        if options.get("edit", True):
+            rows[2]["payload"]["input"] = "*** Begin Patch\n*** Add File: synthetic.py\n+pass\n*** End Patch"
         if parent:
             rows[0]["payload"]["source"]["subagent"]["thread_spawn"]["parent_thread_id"] = parent
         for row in rows:
@@ -259,6 +261,14 @@ class AncestorLinkTests(unittest.TestCase):
         self.assertEqual(report["coverage"]["evidence_gaps"], {"ancestor_log_missing": 1})
         self.codex("leaf", parent="child")
         report = self.report()
+        self.assertTrue(all(r["reason"] == "no_linked_pr" for r in report["units"]))
+
+    def test_repeated_ancestor_link_conflict_counts_the_command_once(self):
+        self.codex("root", command="git push", output=push_output("worker-1"))
+        for identity in ("child", "sibling", "leaf"):
+            self.codex(identity, parent="root")
+        report = self.report([pull(1, seconds=10)])
+        self.assertEqual(report["coverage"]["evidence_gaps"].get("link_conflicts"), 1)
         self.assertTrue(all(r["reason"] == "no_linked_pr" for r in report["units"]))
 
     def test_no_edits_still_means_no_change_for_an_unshipped_chain(self):

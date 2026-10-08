@@ -60,6 +60,7 @@ class Session:
     is_worker: bool = False
     commands: dict[str, CommandExecution] = field(default_factory=dict)
     edits: dict[str, datetime] = field(default_factory=dict)
+    edit_targets: dict[str, tuple[str | None, ...]] = field(default_factory=dict)
     completed_at: datetime | None = None
     local_evidence_gaps: Counter = field(default_factory=Counter)
     # Open-format emitter identities stay local; IDs use the adapter namespace.

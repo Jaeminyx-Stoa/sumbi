@@ -1931,7 +1931,9 @@
       }
     ],
     "missing_prs": 0,
-    "evidence_gaps": {},
+    "evidence_gaps": {
+      "edit_target_unknown": 16
+    },
     "link_evidence_counts": {
       "pushed_branch": 24
     },
