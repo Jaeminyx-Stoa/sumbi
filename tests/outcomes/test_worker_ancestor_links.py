@@ -223,6 +223,44 @@ class AncestorLinkTests(unittest.TestCase):
         self.assertEqual(report["success_rate"]["denominator"], 2)
         self.assertEqual(report["cost"]["per_success"]["total"]["numerator"], 200)
 
+    def test_only_out_of_scope_authorship_does_not_prove_change(self):
+        for command, output in (
+            ("git push", push_output("worker-1", "example/unmeasured")),
+            ("gh pr create", "https://github.com/example/unmeasured/pull/1")):
+            with self.subTest(command=command):
+                self.codex("child", parent="missing", edit=False,
+                    command=command, output=output)
+                row = self.unit(self.report())
+                self.assertEqual((row["state"], row["reason"]), ("no_change", "no_known_edit"))
+
+    def test_ancestor_command_gaps_are_counted_once_for_multiple_children(self):
+        for code, output, expected in (
+            (1, "", "failed_authorship_commands"),
+            (None, "", "authorship_exit_unknown"),
+            (0, "https://github.com/example/sample/pull/1\n"
+                "https://github.com/example/sample/pull/2", "link_conflicts"),
+            (0, "", "authorship_result_missing")):
+            with self.subTest(reason=expected):
+                self.codex("root", command="gh pr create", output=output, exit_code=code)
+                self.codex("middle", parent="root")
+                self.codex("child", parent="middle")
+                self.codex("sibling", parent="root")
+                report = self.report()
+                self.assertEqual(report["coverage"]["evidence_gaps"].get(expected), 1)
+                if code is None or expected in ("link_conflicts", "authorship_result_missing"):
+                    self.assertTrue(all(r["reason"] == "no_linked_pr" for r in report["units"]))
+
+    def test_dispatched_exec_without_linked_dispatcher_is_not_observed_root(self):
+        rows = self.codex("child")
+        rows[0]["payload"].update(source="exec", originator="codex_exec")
+        stream(self.home / ".codex/sessions/rollout-child.jsonl", rows)
+        report = self.report()
+        self.assertEqual(self.unit(report)["reason"], "no_linked_pr")
+        self.assertEqual(report["coverage"]["evidence_gaps"], {"ancestor_log_missing": 1})
+        self.codex("leaf", parent="child")
+        report = self.report()
+        self.assertTrue(all(r["reason"] == "no_linked_pr" for r in report["units"]))
+
     def test_no_edits_still_means_no_change_for_an_unshipped_chain(self):
         self.codex("root")
         self.codex("child", parent="root", edit=False)

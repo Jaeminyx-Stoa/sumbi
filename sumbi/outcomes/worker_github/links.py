@@ -59,7 +59,16 @@ def start_repo(session, attributor, repos):
     return start_repo_cwd(session.start_cwd, attributor, repos)
 
 
-def authorship(session, scan, gaps, *, completed_window=None):
+def command_gap(gaps, reason, session, identity, memo=None, run_gaps=None):
+    """Keep unit diagnostics complete while counting each command once per run."""
+    gaps[reason] += 1
+    key = session.agent, session.raw_id, identity, reason
+    if run_gaps is not None and key not in memo:
+        memo.add(key)
+        run_gaps[reason] += 1
+
+
+def authorship(session, scan, gaps, *, completed_window=None, gap_memo=None, run_gaps=None):
     results = {}
     for at, _, kind, data in session.deliverable_events:
         if kind == "execution_refs" and scan.contains(at):
@@ -75,16 +84,16 @@ def authorship(session, scan, gaps, *, completed_window=None):
             continue
         output_only = execution.exit_code is None and execution.error is False
         if execution.error is True or execution.exit_code != 0 and not output_only:
-            gaps["failed_authorship_commands" if execution.exit_code is not None
-                else "authorship_exit_unknown"] += 1
+            command_gap(gaps, "failed_authorship_commands" if execution.exit_code is not None
+                else "authorship_exit_unknown", session, identity, gap_memo, run_gaps)
             continue
         if (not scan.contains(execution.started_at)
             or execution.at < execution.started_at):
-            gaps["link_conflicts"] += 1
+            command_gap(gaps, "link_conflicts", session, identity, gap_memo, run_gaps)
             continue
         if (len({v for k, v in output if k == "pr_created"}) > 1
             or len({v for k, v in output if k == "branch_committed"}) > 1):
-            gaps["link_conflicts"] += 1
+            command_gap(gaps, "link_conflicts", session, identity, gap_memo, run_gaps)
             continue
         for kind, value in output:
             if output_only and kind not in ("push_result", "pr_created"):

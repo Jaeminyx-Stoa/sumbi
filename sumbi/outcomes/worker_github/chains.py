@@ -4,7 +4,7 @@ from collections import Counter
 
 from sumbi.core.time import Window
 from sumbi.events.authorship import actions
-from sumbi.outcomes.worker_github.links import (EVIDENCE, Link, authorship, link_prs,
+from sumbi.outcomes.worker_github.links import (EVIDENCE, Link, authorship, command_gap, link_prs,
     references, start_repo_cwd)
 
 MAX_ANCESTORS = 64
@@ -25,16 +25,17 @@ def ancestor_chain(session, index, gaps):
         current = index[key]
         chain.append(current)
         seen.add(key)
-    if current.dispatch_kind == "subagent":
+    if current.dispatch_kind in ("subagent", "noninteractive_exec"):
         gaps["ancestor_log_missing"] += 1
         return chain, False
     return chain, True
 
 
-def chain_authorship(session, lifetime, gaps):
+def chain_authorship(session, lifetime, gaps, *, gap_memo=None, run_gaps=None):
     """Ancestor results may finish after dispatch even if their command began earlier."""
     scan = Window(min(session.start_at or lifetime.since, lifetime.since), lifetime.until)
-    return tuple(authorship(session, scan, gaps, completed_window=lifetime))
+    return tuple(authorship(session, scan, gaps, completed_window=lifetime,
+        gap_memo=gap_memo, run_gaps=run_gaps))
 
 
 def touched_repositories(session, repos, attributor, *, evidence_repos=()):
@@ -67,21 +68,24 @@ def inherited_links(session, lifetime, ancestors, repos, outcomes, attributor, g
 
 
 def resolve_chain(session, lifetime, index, repos, outcomes, attributor, gaps, *,
-    evidence_repos=()):
+    evidence_repos=(), gap_memo=None):
     """A complete chain without authorship is observed non-shipping, not linking risk."""
     ancestors, complete = ancestor_chain(session, index, gaps)
     local_gaps = Counter()
-    events = [chain_authorship(s, lifetime, local_gaps) for s in ancestors]
-    gaps.update(local_gaps)
+    gap_memo = set() if gap_memo is None else gap_memo
+    events = [chain_authorship(s, lifetime, local_gaps, gap_memo=gap_memo,
+        run_gaps=gaps) for s in ancestors]
     complete &= not any(s.local_evidence_gaps for s in (session, *ancestors))
     complete &= not any(local_gaps[k] for k in ("authorship_exit_unknown", "link_conflicts"))
     if not any(events):
-        missing = sum(lifetime.contains(e.at) and bool(actions(e.command))
-            and (e.exit_code == 0 or e.exit_code is None and e.error is False)
-            for s in (session, *ancestors) for e in s.commands.values())
-        if missing:
-            gaps["authorship_result_missing"] += missing
-            complete = False
+        for member in (session, *ancestors):
+            for identity, execution in member.commands.items():
+                if (lifetime.contains(execution.at) and actions(execution.command)
+                    and (execution.exit_code == 0
+                        or execution.exit_code is None and execution.error is False)):
+                    command_gap(local_gaps, "authorship_result_missing", member, identity,
+                        gap_memo, gaps)
+                    complete = False
     unshipped = complete and not any(events)
     touched = touched_repositories(session, repos, attributor, evidence_repos=evidence_repos)
     links = inherited_links(session, lifetime, ancestors, tuple(sorted(touched)), outcomes,
