@@ -48,6 +48,8 @@ def _p90(values):
 
 
 def _depth(session, index):
+    if session.spawn_depth is not None:
+        return str(session.spawn_depth)
     seen, depth = set(), 0
     while session.parent_raw_id:
         key = session.agent, session.raw_id

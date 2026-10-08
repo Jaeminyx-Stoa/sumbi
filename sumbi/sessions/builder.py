@@ -38,6 +38,7 @@ class _State:
     worker_links: bool = False
     request_records: list = field(default_factory=list)
     dispatch_model_statuses: set = field(default_factory=set)
+    spawn_depths: set = field(default_factory=set)
 
 
 def own_context_at_start(history, started_at, own_start):
@@ -85,6 +86,8 @@ def _metadata(state, metadata, when, window, coverage):
 
 def _start(state, event, when, order, window, coverage, links):
     session = state.session
+    if event.spawn_depth is not None:
+        state.spawn_depths.add(event.spawn_depth)
     if event.provenance != "sumbi-events-v1" and not state.native_start_seen:
         session.dispatch_kind = event.dispatch_kind
         state.native_start_seen = True
@@ -444,6 +447,8 @@ def _request_usage(state):
     statuses = state.dispatch_model_statuses
     if len(statuses) == 1:
         state.session.model_request_status = next(iter(statuses))
+    if len(state.spawn_depths) == 1:
+        state.session.spawn_depth = next(iter(state.spawn_depths))
 
 
 def _open_records(records, states, coverage):

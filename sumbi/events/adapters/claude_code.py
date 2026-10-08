@@ -80,12 +80,12 @@ def _blocks(event, kind, blocks, when):
             yield ToolEnd(identity, block.get("is_error") is True, suffix)
 
 
-def _translate(event, when, parent, child):
+def _translate(event, when, parent, child, spawn_depth=None):
     kind = event.get("type")
     cwd = event.get("cwd") if isinstance(event.get("cwd"), str) else None
     yield SessionStart(cwd, parent if child else None, "worker" if child else "orchestrator",
         "claude-code", provenance="first-observed-cwd",
-        dispatch_kind="subagent" if child else "interactive")
+        dispatch_kind="subagent" if child else "interactive", spawn_depth=spawn_depth)
     if event.get("version"):
         yield Metadata(cli_version=freeze(event["version"]), supplied=("cli_version",))
     message = mapping(event.get("message"))
@@ -120,7 +120,7 @@ def _translate(event, when, parent, child):
             yield Request(key(event.get("requestId") or None), endpoint="start"
                 if subtype == "request_start" else "end")
     if kind == "assistant":
-        if message.get("model"):
+        if message.get("model") and message["model"] != "<synthetic>":
             yield Metadata(model=freeze(message["model"]), supplied=("model",))
         if usage:
             values = {k: integer(usage.get(v)) for k, v in FIELDS.items()}
@@ -142,42 +142,52 @@ def collect(home: Path, coverage: Coverage):
         indices = [i for i, part in enumerate(parts) if part == "subagents"]
         index = indices[-1] if child else None
         parent_hint = parts[index - 1] if child else path.stem
-        agent_hint = (parts[index + 1] if child
-            else path.stem).removesuffix(".jsonl").removeprefix("agent-")
+        agent_hint = path.stem.removeprefix("agent-")
         raw_id = None
         parent = None
-        status = _model_request(root, parts, index, path) if child else "unknown"
+        status, spawn_depth, parent_agent = _subagent_metadata(path) if child else (
+            "unknown", None, None)
         for event in records(path, coverage):
             if raw_id is None:
                 child = child or (path.stem.startswith("agent-")
                     and event.get("isSidechain") is True)
+                if child and index is None:
+                    status, spawn_depth, parent_agent = _subagent_metadata(path)
                 parent = str(event.get("sessionId") or parent_hint)
-                if len(indices) > 1 and ":subagent:" not in parent:
+                workflow = child and index is not None and parts[index + 1] == "workflows"
+                if workflow:
+                    parent = parent_hint
+                base = parent
+                if parent_agent is not None:
+                    parent = base + ":subagent:" + parent_agent
+                elif len(indices) > 1 and ":subagent:" not in parent:
                     for ancestor in indices[:-1]:
                         parent += ":subagent:" + parts[ancestor + 1].removeprefix("agent-")
-                raw_id = parent + ":subagent:" + str(event.get("agentId")
+                namespace = base if parent_agent is not None else parent
+                raw_id = namespace + ":subagent:" + str(event.get("agentId")
                     or agent_hint) if child else parent
-                if child and index is None:
-                    status = _model_request(root, parts, index, path)
             when = timestamp(event.get("timestamp"))
             yield Record("claude-code", raw_id, when, record_identity(event),
-                (ModelRequest(status), *tuple(_translate(event, when, parent, child))),
+                (ModelRequest(status), *tuple(_translate(event, when, parent, child, spawn_depth))),
                 timestamp_supplied="timestamp" in event, fallback_id=key(event.get("uuid") or None),
                 parent_session_id=parent if child else None, worker=child)
 
 
-def _model_request(root, parts, index, path):
-    """Inspect only model presence; do not retain any sidecar values or text."""
-    if index is not None:
-        stem = parts[index + 1].removesuffix(".jsonl")
-        path = root.joinpath(*parts[:index + 1], stem + ".meta.json")
-    else:
-        path = path.with_suffix(".meta.json")
+def _subagent_metadata(path):
+    """Inspect only the model label, integer spawn depth and parent agent ID."""
+    path = path.with_suffix(".meta.json")
     try:
         with path.open(encoding="utf-8") as stream:
             metadata = json.load(stream)
         if not isinstance(metadata, dict):
-            return "unknown"
-        return "requested" if "model" in metadata else "unrequested"
+            return "unknown", None, None
+        model = metadata.get("model")
+        status = "unrequested" if model is None else (
+            "requested" if isinstance(model, str) and model else "unknown")
+        depth = metadata.get("spawnDepth")
+        depth = depth if type(depth) is int and depth >= 1 else None
+        parent = metadata.get("parentAgentId")
+        parent = parent if isinstance(parent, str) and parent else None
+        return status, depth, parent
     except (OSError, ValueError, UnicodeError):
-        return "unknown"
+        return "unknown", None, None

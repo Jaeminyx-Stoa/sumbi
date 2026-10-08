@@ -145,11 +145,27 @@ whether a result returns to its parent in the foreground or later in the backgro
 `dispatched_sessions` counts included children; `dispatching_parent_sessions`
 counts their distinct included direct parents. A nested child can itself be a
 dispatching parent. `nesting_depth` counts children by depth, with roots at zero
-and direct children at one. A missing ancestor or cycle makes depth `unknown`.
+and direct children at one. Claude sidecars supply a positive integer
+`spawnDepth`, which takes precedence even when an ancestor log is missing.
+Without that field, depth follows the observed parent chain; a missing ancestor
+or cycle makes that fallback depth `unknown`.
 `parent_unobserved` counts children whose direct parent is missing or excluded
 from the selected window/scope. The child still contributes its own volume,
 tokens, model and friction evidence. A parent observed in another project still
 counts as a dispatcher; only its allocations to this project contribute tokens.
+
+Claude Code sidecars are always adjacent to their log: `agent-<id>.jsonl` uses
+`agent-<id>.meta.json`, including the
+`<session>/subagents/workflows/<run>/agent-<id>.jsonl` layout. When `agentId`
+is absent from a record, the log filename supplies the agent ID. Flat nested
+subagents share their parent's `subagents/` directory. A sidecar's
+`parentAgentId` links the child to that subagent session, rather than to the root
+dispatcher. Nested folders remain a fallback when this ID is absent.
+Workflow records can carry a `sessionId` different from the enclosing session
+folder. The enclosing session is their dispatcher and supplies the session
+namespace; `parentAgentId`, when present, instead selects a subagent in that
+namespace. A missing parent subagent log remains `parent_unobserved`; neither
+the root nor the workflow record's `sessionId` substitutes for it.
 
 The usual `[since, until)` rules apply: a session enters on an in-window event or
 overlapping paired interval; tokens use the selected request/snapshot timestamp,
@@ -174,8 +190,9 @@ reported components. Unreported cache kinds are omitted, rather than inferred.
 Claude uses one selected assistant `message.id`, despite repeated content-block
 usage. Codex uses `info.last_token_usage` on a `token_count` event. Its input
 already includes cached input: new input subtracts cached input, cache read
-retains it, and unsupported cache-write counters remain unreported under the
-existing adapter rules. These request observations are separate from billable
+retains it, and `cache_write_input_tokens` is ignored under the existing token
+rules: `cache_write` remains unreported in both cumulative and per-request usage.
+These request observations are separate from billable
 cumulative deltas, so existing collect totals do not change. Exact record replays
 and consecutive unchanged cumulative vectors do not create extra request observations.
 Without per-turn observations, a cumulative delta is not treated as one context.
@@ -207,9 +224,11 @@ a null share. Small cohorts may therefore have a decile larger than 10%.
 
 **Model request.** `model_request.by_request` splits child session counts and
 allocated `total_tokens` by `requested`, `unrequested` and `unknown`.
-Claude's `agent-<id>.meta.json` sidecar is inspected only for the `model` key:
-presence means requested, absence in a readable object means unrequested, and
-a missing, unreadable or malformed sidecar means unknown. No description,
+Claude's adjacent `agent-<id>.meta.json` sidecar is inspected only for `model`,
+`spawnDepth` and `parentAgentId`. A non-empty model label means requested;
+an absent or null `model` in a readable object means unrequested. A missing,
+unreadable or malformed sidecar, or invalid model value, means unknown. The
+model label only establishes request status, never the observed model. No description,
 custom agent type, tool-use identifier, request shape or other sidecar text is
 retained or emitted. Conflicting statuses across resumed files mean unknown.
 Codex status remains unknown because its supported log shapes do not state whether
@@ -218,11 +237,15 @@ the dispatch requested a model. An observed model does not imply it was requeste
 in force at each billable event, with unknown for absent or ambiguous metadata.
 Each session counts once per model/status row it occupies, so a session using
 several models can appear in several rows; its tokens are split, never duplicated.
+Claude's `<synthetic>` placeholder model is excluded from observed model metadata
+and cannot create a model row or replace the last observed model.
 Children without billable events use their observed session models for zero-token
 session counts, or unknown when no model was observed.
 
 **Delegation estimate.** `estimate.measurement` is `estimated`. Let P be the
-parent's last observed request context at or before the child's start, C_i the
+direct dispatcher's last observed request context at or before the child's start,
+using the sidecar parent link for flat nesting and the enclosing session for
+workflow children without a parent subagent ID. Let C_i be the
 child's contexts in this group/window, and C_0 its first observed lifetime request
 context. Compute `inline_context = sum(P + C_i - C_0)` and
 `actual_context = sum(C_i)`. `median_inline_to_actual_context_ratio` is the median
@@ -244,6 +267,8 @@ boundary; Windows drive paths compare without case and POSIX paths preserve case
 edit target and every target known to be outside that checkout. No edits and
 unknown targets do not qualify. `edits_outside_checkout` counts outside target
 occurrences, one per de-duplicated edit ID/target, including multi-target changes.
+These are edit occurrences, not distinct files: separate edits to the same file
+count separately.
 `script_edits_outside_checkout` counts those occurrences with extensions `.sh`,
 `.bash`, `.py`, `.ps1`, `.js`, `.mjs`, `.cmd` or `.bat` (case-insensitive).
 `edit_targets_unobserved` counts target occurrences with an unresolved target or

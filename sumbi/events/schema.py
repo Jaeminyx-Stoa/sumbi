@@ -61,6 +61,7 @@ class SessionStart:
         "sumbi-events-v1"] = "sumbi-events-v1"
     metadata: Metadata = Metadata()
     dispatch_kind: Literal["subagent", "noninteractive_exec", "interactive", "unknown"] = "unknown"
+    spawn_depth: int | None = None
 
 
 @dataclass(frozen=True)

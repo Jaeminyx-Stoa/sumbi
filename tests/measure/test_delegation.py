@@ -10,6 +10,9 @@ from sumbi.core.time import Window
 from sumbi.core.values import timestamp
 from sumbi.measure.attribution import ProjectRule
 from sumbi.measure.report import collect, text_summary
+from sumbi.core.records import Coverage
+from sumbi.events.adapters import claude_code
+from sumbi.sessions.builder import collect as collect_sessions
 
 
 WINDOW = Window(timestamp("2030-01-01T00:00:00Z"), timestamp("2030-01-02T00:00:00Z"))
@@ -129,6 +132,100 @@ class DelegationTests(unittest.TestCase):
         self.assertEqual(group["context"]["request_total_tokens"], 400_020)
         self.assertAlmostEqual(group["estimate"]["median_inline_to_actual_context_ratio"], .65)
         self.assertEqual(group["model_request"]["by_request"]["unknown"]["sessions"], 1)
+
+    def test_workflow_sidecars_and_filename_ids_use_enclosing_dispatcher(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.claude(0, "root", 80_000)])
+        # This other observed session must not receive the workflow children.
+        self.save(".claude/projects/group/other.jsonl", [
+            self.claude(0, "other", 400_000, parent="other")])
+        for name, sidecar in (("requested", {"model": "model-b", "spawnDepth": 1}),
+                              ("default", {"spawnDepth": 1}),
+                              ("null", {"model": None, "spawnDepth": 1})):
+            path = self.save(f".claude/projects/group/parent/subagents/workflows/run/agent-{name}.jsonl",
+                [self.claude(1, name, 100_000, parent="other")])
+            path.with_suffix(".meta.json").write_text(json.dumps(sidecar), encoding="utf-8")
+        sessions = collect_sessions(claude_code, self.home, WINDOW, Coverage())
+        children = [s for s in sessions if s.is_worker]
+        self.assertEqual({s.raw_id for s in children}, {
+            "parent:subagent:requested", "parent:subagent:default", "parent:subagent:null"})
+        self.assertEqual({s.parent_raw_id for s in children}, {"parent"})
+        group = self.summary()
+        self.assertEqual(group["volume"], {"dispatched_sessions": 3, "dispatching_parent_sessions": 1,
+            "parent_unobserved": 0, "nesting_depth": {"1": 3}})
+        self.assertEqual(group["cost_share"]["parents"]["total"], 80_010)
+        self.assertEqual(group["model_request"]["by_request"]["requested"]["sessions"], 1)
+        self.assertEqual(group["model_request"]["by_request"]["unrequested"]["sessions"], 2)
+        self.assertEqual(group["model_request"]["by_request"]["unknown"]["sessions"], 0)
+        self.assertAlmostEqual(group["estimate"]["median_inline_to_actual_context_ratio"], .8)
+
+    def test_flat_depth_two_and_three_use_direct_parent_context_at_dispatch(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.claude(0, "root", 80_000)])
+        self.child("one", [self.claude(1, "one", 120_000, agent="one")], {"spawnDepth": 1})
+        two_cwd, three_cwd = self.root / "two", self.root / "three"
+        two_cwd.mkdir()
+        three_cwd.mkdir()
+        two = [self.claude(2, "two-first", 300_000, agent="two"),
+               self.claude(4, "two-later", 600_000, agent="two")]
+        three = self.claude(3, "three", 150_000, agent="three")
+        for record in two:
+            record["cwd"] = str(two_cwd)
+        three["cwd"] = str(three_cwd)
+        self.child("two", two, {"spawnDepth": 2, "parentAgentId": "one"})
+        self.child("three", [three], {"spawnDepth": 3, "parentAgentId": "two"})
+        sessions = collect_sessions(claude_code, self.home, WINDOW, Coverage())
+        parents = {s.raw_id: s.parent_raw_id for s in sessions if s.is_worker}
+        self.assertEqual(parents, {"parent:subagent:one": "parent",
+            "parent:subagent:two": "parent:subagent:one",
+            "parent:subagent:three": "parent:subagent:two"})
+        report = self.report(rules=[ProjectRule("two", paths=[str(two_cwd)]),
+                                   ProjectRule("three", paths=[str(three_cwd)])])
+        group = report["delegation"]["summary"]
+        self.assertEqual(group["volume"], {"dispatched_sessions": 3, "dispatching_parent_sessions": 3,
+            "parent_unobserved": 0, "nesting_depth": {"1": 1, "2": 1, "3": 1}})
+        groups = {g["rule"]: g for g in report["delegation"]["by_project_and_agent"]}
+        # P=120000 for depth two; P=300000 (not its later 600000) for depth three.
+        self.assertAlmostEqual(groups["two"]["estimate"]["median_inline_to_actual_context_ratio"], .6)
+        self.assertAlmostEqual(groups["three"]["estimate"]["median_inline_to_actual_context_ratio"], 2)
+
+    def test_workflow_parent_agent_overrides_enclosing_session(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.claude(0, "root", 80_000)])
+        self.child("dispatcher", [self.claude(1, "dispatcher", 240_000, agent="dispatcher")],
+                   {"spawnDepth": 1})
+        path = self.save(".claude/projects/group/parent/subagents/workflows/run/agent-child.jsonl",
+            [self.claude(2, "child", 120_000, parent="workflow-session")])
+        path.with_suffix(".meta.json").write_text(json.dumps({
+            "spawnDepth": 2, "parentAgentId": "dispatcher"}), encoding="utf-8")
+        sessions = collect_sessions(claude_code, self.home, WINDOW, Coverage())
+        child = next(s for s in sessions if s.raw_id == "parent:subagent:child")
+        self.assertEqual(child.parent_raw_id, "parent:subagent:dispatcher")
+        group = self.summary()
+        self.assertEqual(group["volume"]["nesting_depth"], {"1": 1, "2": 1})
+        self.assertAlmostEqual(group["estimate"]["median_inline_to_actual_context_ratio"], (1/3 + 2)/2)
+
+    def test_missing_flat_parent_keeps_reported_depth_and_skips_estimate(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.claude(0, "root", 80_000)])
+        self.child("child", [self.claude(1, "child", 100_000, agent="child")],
+                   {"spawnDepth": 3, "parentAgentId": "missing"})
+        group = self.summary()
+        self.assertEqual(group["volume"], {"dispatched_sessions": 1, "dispatching_parent_sessions": 0,
+            "parent_unobserved": 1, "nesting_depth": {"3": 1}})
+        self.assertEqual(group["estimate"]["context_unobserved"], 1)
+        self.assertIsNone(group["estimate"]["median_inline_to_actual_context_ratio"])
+
+    def test_synthetic_placeholder_does_not_create_or_replace_model_rows(self):
+        placeholder = self.claude(2, "placeholder", 30, agent="child", output=0, model="<synthetic>")
+        placeholder["message"]["usage"] = dict.fromkeys(placeholder["message"]["usage"], 0)
+        self.child("child", [self.claude(1, "real-request", 100_000, agent="child"),
+            placeholder, self.claude(3, "later-request", 200_000, agent="child", model=None)])
+        group = self.summary()
+        self.assertEqual(group["model_request"]["by_observed_model_and_request"], [
+            {"model": "model-a", "request": "unknown", "sessions": 1, "total_tokens": 300_020}])
+
+    def test_sidecar_depth_requires_positive_integer(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.claude(0, "root", 80_000)])
+        for name, depth in (("boolean", True), ("string", "3"), ("zero", 0), ("negative", -1)):
+            self.child(name, [self.claude(1, name, 100_000, agent=name)], {"spawnDepth": depth})
+        self.assertEqual(self.summary()["volume"]["nesting_depth"], {"1": 4})
 
     def test_cumulative_only_and_partial_context_are_unobserved(self):
         self.save(".codex/sessions/rollout-child.jsonl", [self.codex_meta("child", 1, "missing"),
