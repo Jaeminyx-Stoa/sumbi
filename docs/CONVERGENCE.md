@@ -1,4 +1,4 @@
-# Goal convergence (design proposal, draft 3)
+# Goal convergence (design proposal, draft 4)
 
 Status: proposal; nothing here is implemented yet. It extends [DESIGN.md](DESIGN.md) invariant 1 (deliverables are fixed with acceptance criteria at dispatch) to long-running work that spans many sessions. Draft 1 was reviewed by a model from a different family. See [Review record](#review-record).
 
@@ -23,6 +23,7 @@ Action rules cannot catch any of these. They answer "may the agent do this?" and
    - The check must exercise the real acceptance path on representative data. A check that only proves its collection path is a dry run, not acceptance. The assignee cannot modify the check or its data.
    - Before dispatch, the check runs once on the current state to record a baseline. If it cannot run, the goal goes back to its owner.
    - A change of environment, data or check implementation requires a new baseline.
+   - A visible, immutable check can still be overfitted, or can miss requirements it does not measure. Representativeness is the owner's responsibility: the owner reassesses it at every revision, and the check is validated independently of the assignee.
 2. **One goal, one owner, one current version.**
    - Every channel that carries the goal (agent goal commands, briefs, contracts, decision logs) refers to `goal_id@version`. A mismatch stops the assignee.
    - Only the owner revises a goal, by issuing a new version.
@@ -30,7 +31,7 @@ Action rules cannot catch any of these. They answer "may the agent do this?" and
 3. **Progress is the check's trajectory, not the agent's report.**
    - The harness records check results over time.
    - Effort is elapsed time, tokens or sub-dispatches. When effort since the last qualifying improvement exceeds a budget, the harness stops the work and escalates to the owner with the trajectory.
-   - A binary check has no intermediate trajectory. For binary checks, the budget measures effort since dispatch or since the last change of check result.
+   - A binary check has no intermediate trajectory. For binary checks, the budget measures effort since dispatch or since the first pass. A regression followed by a repeated pass does not restart it.
    - Escalation needs an owner who answers. Each goal declares an owner-response deadline and a cumulative budget across `continue` decisions. Effort after an escalation stays observable, because an escalation record alone does not prove that work stopped.
 
 The harness implements these principles. sumbi measures whether they hold and whether adopting them improves outcomes. None of them replaces approvals, cross-family review or money-path gates. An owner's acceptance is not one of those gates.
@@ -52,9 +53,9 @@ The new record types inherit the v1 envelope and rules. A record's `timestamp` i
 | --- | --- | --- |
 | `goal_declared` | `goal_id`, `version` (integer, strictly increasing per goal), `owner_id`, `check_id`, `check_digest` (covers check implementation, data selection and environment pin), `direction` (`pass`, `higher` or `lower`), `retry_policy` (`attempts` per evaluated state, `aggregate`: `all`, `majority` or `last`), `min_improvement` (non-negative), `stall_budget` (value and unit), `cumulative_budget` (value and unit), `response_deadline_seconds`, `baseline_freshness_seconds` | `target` (required unless `pass`), `supersedes_version` |
 | `goal_reference` | `goal_id`, `version`, `role` (`dispatch`, `resume` or `handoff`), `state` (`start` or `end`) | `deliverable_id` |
-| `goal_check` | `goal_id`, `version`, `check_id`, `check_digest`, `run_id`, `attempt`, `started_at`, `completed_at`, `evaluated_state` (an opaque digest of the evaluated tree or artifact), `scope` (`baseline`, `progress` or `final`), `completeness` (`complete` or `partial`), `result` (`pass`, `fail`, `unrunnable` or `error`) | `value` (finite number, required when `direction` is not `pass`), `unrunnable_class` (`permission`, `scope`, `data`, `resource`, `environment` or `other`) |
+| `goal_check` | `goal_id`, `version`, `check_id`, `check_digest`, `run_id`, `aggregate_id`, `attempt`, `started_at`, `completed_at`, `evaluated_state` (an opaque digest of the evaluated tree or artifact), `scope` (`baseline`, `progress` or `final`), `completeness` (`complete` or `partial`), `result` (`pass`, `fail`, `unrunnable` or `error`) | `value` (finite number, required when `direction` is not `pass`), `unrunnable_class` (`permission`, `scope`, `data`, `resource`, `environment` or `other`) |
 | `goal_escalation` | `goal_id`, `version`, `class` (`stalled`, `unrunnable`, `conflict`, `budget` or `other`), `last_check_event_id` (null before any check) | `effort_since_improvement` (seconds, tokens, dispatches) |
-| `goal_decision` | `goal_id`, `from_version`, `decision` (`revise`, `continue`, `abandon` or `accept`), `actor_id` | `to_version` (required if and only if `revise`), `escalation_event_id` (required when answering an escalation), `accepted_check_event_id` (required for `accept`) |
+| `goal_decision` | `goal_id`, `from_version`, `decision` (`revise`, `continue`, `abandon` or `accept`), `actor_id` | `to_version` (required if and only if `revise`), `escalation_event_id` (required when answering an escalation), `accepted_aggregate_id` (required for `accept`) |
 
 **State machine and validity**
 - **Current version.** A version becomes current at its `goal_declared` timestamp and stays current until a later version is declared. Events whose time is unknown cannot select a version; they are gaps.
@@ -65,11 +66,16 @@ The new record types inherit the v1 envelope and rules. A record's `timestamp` i
 - **Pass and value.** `pass` must agree with `value` and `target` when both are present.
 - **Retries.** Retries count only under the declared `retry_policy`. A result produced by extra attempts is recorded but cannot pass.
 - **Freshness.** A pass certifies only the `evaluated_state` it checked. Edits after `started_at` are not covered.
-- **Later results win.** A later `fail`, `error` or `unrunnable` on the current state cancels an earlier pass.
+- **Attempts and aggregates.** A check run consists of attempt events. Attempts that share one `aggregate_id` form one aggregate evaluation of one evaluated state.
+  - The aggregate is complete when it has the declared number of `complete` attempts and none of them is `error` or `unrunnable`. Otherwise it is incomplete: it has no result and cannot pass.
+  - The aggregate result follows `retry_policy.aggregate`: `all` requires every attempt to pass; `majority` requires more passes than fails; `last` takes the last attempt.
+  - The aggregate value is the worst attempt value for `all`, the median for `majority`, and the last attempt's value for `last`.
+  - Readiness, progress, invalidation and acceptance all act on complete aggregates, never on single attempts.
+- **Later results win.** A later complete aggregate on the current goal version that does not pass cancels an earlier passing aggregate.
 - **Decision authority.** Decisions name an `actor_id`. A decision whose actor is not the declared owner is invalid: it changes no state, cannot establish success, and counts as `unowned_decision`. sumbi-events still cannot authenticate emitters (a v1 limitation).
 - **IDs and ordering.** `goal_id` is unique in a log home; `run_id` is unique per goal version; owner and actor IDs share one namespace per home. Events with equal timestamps whose order changes a state are ambiguous. Ambiguous orderings and illegal transitions (dispatch before declaration, a reference `end` without `start`, a decision without a valid escalation or check link) are gaps and never resolve in the favourable direction.
 - **Aggregates.** Attempts are bounded per evaluated state and version, across runs; a new `run_id` on the same state does not reset them. An aggregate result needs `complete` attempts on one evaluated state; missing or `error` attempts make it incomplete.
-- **Acceptance binding.** An `accept` binds to one `final` check event and its evaluated state, and is valid only if no later result on that goal version contradicts it.
+- **Acceptance binding.** An `accept` binds to one complete `final` aggregate and its evaluated state. It is valid only if no later complete aggregate on that goal version fails to pass.
 
 ## Measurements (`sumbi collect`, `goals` section)
 
@@ -102,10 +108,10 @@ The new record types inherit the v1 envelope and rules. A record's `timestamp` i
 - First pass, and effort to first pass.
 - Accepted outcome. Revised versions are reported separately from original versions.
 - Stall episodes and their effort.
-- Share of stall episodes over budget that ended in an escalation.
+- Share of stall episodes over budget that were escalated after exceeding the budget.
 - Stale-version effort.
 - Escalation latency and pending escalations.
-- Outcome counts: `reached`, `abandoned`, `unresolved` and censored.
+- Outcome counts: `reached`, `abandoned` and `superseded`, with censored goals counted separately.
 - Cost per reached goal, under the existing lifetime cost rules.
 
 **Anti-gaming**
@@ -121,7 +127,7 @@ The opt-in `goal-check` outcome source is a weaker machine-evidence source under
 - **Success:** a valid owner `accept` bound to a `final` pass on the dispatched version, within the follow-up window. The window is anchored at dispatch, like M2 cohorts.
 - **Terminal non-success:** `abandoned` or `superseded`. Censored (`unresolved`) units stay pending; like M2's pending-work gate, they withhold the final verdict.
 - **Statistics:** the existing M2 engine, with pre-registered margin and sample size, Wilson and Newcombe intervals, whole-unit bootstrap, and the ordered coverage, comparability, success and cost gates. Lifetime cost includes failures, retries and revisions.
-- **Clustering:** goals that share a deliverable or session are clustered. They are not independent samples.
+- **Dependence:** goals that share a deliverable or a session are not independent samples. Until cluster-aware inference exists, comparisons containing such units are withheld; they are never fed to Wilson, Newcombe or the independent bootstrap.
 - **Withheld verdicts:** any of these withhold a verdict:
   - coverage gaps and missing events;
   - a change of check digest within an arm;
@@ -164,6 +170,8 @@ Draft 1 was reviewed by a model from a different family. Verdict: proceed with c
 - best-result improvement and cumulative stall effort;
 - censoring as pending, one judged deliverable per goal, and comparability gates;
 - the G1 and G2 acceptance cases.
+
+The third review requested one change (P1): define whether invalidation and acceptance act on attempts or on aggregates. Draft 4 defines aggregate evaluations and binds both to them. Its P2 details go to the G1 implementation specification. These include exact field validation, metric denominators, switch-boundary allocation, accounting of revision costs, digest pseudonymization and the additional hand-computed G1 cases.
 
 | Finding | Where draft 2 addresses it |
 | --- | --- |
