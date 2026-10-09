@@ -118,6 +118,8 @@ def prepare(root, case):
         save(fixture / "interventions.jsonl", json.dumps({
             "intervention_id": "synthetic-local-round", "practice_id": "handoff",
             "utc_time": "2030-01-02T01:00:01Z"}) + "\n")
+    elif setup == "improve":
+        copy_text_tree(DIRECTORY / "fixtures/improve", fixture)
     elif setup == "register-existing":
         save(root / "published-registration.json", '{"existing": "synthetic sentinel"}\n')
     elif setup.startswith("worker-github"):

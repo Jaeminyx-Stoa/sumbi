@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.3",
+  "window": {
+    "since": "2030-01-01T00:00:00Z",
+    "until": "2030-01-02T00:00:00Z",
+    "bounds": "[since,until)"
+  },
+  "summary": {
+    "sessions": 2,
+    "counts": {
+      "tool_errors": 3,
+      "api_errors": 0,
+      "compactions": 1
+    },
+    "tokens": {
+      "total": 100
+    }
+  },
+  "coverage": {
+    "unattributed_share": 0.1
+  }
+}

@@ -42,7 +42,18 @@ def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = Non
         raise InstallError("Intervention ID must be a bounded public-safe label.")
     if not plan.changes:
         return {"applied": [], "baseline": {"status": "not requested (empty plan)"}}
-    root = plan.root
+    def prepare(originals, modes):
+        return _prepare_apply(plan, originals, modes, home=home, salt=salt,
+            intervention_id=intervention_id)
+    return apply_transaction(plan.root, plan.changes, prepare)
+
+
+def apply_transaction(root: Path, changes: list, prepare) -> dict:
+    """Publish checked targets and their ledger as one recoverable transaction.
+
+    Callers validate their own source of changes; prepare repeats those checks
+    under the shared install lock and persists a prepared recovery manifest.
+    """
     local = safe_path(root, ".sumbi")
     local.mkdir(mode=0o700, exist_ok=True)
     lock = safe_path(root, ".sumbi/install.lock")
@@ -57,9 +68,9 @@ def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = Non
     created_dirs: set[Path] = set()
     backup_relative = None
     try:
-        ledger_path, ledger, baseline_result, backup_relative, records, manifest = _prepare_apply(
-            plan, originals, modes, home=home, salt=salt, intervention_id=intervention_id)
-        updates = [(c.path, c.after) for c in plan.changes]
+        ledger_path, ledger, baseline_result, backup_relative, records, manifest = prepare(
+            originals, modes)
+        updates = [(c.path, c.after) for c in changes]
         updates.append((ledger_path, (ledger or b"") + b"".join(
             (json.dumps(record, sort_keys=True) + "\n").encode() for record in records)))
         # Check the whole transaction after the baseline and backups too.
@@ -76,7 +87,7 @@ def apply_plan(plan: Plan, *, home: Path | None = None, salt: bytes | None = Non
         relative_manifest = backup_relative + "/manifest.json"
         _write(root, relative_manifest, read_bytes(root, relative_manifest),
             (json.dumps(completed, indent=2) + "\n").encode(), 0o600)
-        return {"applied": [p["id"] for p in plan.practices],
+        return {"applied": [p["practice_id"] for p in records],
             "baseline": baseline_result, "backup": backup_relative,
             "backup_id": backup_relative.rsplit("/", 1)[1]}
     except BaseException as error:

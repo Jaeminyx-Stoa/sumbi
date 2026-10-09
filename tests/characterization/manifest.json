@@ -1680,6 +1680,27 @@
         "2030-01-15T00:00:00Z"
       ],
       "expected_exit": 2
+    },
+    {
+      "name": "improve-observations",
+      "command": "improve",
+      "setup": "improve",
+      "argv": [
+        "improve",
+        "--evidence",
+        "{fixture}/collect.json",
+        "--json"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "improve-missing-evidence",
+      "command": "improve",
+      "setup": "empty",
+      "argv": [
+        "improve"
+      ],
+      "expected_exit": 1
     }
   ]
 }
