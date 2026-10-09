@@ -87,7 +87,7 @@ overhead separate, and cannot certify human acceptance or later reverts. See
   - Applies additive practices from a curated catalog that distills Superpowers, gstack, gajae code and two in-house harness labs.
   - Installation uses the bundled catalog and makes no network request.
 - **Measure (`sumbi collect`, `sumbi deliver`).** Read native Claude Code and Codex logs or opt-in agent-neutral events, plus GitHub pull-request outcomes. The open format supports local verification outcomes without assigning GitHub ownership. Reports contain counts, durations, labels and IDs; raw text is restricted to an explicitly requested local review file.
-- **Improve (`sumbi improve`).** Turn collect observations into an owner-authored, evidence-linked proposal for one to three source/configuration/document changes. Review-bound application reuses install backups and rollback; [local review and comparison workflow](docs/IMPROVE.md).
+- **Improve (`sumbi improve`).** Turn collect observations into an owner-authored, evidence-linked proposal for a bounded set of source/configuration/document changes. Review-bound application reuses install backups and rollback; [local review and comparison workflow](docs/IMPROVE.md).
 - **Compare (`sumbi compare`).**
   - Count success per dispatched deliverable using recorded outcome evidence.
   - Compare rounds on cost per success: time, and tokens split into new input, cache writes, cache reads and output.

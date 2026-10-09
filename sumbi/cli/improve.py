@@ -1,5 +1,6 @@
 """Compose evidence observations and reviewed local change application."""
 
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sys
@@ -52,7 +53,8 @@ def run(args):
             registration = read_registration(args.registration)
             if (registration.intervention_id != plan.summary["intervention_id"]
                 or registration.predictions != (plan.summary["prediction"],)
-                or not registration.preregistered):
+                or not registration.preregistered
+                or args.apply and registration.registered_at > datetime.now(timezone.utc)):
                 raise InstallError(
                     "Registration must pre-register this intervention and prediction.")
         result = apply_improvement(plan, args.reviewed_sha256) if args.apply else None
@@ -66,7 +68,12 @@ def run(args):
             print("Review and verification are owner-local attestations, "
                 "not authenticated evidence.")
             for change in plan.changes:
-                sys.stdout.write(change.diff())
+                diff = change.diff()
+                if diff:
+                    sys.stdout.write(diff)
+                else:
+                    print("Line endings only: " + change.path
+                        + " (exact before/after SHA-256 in summary).")
         return 0
     except (InstallError, OSError, ValueError) as error:
         message = (str(error) if isinstance(error, InstallError)

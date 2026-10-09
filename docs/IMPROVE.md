@@ -15,8 +15,9 @@ sumbi improve --root . --revert BACKUP_ID
 ```
 
 With evidence alone, output is finite numeric observations: sessions, tool/API
-errors, compactions, reported tokens, summed wall time, estimated active time,
-and unattributed spend share when present. Missing metrics remain missing.
+errors, compactions, reported tokens and their reported components (new input,
+cache writes, cache reads, output, and reasoning output as an output subset),
+summed wall time, estimated active time, and unattributed spend share when present. Missing metrics remain missing.
 Collect supplies no success outcome or causal diagnosis; even an empty report
 can be inspected, but it cannot establish that a change will improve outcomes.
 The collect JSON is bounded to 16 MiB and must use the current schema version.
@@ -76,6 +77,9 @@ for `before_sha256` only when a target does not exist. Bundle size is at most
 Evidence references must match numeric values at supported pointers exactly:
 `/summary/sessions`, `/summary/counts/tool_errors`, `/summary/counts/api_errors`,
 `/summary/counts/compactions`, `/summary/tokens/total`,
+`/summary/tokens/new_input`, `/summary/tokens/cache_write`,
+`/summary/tokens/cache_read`, `/summary/tokens/output`,
+`/summary/tokens/reasoning_output` (an output subset),
 `/summary/time/active_seconds/value`, `/summary/time/wall_span_seconds/value`,
 and `/coverage/unattributed_share`. Hypothesis and rationale are local reviewed
 text, not conclusions computed from those counts.
@@ -91,11 +95,15 @@ These are **owner-local attestations**, not authenticated independent review or
 proof of safety. The reviewer must check approvals, money-path constraints,
 permissions and other safety gates; syntactic additions can weaken them too.
 
-One to three exact UTF-8 targets are supported, including source, configuration
-and harness documentation (`.py`, `.js`, `.ts`, `.tsx`, `.jsx`, `.json`, `.toml`,
+A bundle supports up to 64 exact UTF-8 targets as a resource bound, including
+source, configuration and harness documentation (`.py`, `.js`, `.ts`, `.tsx`, `.jsx`, `.json`, `.toml`,
 `.yaml`, `.yml`, `.md`, `.txt`, `.ini`, `.cfg`, `.sh`). There are no file deletions
-or executable-mode changes. Traversal, symlinks, hardlinks, metadata, nested
-repositories, ignored/excluded paths and known secret/session-log areas are
+or executable-mode changes. Keep each round to one to three interventions; a
+coupled intervention may require more than three source files. Target text
+rejects C0/C1 and DEL controls except tabs, LF and strict CRLF. Text and target
+paths reject Unicode bidirectional embedding/override/isolate controls. A line-ending-only change
+prints an explicit local review note because unified diffs normalize CRLF.
+Traversal, symlinks, hardlinks, metadata, nested repositories, ignored/excluded paths and known secret/session-log areas are
 refused. This path filter is not a secret scanner: review target contents too.
 
 Apply re-reads bundle, evidence and target bytes under the existing install
@@ -111,7 +119,8 @@ Pre-register the custom prediction using the existing [registration JSON
 schema](MEASUREMENT.md#registration-json-schema) before applying. The `register`
 convenience command continues to copy catalog predictions; custom changes use
 the documented JSON schema. Optional `improve --registration FILE` checks the
-intervention ID, prediction and registration order. Then pass
+intervention ID, prediction and registration order; apply also refuses a
+registration timestamp later than the current UTC time. Then pass
 `--interventions .sumbi/interventions.jsonl` to `compare` to account for the
 actual apply timestamp. Apply does not claim adoption, cost savings or success.
 The existing comparison exposure reader ignores revert audit rows; do not treat

@@ -21,12 +21,18 @@ from .revert import LEDGER
 
 LABEL = re.compile(r"[a-z][a-z0-9-]{0,63}")
 HASH = re.compile(r"[a-f0-9]{64}")
+MAX_TARGETS = 64
 METRICS = {
     "/summary/sessions": "sessions",
     "/summary/counts/tool_errors": "tool-errors",
     "/summary/counts/api_errors": "api-errors",
     "/summary/counts/compactions": "compactions",
     "/summary/tokens/total": "reported-tokens",
+    "/summary/tokens/new_input": "new-input-tokens",
+    "/summary/tokens/cache_write": "cache-write-tokens",
+    "/summary/tokens/cache_read": "cache-read-tokens",
+    "/summary/tokens/output": "output-tokens",
+    "/summary/tokens/reasoning_output": "reasoning-output-subset-tokens",
     "/summary/time/active_seconds/value": "estimated-active-seconds",
     "/summary/time/wall_span_seconds/value": "summed-wall-seconds",
     "/coverage/unattributed_share": "unattributed-share",
@@ -56,6 +62,16 @@ def _fields(value, names):
 
 def _private_text(value):
     return isinstance(value, str) and 0 < len(value.strip()) <= 16384 and "\x00" not in value
+
+
+def _display_text(text: str) -> None:
+    """Refuse controls that could disguise local diff contents or target names."""
+    for index, character in enumerate(text):
+        code = ord(character)
+        if (code < 32 and character not in "\t\n\r" or 127 <= code <= 159
+            or 0x202A <= code <= 0x202E or 0x2066 <= code <= 0x2069
+            or character == "\r" and text[index + 1:index + 2] != "\n"):
+            raise ValueError
 
 
 def _load(path: Path, limit: int):
@@ -124,6 +140,7 @@ class Improvement:
 def _target(root: Path, name: str, report: dict):
     if not isinstance(name, str) or len(name) > 240:
         raise ValueError
+    _display_text(name)
     parts = checked_relative(name).parts
     lower = [part.casefold() for part in parts]
     if (any(part in PRIVATE_PARTS or part.startswith(".env.") for part in lower)
@@ -188,7 +205,7 @@ def _validate_bundle(raw, evidence_data, measured):
             and review["safety_gates_preserved"] is None)):
         raise ValueError
     entries = raw["changes"]
-    if not isinstance(entries, list) or not 1 <= len(entries) <= 3:
+    if not isinstance(entries, list) or not 1 <= len(entries) <= MAX_TARGETS:
         raise ValueError
 
 
@@ -204,16 +221,15 @@ def _changes(root, entries, report, evidence, bundle):
         before = read_bytes(root, name)
         _checked(root, name, before)
         if before is not None:
-            before.decode("utf-8")
-            if b"\x00" in before:
-                raise ValueError
+            _display_text(before.decode("utf-8"))
         if (entry["before_sha256"] is not None and not _hash(entry["before_sha256"])):
             raise ValueError
         if entry["before_sha256"] != digest(before):
             raise InstallError("Improvement target changed; rebuild and review the bundle.")
         text = entry["after_text"]
-        if not isinstance(text, str) or not text or "\x00" in text:
+        if not isinstance(text, str) or not text:
             raise ValueError
+        _display_text(text)
         after = text.encode("utf-8")
         if (len(after) > MAX_BYTES or not _hash(entry["after_sha256"])
             or digest(after) != entry["after_sha256"]):
@@ -223,8 +239,7 @@ def _changes(root, entries, report, evidence, bundle):
         if safe_path(root, name).resolve() in {Path(evidence).resolve(), Path(bundle).resolve()}:
             raise ValueError
         changes.append(Change(name, before, after))
-        hashes.append({"target_id": digest(name.encode()), "before_sha256": digest(before),
-            "after_sha256": digest(after)})
+        hashes.append({"before_sha256": digest(before), "after_sha256": digest(after)})
     return changes, hashes
 
 

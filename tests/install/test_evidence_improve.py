@@ -77,6 +77,17 @@ class EvidenceImproveTests(unittest.TestCase):
         self.assertEqual(result["outcome_verdict"], "not-available-from-collect")
         self.assertEqual(next(f["value"] for f in result["findings"] if f["id"] == "tool-errors"), 3)
         self.assertNotIn("DO-NOT-EXPORT", json.dumps(result))
+        self.report["summary"]["tokens"].update(new_input=8, cache_write=None, cache_read=80,
+            output=12, reasoning_output=2)
+        self.evidence.write_text(json.dumps(self.report))
+        _, components = observations(self.evidence)
+        findings = {row["id"]: row["value"] for row in components["findings"]}
+        self.assertEqual(findings["new-input-tokens"], 8)
+        self.assertEqual(findings["cache-read-tokens"], 80)
+        self.assertEqual(findings["output-tokens"], 12)
+        self.assertEqual(findings["reasoning-output-subset-tokens"], 2)
+        self.assertNotIn("cache-write-tokens", findings)
+        self.assertEqual(findings["reported-tokens"], 100)
 
     def test_empty_collect_is_honest_no_outcome(self):
         self.report["summary"]["sessions"] = 0
@@ -105,6 +116,7 @@ class EvidenceImproveTests(unittest.TestCase):
         for private in ["PRIVATE", "device.py", str(self.temp.name), "DO-NOT-EXPORT"]:
             self.assertNotIn(private, summary)
         self.assertEqual(plan.summary["change_count"], 1)
+        self.assertEqual(set(plan.summary["targets"][0]), {"before_sha256", "after_sha256"})
         self.assertFalse((self.root / ".sumbi").exists())
 
     def test_apply_records_baseline_and_reverts_source_without_erasing_history(self):
@@ -308,6 +320,83 @@ class EvidenceImproveTests(unittest.TestCase):
         self.assertEqual((code, err), (0, ""))
         self.assertEqual(json.loads(out)["files"], 1)
         self.assertEqual(self.target.read_bytes(), b"LIMIT = 1\n")
+
+    def test_diff_controls_in_original_and_replacement_are_refused(self):
+        controls = ["\x1b[2J", "\x07", "\x0c", "\x7f", "\x85", "\rX"]
+        controls += [chr(code) for code in (*range(0x202A, 0x202F), *range(0x2066, 0x206A))]
+        entry = self.raw["changes"][0]
+        for control in controls:
+            with self.subTest(control=repr(control), side="original"):
+                self.target.write_bytes(("LIMIT = 1" + control + "\n").encode())
+                entry.update(before_sha256=digest(self.target.read_bytes()),
+                    after_text="LIMIT = 2\n", after_sha256=digest(b"LIMIT = 2\n"))
+                self.save()
+                with self.assertRaises(InstallError):
+                    self.plan()
+            with self.subTest(control=repr(control), side="replacement"):
+                self.target.write_bytes(b"LIMIT = 1\n")
+                after = "LIMIT = 2" + control + "\n"
+                entry.update(before_sha256=digest(self.target.read_bytes()),
+                    after_text=after, after_sha256=digest(after.encode()))
+                self.save()
+                with self.assertRaises(InstallError):
+                    self.plan()
+
+    def test_diff_target_bidi_control_is_refused(self):
+        self.raw["changes"][0].update(path="tools/x\u202e.py", before_sha256=None)
+        self.save()
+        with self.assertRaises(InstallError):
+            self.plan()
+
+    def test_crlf_and_tabs_remain_valid_and_apply_exact_bytes(self):
+        after = "LIMIT = 2\r\n\t# valid tab\r\n"
+        self.raw["changes"][0].update(after_text=after, after_sha256=digest(after.encode()))
+        self.save()
+        self.assertIn("+LIMIT = 2", self.plan().changes[0].diff())
+        self.apply()
+        self.assertEqual(self.target.read_bytes(), after.encode())
+
+    def test_line_ending_only_proposal_has_explicit_local_review_note(self):
+        after = "LIMIT = 1\r\n"
+        self.raw["changes"][0].update(after_text=after, after_sha256=digest(after.encode()))
+        self.save()
+        self.assertEqual(self.plan().changes[0].diff(), "")
+        code, out, err = self.invoke("--evidence", self.evidence, "--bundle", self.bundle)
+        self.assertEqual((code, err), (0, ""))
+        self.assertIn("Line endings only: device.py", out)
+        self.assertEqual(self.target.read_bytes(), b"LIMIT = 1\n")
+
+    def test_coupled_four_file_proposal_is_accepted_and_65_targets_refused(self):
+        original = dict(self.raw["changes"][0])
+        self.raw["changes"] = [original] + [{**original, "path": "tools/part-" + str(n) + ".py",
+            "before_sha256": None} for n in range(3)]
+        self.save()
+        self.assertEqual(self.plan().summary["change_count"], 4)
+        self.raw["changes"] = [{**original, "path": "tools/part-" + str(n) + ".py",
+            "before_sha256": None} for n in range(65)]
+        self.save()
+        with self.assertRaises(InstallError):
+            self.plan()
+
+    def test_cli_refuses_future_registration_on_apply(self):
+        now = datetime.now(timezone.utc)
+        planned = now + timedelta(days=2)
+        path = Path(self.temp.name) / "future-registration.json"
+        raw = {"intervention_id": "device-fix", "registered_at": (now+timedelta(days=1)).isoformat(),
+            "applied_at": planned.isoformat(), "predictions": [self.raw["prediction"]],
+            "non_inferiority_margin_pp": 5, "sample_size_per_arm": 20, "follow_up_days": 1,
+            "before": {"since": (planned-timedelta(days=1)).isoformat(),
+                "until": planned.isoformat()},
+            "after": {"since": planned.isoformat(), "until": (planned+timedelta(days=1)).isoformat()}}
+        path.write_text(json.dumps(raw))
+        self.assertTrue(read_registration(path).preregistered)
+        code, out, err = self.invoke("--evidence", self.evidence, "--bundle", self.bundle,
+            "--registration", path, "--apply", "--reviewed-sha256", digest(self.bundle.read_bytes()))
+        self.assertEqual(code, 1)
+        self.assertEqual(out, "")
+        self.assertIn("Registration must pre-register", err)
+        self.assertEqual(self.target.read_bytes(), b"LIMIT = 1\n")
+        self.assertFalse((self.root / ".sumbi/interventions.jsonl").exists())
 
     def test_cli_invalid_combinations_fail_without_echoing_private_inputs(self):
         for args in [[], ["--apply"], ["--evidence", self.evidence, "--apply"],
