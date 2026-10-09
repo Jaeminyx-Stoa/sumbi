@@ -1,8 +1,9 @@
 # Evidence-driven local improvements
 
 `improve` connects an existing collect report to a concrete, reviewed harness
-change. It can address a new source/configuration defect outside the seed
-catalog. It does not infer causality, generate code, fetch internet candidates,
+change. It can address a new harness defect outside the seed catalog. Product
+source stays with the project's own agent and owner: targets are limited to the
+execution harness (see [Targets](#targets)). It does not infer causality, generate code, fetch internet candidates,
 execute verification commands, or apply a comparison verdict automatically.
 An owner or coding agent authors the diagnosis and exact change bundle.
 
@@ -85,7 +86,7 @@ for `before_sha256` only when a target does not exist. Bundle size is at most
     "safety_gates_preserved": null
   },
   "changes": [{
-    "path": "tools/capacity.py",
+    "path": "tools/checks/capacity.py",
     "before_sha256": "BEFORE_SHA256",
     "after_sha256": "AFTER_SHA256",
     "after_text": "CAPACITY = 2\n"
@@ -124,9 +125,30 @@ evidence. Checklist presence is not evidence of improvement. Preserve approvals,
 money-path constraints, permissions and other safety gates; syntactic additions
 can weaken them too.
 
-A bundle supports up to 64 exact UTF-8 targets as a resource bound, including
-source, configuration and harness documentation (`.py`, `.js`, `.ts`, `.tsx`, `.jsx`, `.json`, `.toml`,
-`.yaml`, `.yml`, `.md`, `.txt`, `.ini`, `.cfg`, `.sh`). There are no file deletions
+### Targets
+
+Targets must be execution-harness files:
+
+- agent instruction files at any depth: `AGENTS.md`, `AGENTS.override.md`,
+  `CLAUDE.md`, `GEMINI.md` and `copilot-instructions.md`;
+- harness directories: `.claude/`, `.codex/`, `.agents/`, `.cursor/rules/`,
+  `.github/workflows/`, `.github/instructions/`, `.githooks/` and `docs/sumbi/`;
+- harness files: `.cursorrules`, `.pre-commit-config.yaml`, `CODEOWNERS`,
+  `.github/CODEOWNERS` and `.github/pull_request_template.md`;
+- paths the owner declares as harness tools, such as check scripts or launchers,
+  in `.sumbi/config.toml`:
+
+  ```toml
+  [harness]
+  paths = ["tools/checks/**", "scripts/launch_worker.ps1"]
+  ```
+
+  The paths are repository-relative globs with the same syntax as `exclude`.
+
+Everything else, including product source and general documentation, is refused.
+Within those paths a bundle supports up to 64 exact UTF-8 targets as a resource
+bound, with the suffixes `.py`, `.js`, `.ts`, `.tsx`, `.jsx`, `.json`, `.toml`,
+`.yaml`, `.yml`, `.md`, `.txt`, `.ini`, `.cfg` and `.sh`. There are no file deletions
 or executable-mode changes. Keep each round to one to three interventions; a
 coupled intervention may require more than three source files. Target text
 rejects C0/C1 and DEL controls except tabs, LF and strict CRLF. Text and target

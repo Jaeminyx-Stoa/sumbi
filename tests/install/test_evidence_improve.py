@@ -4,6 +4,7 @@ from contextlib import redirect_stdout, redirect_stderr
 from datetime import datetime, timedelta, timezone
 from io import StringIO
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -29,6 +30,10 @@ class EvidenceImproveTests(unittest.TestCase):
         self.root.mkdir()
         self.target = self.root / "device.py"
         self.target.write_bytes(b"LIMIT = 1\n")
+        # Synthetic harness tools; undeclared product source is refused below.
+        (self.root / ".sumbi").mkdir()
+        (self.root / ".sumbi/config.toml").write_text(
+            '[harness]\npaths = ["device.py", "tools/**"]\n', encoding="utf-8")
         self.evidence = base / "evidence.json"
         self.bundle = base / "bundle.json"
         self.report = {"schema_version": SCHEMA_VERSION,
@@ -118,7 +123,8 @@ class EvidenceImproveTests(unittest.TestCase):
         self.assertEqual(plan.summary["change_count"], 1)
         self.assertNotIn("policy", plan.summary["review"])
         self.assertEqual(set(plan.summary["targets"][0]), {"before_sha256", "after_sha256"})
-        self.assertFalse((self.root / ".sumbi").exists())
+        # A proposal writes nothing; only the owner's harness declaration exists.
+        self.assertEqual([p.name for p in (self.root / ".sumbi").iterdir()], ["config.toml"])
 
     def test_apply_records_baseline_and_reverts_source_without_erasing_history(self):
         result = self.apply()
@@ -245,11 +251,37 @@ class EvidenceImproveTests(unittest.TestCase):
                 with self.assertRaises(InstallError):
                     self.plan()
 
+    def test_only_harness_targets_are_accepted(self):
+        for name in ["AGENTS.md", "pkg/AGENTS.md", "CLAUDE.md", ".claude/commands/check.md",
+            ".codex/config.toml", ".github/workflows/ci.yml", "docs/sumbi/notes.md",
+            "tools/check.sh"]:
+            with self.subTest(name=name):
+                self.raw["changes"][0].update(path=name, before_sha256=None)
+                self.save()
+                self.assertEqual(self.plan().summary["change_count"], 1)
+        for name in ["app/main.py", "src/feature.ts", "README.md", "docs/guide.md"]:
+            with self.subTest(name=name):
+                self.raw["changes"][0].update(path=name, before_sha256=None)
+                self.save()
+                with self.assertRaises(InstallError):
+                    self.plan()
+
+    def test_invalid_harness_configuration_refused(self):
+        for text in ['harness = "tools"\n', '[harness]\npaths = "tools/**"\n',
+            '[harness]\npaths = ["../outside/**"]\n', '[harness]\nother = []\n']:
+            with self.subTest(text=text):
+                (self.root / ".sumbi/config.toml").write_text(text, encoding="utf-8")
+                with self.assertRaises(InstallError):
+                    self.plan()
+
     def test_link_and_hardlink_targets_refused(self):
         self.target.unlink()
         external = Path(self.temp.name) / "external.py"
         external.write_bytes(b"LIMIT = 1\n")
-        self.target.symlink_to(external)
+        try:
+            self.target.symlink_to(external)
+        except OSError:
+            self.skipTest("Symlink creation is unavailable on this test host.")
         with self.assertRaises(InstallError):
             self.plan()
         self.target.unlink()
@@ -271,6 +303,7 @@ class EvidenceImproveTests(unittest.TestCase):
         with self.assertRaises(InstallError):
             self.plan()
 
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits are not represented on Windows.")
     def test_existing_mode_is_preserved_new_modes_not_supplied(self):
         self.target.chmod(0o755)
         result = self.apply()

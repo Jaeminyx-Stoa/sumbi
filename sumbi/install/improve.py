@@ -13,7 +13,9 @@ from sumbi.core.json import unique_object
 from sumbi.core.time import Window
 from .apply import apply_transaction, _protect_local_artifacts, _save_backup
 from .errors import InstallError
-from .exclusions import GitIgnore, excluded_by, load_excludes
+from .configuration import load_configuration
+from .exclusions import (GitIgnore, _validate as validate_patterns, excluded_by, load_excludes,
+    matches)
 from .files import MAX_BYTES, _checked, read_bytes, safe_path, checked_relative
 from .inventory import inventory
 from .planner import Change, digest
@@ -41,6 +43,32 @@ SUFFIXES = {".py", ".js", ".ts", ".tsx", ".jsx", ".json", ".toml", ".yaml",
     ".yml", ".md", ".txt", ".ini", ".cfg", ".sh"}
 PRIVATE_PARTS = {".git", ".sumbi", ".ssh", ".aws", ".azure", ".gnupg", "sessions",
     "logs", "transcripts", "secrets", "credentials", ".env", "node_modules", ".venv"}
+# sumbi changes the execution harness, never product source. Owners declare any
+# further harness tools, such as check scripts, under [harness] paths.
+INSTRUCTION_NAMES = {"agents.md", "agents.override.md", "claude.md", "gemini.md",
+    "copilot-instructions.md"}
+HARNESS_FILES = {".cursorrules", ".pre-commit-config.yaml", "codeowners",
+    ".github/codeowners", ".github/pull_request_template.md"}
+HARNESS_DIRS = (".claude", ".codex", ".agents", ".cursor/rules", ".github/workflows",
+    ".github/instructions", ".githooks", "docs/sumbi")
+
+
+def declared_harness(root: Path) -> tuple[str, ...]:
+    harness = load_configuration(root).get("harness", {})
+    if not isinstance(harness, dict) or set(harness) - {"paths"}:
+        raise InstallError("Harness configuration must be a table with only paths.")
+    try:
+        return validate_patterns(harness.get("paths", []))
+    except InstallError:
+        raise InstallError("Harness paths must be a list of repository-relative "
+            "glob strings.") from None
+
+
+def is_harness(root: Path, name: str) -> bool:
+    lower = name.casefold()
+    return (lower.rsplit("/", 1)[-1] in INSTRUCTION_NAMES or lower in HARNESS_FILES
+        or any(lower == path or lower.startswith(path + "/") for path in HARNESS_DIRS)
+        or any(matches(name, pattern) for pattern in declared_harness(root)))
 
 
 def _number(value):
@@ -150,6 +178,7 @@ def _target(root: Path, name: str, report: dict):
         or any("secret" in part or "credential" in part or "private-key" in part
             for part in lower)
         or excluded_by(name, load_excludes(root))
+        or not is_harness(root, name)
         or any(name == path or name.startswith(path + "/")
             for path in report["versioning"]["nested_repositories"]["paths"])):
         raise ValueError
