@@ -73,7 +73,11 @@ import sibling scanners; assembly preserves report and diagnostic order.
 The planner creates additive managed blocks from the bundled catalog. Placement
 uses observed session starts and versioned load rules. Apply and revert own
 locking, checked publication, backups and rollback; baseline collection runs
-before target writes. [Install boundaries](../sumbi/install/README.md) document
+before catalog target writes. `install/improve.py` uses the same transaction
+for bounded owner-reviewed source/configuration edits and a supplied collect
+evidence baseline. `cli/improve.py` composes optional judge registration checks;
+install still does not import judge. Local diagnosis/diffs stay outside the
+allow-listed improvement summary and intervention record. [Install boundaries](../sumbi/install/README.md) document
 the safety and detection limits.
 
 ## Characterization and extension points

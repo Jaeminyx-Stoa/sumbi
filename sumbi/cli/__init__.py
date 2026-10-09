@@ -8,6 +8,7 @@ from pathlib import Path
 from sumbi.core.time import Window
 from sumbi import __version__
 from sumbi.cli.install import configure_parser as configure_install, run as run_install
+from sumbi.cli.improve import configure_parser as configure_improve, run as run_improve
 from sumbi.events.registry import ADAPTERS, log_roots
 
 
@@ -22,6 +23,8 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="sumbi")
     root.add_argument("--version", action="version", version="sumbi " + __version__)
     commands = root.add_subparsers(dest="command", required=True)
+    configure_improve(commands.add_parser("improve",
+        help="Observe collect evidence and propose reviewed local harness changes"))
     configure_register(commands.add_parser("register",
         help="Create a validated catalog pre-registration; never overwrite"))
     configure_install(commands.add_parser("install",
@@ -38,6 +41,8 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     root = parser()
     args = root.parse_args(argv)
+    if args.command == "improve":
+        return run_improve(args)
     if args.command == "install":
         return run_install(args)
     if args.command == "register":
