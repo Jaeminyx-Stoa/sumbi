@@ -69,6 +69,10 @@ class Session:
     token_evidence_incomplete: bool = False
     metadata_incomplete: dict[str, bool] = field(default_factory=dict)
     request_usage: list[tuple] = field(default_factory=list)
+    compaction_times: set[datetime | None] = field(default_factory=set)
+    # Surrounding record times bound untimed requests; never serialized.
+    request_timing_gaps: list[tuple[datetime | None, datetime | None]] = field(default_factory=list)
+    activity_timing_incomplete: bool = False
     model_history: list[tuple] = field(default_factory=list)
     model_request_status: str = "unknown"
     spawn_depth: int | None = None

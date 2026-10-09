@@ -41,7 +41,11 @@ Delegation all (observed): dispatched 1; dispatching parents 1; parent unobserve
   Model request unrequested: sessions 0; total tokens 0
   Model request unknown: sessions 1; total tokens 6
   Model model-a (unknown): sessions 1; total tokens 6
-  Inline/actual context (estimated): median 20; observed 1; unobserved 0; sessions below one 0; share 0
+  Delegation input comparison (estimated): observed 1; unobserved 0
+  Unobserved estimate reasons (estimated): none
+  Input tokens and carry (estimated): actual_fresh 1; inline_fresh 0; actual_reused 5; inline_reused 60; actual_carry 3; inline_carry 0
+  Fresh:reused break-even ratio (estimated): median 55; p10 55; p90 55; sessions 1; fresh_not_higher 0; reused_not_lower 0
+  Share below fresh:reused ratio (estimated, descriptive): 1 0; 5 0; 10 0; 20 0; 50 0
   Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
 Delegation claude-code (observed): dispatched 1; dispatching parents 1; parent unobserved 0
   Nesting depth: 1 1
@@ -56,7 +60,11 @@ Delegation claude-code (observed): dispatched 1; dispatching parents 1; parent u
   Model request unrequested: sessions 0; total tokens 0
   Model request unknown: sessions 1; total tokens 6
   Model model-a (unknown): sessions 1; total tokens 6
-  Inline/actual context (estimated): median 20; observed 1; unobserved 0; sessions below one 0; share 0
+  Delegation input comparison (estimated): observed 1; unobserved 0
+  Unobserved estimate reasons (estimated): none
+  Input tokens and carry (estimated): actual_fresh 1; inline_fresh 0; actual_reused 5; inline_reused 60; actual_carry 3; inline_carry 0
+  Fresh:reused break-even ratio (estimated): median 55; p10 55; p90 55; sessions 1; fresh_not_higher 0; reused_not_lower 0
+  Share below fresh:reused ratio (estimated, descriptive): 1 0; 5 0; 10 0; 20 0; 50 0
   Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
 Delegation codex (observed): dispatched 0; dispatching parents 0; parent unobserved 0
   Nesting depth: none
@@ -70,7 +78,11 @@ Delegation codex (observed): dispatched 0; dispatching parents 0; parent unobser
   Model request requested: sessions 0; total tokens 0
   Model request unrequested: sessions 0; total tokens 0
   Model request unknown: sessions 0; total tokens 0
-  Inline/actual context (estimated): median unobserved; observed 0; unobserved 0; sessions below one 0; share unobserved
+  Delegation input comparison (estimated): observed 0; unobserved 0
+  Unobserved estimate reasons (estimated): none
+  Input tokens and carry (estimated): actual_fresh 0; inline_fresh 0; actual_reused 0; inline_reused 0; actual_carry 0; inline_carry 0
+  Fresh:reused break-even ratio (estimated): median unobserved; p10 unobserved; p90 unobserved; sessions 0; fresh_not_higher 0; reused_not_lower 0
+  Share below fresh:reused ratio (estimated, descriptive): 1 unobserved; 5 unobserved; 10 unobserved; 20 unobserved; 50 unobserved
   Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
 Delegation project sample project_e3db46d1b932ef2c778ba7cc claude-code (observed): dispatched 1; dispatching parents 1; parent unobserved 0
   Nesting depth: 1 1
@@ -85,7 +97,11 @@ Delegation project sample project_e3db46d1b932ef2c778ba7cc claude-code (observed
   Model request unrequested: sessions 0; total tokens 0
   Model request unknown: sessions 1; total tokens 6
   Model model-a (unknown): sessions 1; total tokens 6
-  Inline/actual context (estimated): median 20; observed 1; unobserved 0; sessions below one 0; share 0
+  Delegation input comparison (estimated): observed 1; unobserved 0
+  Unobserved estimate reasons (estimated): none
+  Input tokens and carry (estimated): actual_fresh 1; inline_fresh 0; actual_reused 5; inline_reused 60; actual_carry 3; inline_carry 0
+  Fresh:reused break-even ratio (estimated): median 55; p10 55; p90 55; sessions 1; fresh_not_higher 0; reused_not_lower 0
+  Share below fresh:reused ratio (estimated, descriptive): 1 0; 5 0; 10 0; 20 0; 50 0
   Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
 Delegation project sample project_e3db46d1b932ef2c778ba7cc codex (observed): dispatched 0; dispatching parents 0; parent unobserved 0
   Nesting depth: none
@@ -99,9 +115,13 @@ Delegation project sample project_e3db46d1b932ef2c778ba7cc codex (observed): dis
   Model request requested: sessions 0; total tokens 0
   Model request unrequested: sessions 0; total tokens 0
   Model request unknown: sessions 0; total tokens 0
-  Inline/actual context (estimated): median unobserved; observed 0; unobserved 0; sessions below one 0; share unobserved
+  Delegation input comparison (estimated): observed 0; unobserved 0
+  Unobserved estimate reasons (estimated): none
+  Input tokens and carry (estimated): actual_fresh 0; inline_fresh 0; actual_reused 0; inline_reused 0; actual_carry 0; inline_carry 0
+  Fresh:reused break-even ratio (estimated): median unobserved; p10 unobserved; p90 unobserved; sessions 0; fresh_not_higher 0; reused_not_lower 0
+  Share below fresh:reused ratio (estimated, descriptive): 1 unobserved; 5 unobserved; 10 unobserved; 20 unobserved; 50 unobserved
   Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
-Delegation estimate measures context volume; it ignores model prices, output tokens and caching behaviour.
+Delegation input comparison is estimated: parent/child model price differences are ignored; final output proxies the returned result; work context is assumed to persist until parent compaction; cache expiry and partial hits are not modelled. Output cost is excluded. Delegation is cheaper below the break-even fresh:reused ratio.
 Delegation shares use the unique union of children and direct parents; nested dispatchers enter that denominator once.
 Hook denials all (observed): sessions 0; denials 0; timeouts 0
   Per 100 tool calls: denials 0; timeouts 0; inner_denials_in_exec 0

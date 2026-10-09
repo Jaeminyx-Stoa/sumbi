@@ -39,7 +39,11 @@ Delegation all (observed): dispatched 2; dispatching parents 2; parent unobserve
   Model request unrequested: sessions 0; total tokens 0
   Model request unknown: sessions 2; total tokens 260
   Model model_99051c601e033380bf6cd425 (unknown): sessions 2; total tokens 260
-  Inline/actual context (estimated): median unobserved; observed 0; unobserved 2; sessions below one 0; share unobserved
+  Delegation input comparison (estimated): observed 0; unobserved 2
+  Unobserved estimate reasons (estimated): child_requests_incomplete 2
+  Input tokens and carry (estimated): actual_fresh 0; inline_fresh 0; actual_reused 0; inline_reused 0; actual_carry 0; inline_carry 0
+  Fresh:reused break-even ratio (estimated): median unobserved; p10 unobserved; p90 unobserved; sessions 0; fresh_not_higher 0; reused_not_lower 0
+  Share below fresh:reused ratio (estimated, descriptive): 1 unobserved; 5 unobserved; 10 unobserved; 20 unobserved; 50 unobserved
   Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 2; tool_errors 0; tool_results 2; tool_failure_rate 0
 Delegation sumbi-events:agent_9e260e54ae0e8fd149c80532 (observed): dispatched 2; dispatching parents 2; parent unobserved 0
   Nesting depth: 1 2
@@ -54,7 +58,11 @@ Delegation sumbi-events:agent_9e260e54ae0e8fd149c80532 (observed): dispatched 2;
   Model request unrequested: sessions 0; total tokens 0
   Model request unknown: sessions 2; total tokens 260
   Model model_99051c601e033380bf6cd425 (unknown): sessions 2; total tokens 260
-  Inline/actual context (estimated): median unobserved; observed 0; unobserved 2; sessions below one 0; share unobserved
+  Delegation input comparison (estimated): observed 0; unobserved 2
+  Unobserved estimate reasons (estimated): child_requests_incomplete 2
+  Input tokens and carry (estimated): actual_fresh 0; inline_fresh 0; actual_reused 0; inline_reused 0; actual_carry 0; inline_carry 0
+  Fresh:reused break-even ratio (estimated): median unobserved; p10 unobserved; p90 unobserved; sessions 0; fresh_not_higher 0; reused_not_lower 0
+  Share below fresh:reused ratio (estimated, descriptive): 1 unobserved; 5 unobserved; 10 unobserved; 20 unobserved; 50 unobserved
   Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 2; tool_errors 0; tool_results 2; tool_failure_rate 0
 Delegation sumbi-events:agent_dafcddd422574acb5f48fb2b (observed): dispatched 0; dispatching parents 0; parent unobserved 0
   Nesting depth: none
@@ -68,7 +76,11 @@ Delegation sumbi-events:agent_dafcddd422574acb5f48fb2b (observed): dispatched 0;
   Model request requested: sessions 0; total tokens 0
   Model request unrequested: sessions 0; total tokens 0
   Model request unknown: sessions 0; total tokens 0
-  Inline/actual context (estimated): median unobserved; observed 0; unobserved 0; sessions below one 0; share unobserved
+  Delegation input comparison (estimated): observed 0; unobserved 0
+  Unobserved estimate reasons (estimated): none
+  Input tokens and carry (estimated): actual_fresh 0; inline_fresh 0; actual_reused 0; inline_reused 0; actual_carry 0; inline_carry 0
+  Fresh:reused break-even ratio (estimated): median unobserved; p10 unobserved; p90 unobserved; sessions 0; fresh_not_higher 0; reused_not_lower 0
+  Share below fresh:reused ratio (estimated, descriptive): 1 unobserved; 5 unobserved; 10 unobserved; 20 unobserved; 50 unobserved
   Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
 Delegation project project_e3db46d1b932ef2c778ba7cc sumbi-events:agent_9e260e54ae0e8fd149c80532 (observed): dispatched 2; dispatching parents 2; parent unobserved 0
   Nesting depth: 1 2
@@ -83,7 +95,11 @@ Delegation project project_e3db46d1b932ef2c778ba7cc sumbi-events:agent_9e260e54a
   Model request unrequested: sessions 0; total tokens 0
   Model request unknown: sessions 2; total tokens 260
   Model model_99051c601e033380bf6cd425 (unknown): sessions 2; total tokens 260
-  Inline/actual context (estimated): median unobserved; observed 0; unobserved 2; sessions below one 0; share unobserved
+  Delegation input comparison (estimated): observed 0; unobserved 2
+  Unobserved estimate reasons (estimated): child_requests_incomplete 2
+  Input tokens and carry (estimated): actual_fresh 0; inline_fresh 0; actual_reused 0; inline_reused 0; actual_carry 0; inline_carry 0
+  Fresh:reused break-even ratio (estimated): median unobserved; p10 unobserved; p90 unobserved; sessions 0; fresh_not_higher 0; reused_not_lower 0
+  Share below fresh:reused ratio (estimated, descriptive): 1 unobserved; 5 unobserved; 10 unobserved; 20 unobserved; 50 unobserved
   Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 2; tool_errors 0; tool_results 2; tool_failure_rate 0
 Delegation project project_e3db46d1b932ef2c778ba7cc sumbi-events:agent_dafcddd422574acb5f48fb2b (observed): dispatched 0; dispatching parents 0; parent unobserved 0
   Nesting depth: none
@@ -97,9 +113,13 @@ Delegation project project_e3db46d1b932ef2c778ba7cc sumbi-events:agent_dafcddd42
   Model request requested: sessions 0; total tokens 0
   Model request unrequested: sessions 0; total tokens 0
   Model request unknown: sessions 0; total tokens 0
-  Inline/actual context (estimated): median unobserved; observed 0; unobserved 0; sessions below one 0; share unobserved
+  Delegation input comparison (estimated): observed 0; unobserved 0
+  Unobserved estimate reasons (estimated): none
+  Input tokens and carry (estimated): actual_fresh 0; inline_fresh 0; actual_reused 0; inline_reused 0; actual_carry 0; inline_carry 0
+  Fresh:reused break-even ratio (estimated): median unobserved; p10 unobserved; p90 unobserved; sessions 0; fresh_not_higher 0; reused_not_lower 0
+  Share below fresh:reused ratio (estimated, descriptive): 1 unobserved; 5 unobserved; 10 unobserved; 20 unobserved; 50 unobserved
   Workaround friction (observed): sessions_all_edits_outside_checkout 0; edits_outside_checkout 0; script_edits_outside_checkout 0; edit_targets_unobserved 0; tool_errors 0; tool_results 0; tool_failure_rate unobserved
-Delegation estimate measures context volume; it ignores model prices, output tokens and caching behaviour.
+Delegation input comparison is estimated: parent/child model price differences are ignored; final output proxies the returned result; work context is assumed to persist until parent compaction; cache expiry and partial hits are not modelled. Output cost is excluded. Delegation is cheaper below the break-even fresh:reused ratio.
 Delegation shares use the unique union of children and direct parents; nested dispatchers enter that denominator once.
 Hook denials all (observed): sessions 0; denials 0; timeouts 0
   Per 100 tool calls: denials 0; timeouts 0; inner_denials_in_exec 0

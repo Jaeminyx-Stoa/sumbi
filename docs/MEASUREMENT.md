@@ -242,22 +242,102 @@ and cannot create a model row or replace the last observed model.
 Children without billable events use their observed session models for zero-token
 session counts, or unknown when no model was observed.
 
-**Delegation estimate.** `estimate.measurement` is `estimated`. Let P be the
-direct dispatcher's last observed request context at or before the child's start,
-using the sidecar parent link for flat nesting and the enclosing session for
-workflow children without a parent subagent ID. Let C_i be the
-child's contexts in this group/window, and C_0 its first observed lifetime request
-context. Compute `inline_context = sum(P + C_i - C_0)` and
-`actual_context = sum(C_i)`. `median_inline_to_actual_context_ratio` is the median
-session ratio. `sessions_ratio_below_one` counts eligible children with ratio
-strictly below one; `share_ratio_below_one` divides by `observed_sessions`.
-`estimate.context_unobserved` counts skipped children: missing parent/start,
-missing or incomplete child requests, unobserved first child context or latest
-parent context, conflicting same-time parent contexts, or zero actual context.
-Empty estimates yield null median and share. A parent outside the window can
-supply P but contributes no parent spend. This ignores model price differences,
-output tokens and caching behaviour: it is a **context-volume estimate, not a
-cost estimate**, and does not establish whether the inline work would succeed.
+**Delegation estimate (schema 1.4).** Every field in `estimate` is labelled by
+`measurement: estimated`; the text summary labels every estimate line too.
+This replaces the previous inline/actual context ratio and its below-one share.
+Observed token shares, context statistics, compaction counts and other outputs
+keep their existing accounting.
+
+Let P be the direct dispatcher's last observed request context at or before the
+child's start, using the existing parent lookup. Missing or conflicting latest
+request evidence, or a compaction between that request and dispatch, leaves P
+unobserved. A parent outside the window can supply P without adding parent spend.
+Let C_0 be the child's first lifetime request context, C_i its subsequent request
+contexts, and n its number of requests. Context is new input plus cache writes
+plus cache reads. Fresh input is new input plus cache writes; reused input is
+cache reads. Codex's unreported cache writes contribute zero to this estimate
+only; its existing observed `cache_write` output remains null.
+
+T counts observed parent requests strictly after the child's last recorded
+activity, before the next parent compaction, or through the last observed parent
+activity when no later compaction is recorded. A request at the compaction time
+is excluded. Parent requests overlapping the child are excluded. Timing uses all
+local records, including nonbillable child activity and parent records outside
+the selected window. Claude `compact_boundary`, Codex `compacted`, response
+`compaction`, `context_compacted` and completed `ContextCompaction` items supply
+local boundary times without changing existing compaction counts. Boundary times
+never enter public session output. The last observed activity is a session-end
+proxy, so truncated or still-running logs can understate future carry.
+
+Carry evidence requires a timed child activity, timed parent requests after it,
+and timed compaction boundaries. Untimestamped metadata, summaries and other
+non-request records do not block the estimate; the general session activity
+completeness flag retains its existing meaning for other measurements.
+Untimed usage or request records are bounded by the surrounding timed records
+in stream order. A gap that could overlap carry is
+`carry_parent_requests_incomplete`; gaps bounded before the child's last activity
+or at/after the next compaction do not affect T. Unbounded gaps, or gaps in a
+stream with conflicting time order, remain incomplete. An untimed compaction
+boundary is `carry_compaction_time_unobserved`.
+
+For each eligible child, calculate:
+
+```
+actual_fresh = sum(child new_input + cache_write)
+inline_fresh = max(0, actual_fresh - C_0)
+inline_carry = (C_n - C_0) * T
+actual_carry = R * T
+inline_reused = sum(P + previous_context - C_0) + inline_carry
+actual_reused = sum(child cache_read) + actual_carry
+```
+
+The first request's `previous_context` is C_0; later requests use the immediately
+preceding request context. R is the final child request's output token count.
+Output costs are the same in both alternatives and excluded; R contributes only
+as reused input on subsequent parent requests. Context growth is signed, as in
+the formula, including any observed child context shrinkage.
+
+The six token fields are sums over estimate-observed sessions, with carry
+components also reported separately. Carry is already included in each reused
+sum and must not be added again. `observed_sessions` counts complete estimates;
+`unobserved_sessions` counts all other children. `unobserved_reasons` records one
+reason per skipped child, with category totals `parent_context_unobserved`,
+`child_context_unobserved` and `carry_unobserved`. Child completeness is checked
+first, then P, lifetime child evidence, and T. Reasons distinguish missing
+parent/dispatch, missing or stale latest parent requests, conflicting context,
+compacted parent context, incomplete child scope or requests, unreported token
+kinds, missing activity times, incomplete later parent requests and missing R.
+The full lifetime child request sequence must belong to this window/group;
+partial windows or children split across projects are `child_scope_incomplete`.
+Their observed cost shares and context statistics still use the selected events.
+This avoids applying a lifetime startup subtraction to a partial sequence.
+
+For sessions with both differences positive:
+
+```
+r* = (inline_reused - actual_reused) / (actual_fresh - inline_fresh)
+```
+
+`break_even_sessions` counts this sample. `break_even_ratio_median` is its ordinary
+median; `break_even_ratio_p10` and `break_even_ratio_p90` use nearest ranks
+`ceil(0.1 * n)` and `ceil(0.9 * n)`. Empty samples yield null statistics.
+Delegation is cheaper when the real fresh:reused input price ratio is below r*;
+at r* the input costs match. No provider prices are embedded.
+`fresh_not_higher` counts nonpositive fresh differences: delegation is never more
+expensive on input. `reused_not_lower` counts nonpositive reused differences:
+inline is never more expensive. These counts can overlap at a tie; both are
+excluded from the positive-difference ratio sample.
+`share_break_even_ratio_below` reports strictly-below shares at 1, 5, 10, 20 and 50
+using only `break_even_sessions` as denominator, or null for an empty sample.
+These are descriptive reference points, not a savings verdict; readers must apply
+their provider's fresh:reused ratio and inspect the two classification counts.
+
+**Limitations.** Parent/child model price differences are ignored. R proxies the
+returned result; it may contain tool arguments or other output that never returns
+to the parent. Carry assumes the inline work context would remain in the parent
+until compaction, while delegation carries only R. Cache expiry, partial hits and
+other caching behaviour are not modelled. The estimate does not establish that
+inline work would succeed, nor that a recorded session has finished permanently.
 
 **Workaround friction.** `workaround_friction` uses recorded edit targets and the
 child's start cwd, resolved to its local checkout root when Git can identify one,

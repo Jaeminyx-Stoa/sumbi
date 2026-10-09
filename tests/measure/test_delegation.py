@@ -79,6 +79,251 @@ class DelegationTests(unittest.TestCase):
     def summary(self):
         return self.report()["delegation"]["summary"]
 
+    def input_request(self, minute, identity, fresh, reused=0, output=10, agent=None):
+        record = self.claude(minute, identity, fresh + reused, agent=agent, output=output)
+        record["message"]["usage"] = {"input_tokens": fresh // 2,
+            "cache_creation_input_tokens": fresh - fresh // 2,
+            "cache_read_input_tokens": reused, "output_tokens": output}
+        return record
+
+    def carry_pair(self, compact=False, output=10):
+        parent = [self.input_request(0, "dispatch", 2000),
+                  self.input_request(4, "overlapping", 10, 2000),
+                  self.input_request(6, "later-one", 10, 2010),
+                  self.input_request(8, "later-two", 10, 2020)]
+        if compact:
+            parent.insert(3, {"type": "system", "subtype": "compact_boundary",
+                              "timestamp": at(7), "sessionId": "parent"})
+        self.save(".claude/projects/group/parent.jsonl", parent)
+        self.child("child", [self.input_request(1, "startup", 100, agent="child"),
+            self.input_request(3, "work", 200, 100, output=output, agent="child"),
+            {"type": "user", "timestamp": at(5), "sessionId": "parent", "agentId": "child",
+             "message": {"content": [{"type": "tool_result", "tool_use_id": "work"}]}}])
+        return self.summary()["estimate"]
+
+    def test_large_parent_small_child_has_high_break_even_ratio(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.input_request(0, "dispatch", 100_000)])
+        self.child("child", [self.input_request(1, "startup", 100, agent="child")])
+        estimate = self.summary()["estimate"]
+        self.assertEqual({key: estimate[key] for key in (
+            "actual_fresh", "inline_fresh", "actual_reused", "inline_reused")},
+            {"actual_fresh": 100, "inline_fresh": 0, "actual_reused": 0, "inline_reused": 100_000})
+        self.assertEqual(estimate["break_even_ratio_median"], 1000)
+        self.assertEqual(estimate["share_break_even_ratio_below"],
+                         {str(value): 0 for value in (1, 5, 10, 20, 50)})
+
+    def test_small_parent_large_startup_favours_inline(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.input_request(0, "dispatch", 100)])
+        self.child("child", [self.input_request(1, "startup", 10_000, agent="child"),
+            self.input_request(2, "work", 1000, 10_000, agent="child")])
+        estimate = self.summary()["estimate"]
+        self.assertEqual(estimate["actual_fresh"], 11_000)
+        self.assertEqual(estimate["inline_fresh"], 1000)
+        self.assertEqual(estimate["actual_reused"], 10_000)
+        self.assertEqual(estimate["inline_reused"], 200)
+        self.assertEqual(estimate["reused_not_lower"], 1)
+        self.assertEqual(estimate["break_even_sessions"], 0)
+        self.assertIsNone(estimate["break_even_ratio_median"])
+
+    def test_carry_until_observed_parent_session_end(self):
+        estimate = self.carry_pair()
+        self.assertEqual(estimate["actual_carry"], 20)
+        self.assertEqual(estimate["inline_carry"], 400)
+        self.assertEqual(estimate["actual_reused"], 120)
+        self.assertEqual(estimate["inline_reused"], 4400)
+        self.assertEqual(estimate["break_even_ratio_median"], 42.8)
+        self.assertEqual(estimate["break_even_ratio_p10"], 42.8)
+        self.assertEqual(estimate["break_even_ratio_p90"], 42.8)
+
+    def test_compaction_stops_carry_and_preserves_public_counts(self):
+        estimate = self.carry_pair(compact=True)
+        self.assertEqual(estimate["actual_carry"], 10)
+        self.assertEqual(estimate["inline_carry"], 200)
+        self.assertEqual(estimate["break_even_ratio_median"], 40.9)
+        sessions = collect_sessions(claude_code, self.home, WINDOW, Coverage())
+        parent = next(s for s in sessions if s.raw_id == "parent")
+        self.assertEqual(parent.compaction_times, {timestamp(at(7))})
+        self.assertEqual(parent.counts["compactions"], 1)
+        self.assertNotIn("compaction_times", json.dumps(self.report()))
+
+    def test_large_final_output_can_reverse_the_reused_advantage(self):
+        estimate = self.carry_pair(output=10_000)
+        self.assertEqual(estimate["actual_carry"], 20_000)
+        self.assertEqual(estimate["actual_reused"], 20_100)
+        self.assertEqual(estimate["reused_not_lower"], 1)
+        self.assertIsNone(estimate["break_even_ratio_median"])
+
+    def test_inline_reuses_the_preceding_request_context(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.input_request(0, "dispatch", 2000)])
+        self.child("child", [self.input_request(1, "startup", 100, agent="child"),
+            self.input_request(2, "work-one", 200, 100, agent="child"),
+            self.input_request(3, "work-two", 300, 300, agent="child")])
+        estimate = self.summary()["estimate"]
+        self.assertEqual(estimate["inline_reused"], 6200)
+        self.assertEqual(estimate["actual_reused"], 400)
+        self.assertEqual(estimate["break_even_ratio_median"], 58)
+
+    def test_ratio_distribution_uses_session_nearest_ranks_and_strict_thresholds(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.input_request(0, "dispatch", 1000)])
+        for index in range(1, 11):
+            self.child(str(index), [self.input_request(1, str(index), index * 100, agent=str(index))])
+        estimate = self.summary()["estimate"]
+        self.assertEqual(estimate["break_even_sessions"], 10)
+        self.assertEqual(estimate["break_even_ratio_p10"], 1)
+        self.assertEqual(estimate["break_even_ratio_p90"], 5)
+        self.assertAlmostEqual(estimate["break_even_ratio_median"], (10/6 + 10/5)/2)
+        self.assertEqual(estimate["share_break_even_ratio_below"],
+                         {"1": 0, "5": .8, "10": .9, "20": 1, "50": 1})
+
+    def test_untimed_compaction_leaves_the_estimate_unobserved(self):
+        self.carry_pair()
+        parent = json.loads((self.home / ".claude/projects/group/parent.jsonl").read_text().splitlines()[0])
+        self.save(".claude/projects/group/parent.jsonl", [parent,
+            {"type": "system", "subtype": "compact_boundary", "sessionId": "parent"}])
+        estimate = self.summary()["estimate"]
+        self.assertEqual(estimate["unobserved_sessions"], 1)
+        self.assertEqual(estimate["unobserved_reasons"], {"carry_compaction_time_unobserved": 1})
+
+    def test_untimed_non_request_records_do_not_block_carry(self):
+        expected = self.carry_pair()
+        parent_path = self.home / ".claude/projects/group/parent.jsonl"
+        parent = [json.loads(line) for line in parent_path.read_text().splitlines()]
+        for kind in ("summary", "file-history-snapshot"):
+            with self.subTest(kind=kind):
+                self.save(".claude/projects/group/parent.jsonl", [*parent,
+                    {"type": kind, "sessionId": "parent"}])
+                self.assertEqual(self.summary()["estimate"], expected)
+                sessions = collect_sessions(claude_code, self.home, WINDOW, Coverage())
+                dispatcher = next(s for s in sessions if s.raw_id == "parent")
+                self.assertTrue(dispatcher.activity_timing_incomplete)
+        child_path = self.home / ".claude/projects/group/parent/subagents/agent-child.jsonl"
+        child = [json.loads(line) for line in child_path.read_text().splitlines()]
+        self.child("child", [*child, {"type": "summary", "sessionId": "parent", "agentId": "child"}])
+        self.assertEqual(self.summary()["estimate"], expected)
+
+    def test_untimed_parent_usage_inside_carry_stays_unobserved(self):
+        self.carry_pair()
+        path = self.home / ".claude/projects/group/parent.jsonl"
+        parent = [json.loads(line) for line in path.read_text().splitlines()]
+        for bad_time in (None, "invalid"):
+            with self.subTest(timestamp=bad_time):
+                usage = self.input_request(7, "untimed", 10, 2010)
+                if bad_time is None:
+                    del usage["timestamp"]
+                else:
+                    usage["timestamp"] = bad_time
+                self.save(".claude/projects/group/parent.jsonl", [*parent[:3], usage, *parent[3:]])
+                estimate = self.summary()["estimate"]
+                self.assertEqual(estimate["observed_sessions"], 0)
+                self.assertEqual(estimate["unobserved_reasons"], {"carry_parent_requests_incomplete": 1})
+
+    def test_untimed_request_boundary_inside_carry_stays_unobserved(self):
+        self.carry_pair()
+        path = self.home / ".claude/projects/group/parent.jsonl"
+        parent = [json.loads(line) for line in path.read_text().splitlines()]
+        parent.insert(3, {"type": "system", "subtype": "request_start", "sessionId": "parent"})
+        self.save(".claude/projects/group/parent.jsonl", parent)
+        self.assertEqual(self.summary()["estimate"]["unobserved_reasons"],
+                         {"carry_parent_requests_incomplete": 1})
+
+    def test_untimed_parent_usage_before_carry_does_not_block_it(self):
+        expected = self.carry_pair()
+        path = self.home / ".claude/projects/group/parent.jsonl"
+        parent = [json.loads(line) for line in path.read_text().splitlines()]
+        usage = self.input_request(2, "untimed", 10, 2000)
+        del usage["timestamp"]
+        parent.insert(1, usage)
+        self.save(".claude/projects/group/parent.jsonl", parent)
+        self.assertEqual(self.summary()["estimate"], expected)
+
+    def test_untimed_parent_usage_after_compaction_does_not_block_carry(self):
+        expected = self.carry_pair(compact=True)
+        path = self.home / ".claude/projects/group/parent.jsonl"
+        parent = [json.loads(line) for line in path.read_text().splitlines()]
+        usage = self.input_request(9, "untimed", 10, 2030)
+        del usage["timestamp"]
+        self.save(".claude/projects/group/parent.jsonl", [*parent, usage])
+        self.assertEqual(self.summary()["estimate"], expected)
+
+    def test_untimed_trailing_parent_usage_without_compaction_blocks_carry(self):
+        self.carry_pair()
+        path = self.home / ".claude/projects/group/parent.jsonl"
+        parent = [json.loads(line) for line in path.read_text().splitlines()]
+        usage = self.input_request(9, "untimed", 10, 2030)
+        del usage["timestamp"]
+        self.save(".claude/projects/group/parent.jsonl", [*parent, usage])
+        self.assertEqual(self.summary()["estimate"]["unobserved_reasons"],
+                         {"carry_parent_requests_incomplete": 1})
+
+    def test_out_of_order_parent_records_cannot_bound_untimed_usage(self):
+        self.carry_pair()
+        usage = self.input_request(2, "untimed", 10, 2000)
+        del usage["timestamp"]
+        self.save(".claude/projects/group/parent.jsonl", [self.input_request(0, "dispatch", 2000),
+            usage, self.input_request(4, "overlapping", 10, 2000),
+            self.input_request(3, "out-of-order", 10, 2000),
+            self.input_request(6, "later", 10, 2010)])
+        self.assertEqual(self.summary()["estimate"]["unobserved_reasons"],
+                         {"carry_parent_requests_incomplete": 1})
+
+    def test_codex_untimed_usage_inside_carry_stays_unobserved(self):
+        usage = self.codex_usage(7, 5000, 1000)
+        del usage["timestamp"]
+        self.save(".codex/sessions/rollout-parent.jsonl", [self.codex_meta("parent"),
+            self.codex_usage(0, 1000, 1000), self.codex_usage(6, 3000, 2000),
+            usage, self.codex_usage(8, 7000, 2000)])
+        self.save(".codex/sessions/rollout-child.jsonl", [self.codex_meta("child", 1, "parent"),
+            self.codex_usage(2, 100, 100)])
+        self.assertEqual(self.summary()["estimate"]["unobserved_reasons"],
+                         {"carry_parent_requests_incomplete": 1})
+
+    def test_compaction_before_dispatch_invalidates_stale_parent_context(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.input_request(0, "dispatch", 2000),
+            {"type": "system", "subtype": "compact_boundary", "sessionId": "parent", "timestamp": at(1)}])
+        self.child("child", [self.input_request(2, "startup", 100, agent="child")])
+        self.assertEqual(self.summary()["estimate"]["unobserved_reasons"], {"parent_context_compacted": 1})
+
+    def test_missing_child_cache_kind_does_not_become_zero(self):
+        self.save(".claude/projects/group/parent.jsonl", [self.input_request(0, "dispatch", 2000)])
+        child = self.input_request(1, "startup", 100, agent="child")
+        del child["message"]["usage"]["cache_read_input_tokens"]
+        self.child("child", [child])
+        self.assertEqual(self.summary()["estimate"]["unobserved_reasons"],
+                         {"child_token_kinds_unobserved": 1})
+
+    def test_carry_is_unobserved_with_cumulative_only_parent_requests(self):
+        self.save(".codex/sessions/rollout-parent.jsonl", [self.codex_meta("parent"),
+            self.codex_usage(0, 1000, 1000), self.codex_usage(5, 2000)])
+        self.save(".codex/sessions/rollout-child.jsonl", [self.codex_meta("child", 1, "parent"),
+            self.codex_usage(2, 100, 100)])
+        estimate = self.summary()["estimate"]
+        self.assertEqual(estimate["carry_unobserved"], 1)
+        self.assertEqual(estimate["unobserved_reasons"], {"carry_parent_requests_incomplete": 1})
+
+    def test_codex_compaction_shapes_record_times_without_changing_counts(self):
+        from sumbi.events.adapters import codex
+        shapes = [{"type": "compacted", "timestamp": at(7), "payload": {}},
+            {"type": "event_msg", "timestamp": at(7), "payload": {"type": "context_compacted"}},
+            {"type": "response_item", "timestamp": at(7), "payload": {"type": "compaction"}},
+            {"type": "event_msg", "timestamp": at(7), "payload": {"type": "item_completed",
+             "item": {"id": "compact", "type": "ContextCompaction"}}}]
+        for index, shape in enumerate(shapes):
+            with self.subTest(shape=index):
+                self.save(".codex/sessions/rollout-parent.jsonl", [self.codex_meta("parent"),
+                    self.codex_usage(0, 2000, 2000), self.codex_usage(6, 4010, 2010), shape,
+                    self.codex_usage(8, 6030, 2020)])
+                self.save(".codex/sessions/rollout-child.jsonl", [self.codex_meta("child", 1, "parent"),
+                    self.codex_usage(2, 100, 100), self.codex_usage(3, 400, 300)])
+                estimate = self.summary()["estimate"]
+                self.assertEqual(estimate["actual_fresh"], 360)
+                self.assertEqual(estimate["inline_fresh"], 260)
+                self.assertEqual(estimate["actual_carry"], 10)
+                self.assertEqual(estimate["inline_carry"], 200)
+                parent = next(s for s in collect_sessions(codex, self.home, WINDOW, Coverage())
+                              if s.raw_id == "parent")
+                self.assertEqual(parent.compaction_times, {timestamp(at(7))})
+                self.assertEqual(parent.counts["compactions"], int(index == 0))
+
     def test_claude_foreground_background_nested_missing_and_model_sidecars(self):
         dispatches = [{"type": "tool_use", "id": "foreground", "name": "Agent",
                        "input": {"model": "sonnet"}},
@@ -113,10 +358,10 @@ class DelegationTests(unittest.TestCase):
         self.assertEqual(group["model_request"]["by_request"]["unrequested"], {"sessions": 1, "total_tokens": 50_010})
         estimate = group["estimate"]
         self.assertEqual(estimate["observed_sessions"], 4)
-        self.assertEqual(estimate["context_unobserved"], 1)
-        self.assertEqual(estimate["sessions_ratio_below_one"], 2)
-        self.assertEqual(estimate["share_ratio_below_one"], .5)
-        self.assertEqual(estimate["median_inline_to_actual_context_ratio"], (5/7 + 1)/2)
+        self.assertEqual(estimate["unobserved_sessions"], 1)
+        self.assertEqual(estimate["parent_context_unobserved"], 1)
+        self.assertEqual(estimate["share_break_even_ratio_below"]["1"], .5)
+        self.assertAlmostEqual(estimate["break_even_ratio_median"], (199_960 / 200_000 + 1)/2)
 
     def test_codex_per_turn_context_keeps_existing_token_kinds_and_deduplicates(self):
         self.save(".codex/sessions/rollout-parent.jsonl", [self.codex_meta("parent"),
@@ -130,7 +375,7 @@ class DelegationTests(unittest.TestCase):
             "cache_write": None, "output": 10, "total": 400_010})
         self.assertEqual(group["context"]["session_average_median"], 200_000)
         self.assertEqual(group["context"]["request_total_tokens"], 400_020)
-        self.assertAlmostEqual(group["estimate"]["median_inline_to_actual_context_ratio"], .65)
+        self.assertAlmostEqual(group["estimate"]["break_even_ratio_median"], 159_960 / 150_000)
         self.assertEqual(group["model_request"]["by_request"]["unknown"]["sessions"], 1)
 
     def test_workflow_sidecars_and_filename_ids_use_enclosing_dispatcher(self):
@@ -156,7 +401,7 @@ class DelegationTests(unittest.TestCase):
         self.assertEqual(group["model_request"]["by_request"]["requested"]["sessions"], 1)
         self.assertEqual(group["model_request"]["by_request"]["unrequested"]["sessions"], 2)
         self.assertEqual(group["model_request"]["by_request"]["unknown"]["sessions"], 0)
-        self.assertAlmostEqual(group["estimate"]["median_inline_to_actual_context_ratio"], .8)
+        self.assertAlmostEqual(group["estimate"]["break_even_ratio_median"], 79_980 / 99_980)
 
     def test_flat_depth_two_and_three_use_direct_parent_context_at_dispatch(self):
         self.save(".claude/projects/group/parent.jsonl", [self.claude(0, "root", 80_000)])
@@ -184,8 +429,8 @@ class DelegationTests(unittest.TestCase):
             "parent_unobserved": 0, "nesting_depth": {"1": 1, "2": 1, "3": 1}})
         groups = {g["rule"]: g for g in report["delegation"]["by_project_and_agent"]}
         # P=120000 for depth two; P=300000 (not its later 600000) for depth three.
-        self.assertAlmostEqual(groups["two"]["estimate"]["median_inline_to_actual_context_ratio"], .6)
-        self.assertAlmostEqual(groups["three"]["estimate"]["median_inline_to_actual_context_ratio"], 2)
+        self.assertAlmostEqual(groups["two"]["estimate"]["break_even_ratio_median"], 239_960 / 300_000)
+        self.assertAlmostEqual(groups["three"]["estimate"]["break_even_ratio_median"], 299_970 / 149_980)
 
     def test_workflow_parent_agent_overrides_enclosing_session(self):
         self.save(".claude/projects/group/parent.jsonl", [self.claude(0, "root", 80_000)])
@@ -200,7 +445,8 @@ class DelegationTests(unittest.TestCase):
         self.assertEqual(child.parent_raw_id, "parent:subagent:dispatcher")
         group = self.summary()
         self.assertEqual(group["volume"]["nesting_depth"], {"1": 1, "2": 1})
-        self.assertAlmostEqual(group["estimate"]["median_inline_to_actual_context_ratio"], (1/3 + 2)/2)
+        self.assertAlmostEqual(group["estimate"]["break_even_ratio_median"],
+                               (79_980 / 239_980 + 239_980 / 119_980)/2)
 
     def test_missing_flat_parent_keeps_reported_depth_and_skips_estimate(self):
         self.save(".claude/projects/group/parent.jsonl", [self.claude(0, "root", 80_000)])
@@ -209,8 +455,8 @@ class DelegationTests(unittest.TestCase):
         group = self.summary()
         self.assertEqual(group["volume"], {"dispatched_sessions": 1, "dispatching_parent_sessions": 0,
             "parent_unobserved": 1, "nesting_depth": {"3": 1}})
-        self.assertEqual(group["estimate"]["context_unobserved"], 1)
-        self.assertIsNone(group["estimate"]["median_inline_to_actual_context_ratio"])
+        self.assertEqual(group["estimate"]["unobserved_sessions"], 1)
+        self.assertIsNone(group["estimate"]["break_even_ratio_median"])
 
     def test_synthetic_placeholder_does_not_create_or_replace_model_rows(self):
         placeholder = self.claude(2, "placeholder", 30, agent="child", output=0, model="<synthetic>")
@@ -234,7 +480,7 @@ class DelegationTests(unittest.TestCase):
         self.assertEqual(group["context"]["context_unobserved"], 1)
         self.assertIsNone(group["context"]["session_average_median"])
         self.assertIsNone(group["context"]["sensitivity"]["100000"]["share"])
-        self.assertEqual(group["estimate"]["context_unobserved"], 1)
+        self.assertEqual(group["estimate"]["unobserved_sessions"], 1)
 
     def test_edits_inside_outside_scripts_and_tool_failures_emit_only_counts(self):
         outside = str(self.root / "scratch" / "helper.py")
@@ -270,7 +516,7 @@ class DelegationTests(unittest.TestCase):
         self.assertEqual(group["cost_share"]["dispatched"]["total"], 0)
         self.assertIsNone(group["cost_share"]["dispatched_share"]["total"])
         self.assertEqual(group["concentration"]["top_decile_sessions"], 0)
-        self.assertIsNone(group["estimate"]["median_inline_to_actual_context_ratio"])
+        self.assertIsNone(group["estimate"]["break_even_ratio_median"])
         self.assertIn("Delegation all", text_summary(self.report()))
 
     def test_parent_outside_window_can_supply_context_but_not_parent_tokens(self):
@@ -281,7 +527,7 @@ class DelegationTests(unittest.TestCase):
         group = self.summary()
         self.assertEqual(group["volume"]["parent_unobserved"], 1)
         self.assertEqual(group["cost_share"]["parents"]["total"], 0)
-        self.assertEqual(group["estimate"]["median_inline_to_actual_context_ratio"], .5)
+        self.assertAlmostEqual(group["estimate"]["break_even_ratio_median"], 49_980 / 99_980)
 
     def test_unreadable_sidecar_does_not_read_or_emit_description(self):
         path = self.child("child", [self.claude(1, "child", 50_000, agent="child")])
@@ -340,8 +586,8 @@ class DelegationTests(unittest.TestCase):
             self.codex_usage(3, 100_000, 100_000)])
         group = self.summary()
         self.assertEqual(group["context"]["observed_sessions"], 1)
-        self.assertEqual(group["estimate"]["context_unobserved"], 1)
-        self.assertIsNone(group["estimate"]["median_inline_to_actual_context_ratio"])
+        self.assertEqual(group["estimate"]["unobserved_sessions"], 1)
+        self.assertIsNone(group["estimate"]["break_even_ratio_median"])
 
     def test_unobserved_first_child_context_prevents_estimate_in_later_window(self):
         self.save(".codex/sessions/rollout-parent.jsonl", [self.codex_meta("parent"),
@@ -350,7 +596,7 @@ class DelegationTests(unittest.TestCase):
             self.codex_usage(2, 100_000), self.codex_usage(4, 200_000, 100_000)])
         group = self.report(Window(timestamp(at(3)), WINDOW.until))["delegation"]["summary"]
         self.assertEqual(group["context"]["observed_sessions"], 1)
-        self.assertEqual(group["estimate"]["context_unobserved"], 1)
+        self.assertEqual(group["estimate"]["unobserved_sessions"], 1)
 
     def test_all_script_extensions_and_windows_path_boundaries(self):
         self.cwd = "R:/fixture/checkout/subdirectory"
@@ -374,7 +620,7 @@ class DelegationTests(unittest.TestCase):
              "message": {"content": [{"type": "tool_result", "tool_use_id": "dispatch"}]}}])
         self.child("background", [self.claude(1, "child", 100_000, agent="background")], {})
         self.assertEqual(self.summary()["volume"]["dispatching_parent_sessions"], 1)
-        self.assertEqual(self.summary()["estimate"]["median_inline_to_actual_context_ratio"], .5)
+        self.assertAlmostEqual(self.summary()["estimate"]["break_even_ratio_median"], 49_980 / 99_980)
 
     def test_concentration_rounds_up_decile(self):
         self.save(".claude/projects/group/parent.jsonl", [self.claude(0, "parent", 50_000)])
@@ -393,7 +639,8 @@ class DelegationTests(unittest.TestCase):
         group = self.report(Window(timestamp(at(2)), timestamp(at(5))))["delegation"]["summary"]
         self.assertEqual(group["cost_share"]["dispatched"]["total"], 100_010)
         self.assertEqual(group["context"]["session_average_median"], 100_000)
-        self.assertEqual(group["estimate"]["median_inline_to_actual_context_ratio"], 2.5)
+        self.assertIsNone(group["estimate"]["break_even_ratio_median"])
+        self.assertEqual(group["estimate"]["unobserved_reasons"], {"child_scope_incomplete": 1})
 
     def test_model_tokens_split_and_session_count_can_appear_in_several_rows(self):
         self.save(".codex/sessions/rollout-child.jsonl", [self.codex_meta("child", 0, "missing"),
@@ -414,7 +661,7 @@ class DelegationTests(unittest.TestCase):
         rows = self.summary()["model_request"]["by_observed_model_and_request"]
         self.assertEqual(rows, [{"model": "model-a", "request": "unknown", "sessions": 1, "total_tokens": 0}])
 
-    def test_zero_context_is_observed_but_estimate_ratio_is_undefined(self):
+    def test_zero_context_is_observed_and_fresh_is_not_higher(self):
         self.save(".claude/projects/group/parent.jsonl", [self.claude(0, "parent", 50_000)])
         child = self.claude(1, "child", 50_000, agent="child")
         child["message"]["usage"] = {"input_tokens": 0, "cache_creation_input_tokens": 0,
@@ -423,7 +670,8 @@ class DelegationTests(unittest.TestCase):
         group = self.summary()
         self.assertEqual(group["context"]["session_average_median"], 0)
         self.assertEqual(group["context"]["sensitivity"]["100000"]["share"], 0)
-        self.assertEqual(group["estimate"]["context_unobserved"], 1)
+        self.assertEqual(group["estimate"]["unobserved_sessions"], 0)
+        self.assertEqual(group["estimate"]["fresh_not_higher"], 1)
 
     def test_partial_context_excludes_entire_child_from_context_figures(self):
         self.save(".codex/sessions/rollout-child.jsonl", [self.codex_meta("child", 0, "missing"),

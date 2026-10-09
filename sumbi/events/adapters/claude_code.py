@@ -171,7 +171,9 @@ def collect(home: Path, coverage: Coverage):
             yield Record("claude-code", raw_id, when, record_identity(event),
                 (ModelRequest(status), *tuple(_translate(event, when, parent, child, spawn_depth))),
                 timestamp_supplied="timestamp" in event, fallback_id=key(event.get("uuid") or None),
-                parent_session_id=parent if child else None, worker=child)
+                parent_session_id=parent if child else None, worker=child,
+                usage_record=event.get("type") == "assistant"
+                and bool(mapping(mapping(event.get("message")).get("usage"))))
 
 
 def _subagent_metadata(path):
