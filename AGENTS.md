@@ -2,6 +2,11 @@
 
 The design is in [docs/DESIGN.md](docs/DESIGN.md). Read the parts your task touches; this file only holds the rules that always apply.
 
+- **Purpose and lane.**
+  - sumbi audits how coding agents work and improves their execution harness: agent instructions, workflow checks and tools, automations, and execution-process briefs. The aim is higher goal achievement and fewer tokens per goal. Product features, requirements and acceptance decisions stay with the project's agent and owner.
+  - When you audit or improve another project's harness, including through a sumbi installation, limit your work to harness diagnosis, harness changes and measurement.
+  - You may read or request the product context that work needs. Do not create or decide product plans, requirements or briefs. These limits apply to sumbi's harness role, not to the host project's own product agent.
+
 - **This repository will be public.** Never commit any of these:
   - real session logs or transcripts, customer data, secrets
   - internal company, project or host names
