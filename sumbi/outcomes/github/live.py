@@ -16,7 +16,8 @@ import urllib.parse
 import urllib.request
 
 from sumbi.outcomes.github.ledger import PR, utc
-from sumbi.outcomes.github.recorded import FixtureOutcomes, SHA
+from sumbi.outcomes.github.recorded import (FixtureOutcomes, SHA, branch_request_repo,
+    branch_commits_unavailable)
 from dataclasses import replace
 
 API = "https://api.github.com"
@@ -112,6 +113,7 @@ class GitHubOutcomes(FixtureOutcomes):
         self._policies = {}
         self._recordings = {}
         self._capture_incomplete = set()
+        self._branch_gaps = {}
         repos = sorted({r for d in ledger for r in d.repos})
         for repo in repos:
             start = min(d.dispatched_at for d in ledger if repo in d.repos)
@@ -139,6 +141,9 @@ class GitHubOutcomes(FixtureOutcomes):
     def _filter(path, raw, *, head_refs=False):
         """Allow-list only data used by this adapter, dropping all author fields."""
         endpoint = path.split("?", 1)[0]
+        if re.fullmatch(r"/repos/[^/]+/[^/]+", endpoint):
+            # HTTP success proves readability; repository metadata is unnecessary.
+            return {}
 
         def pull(pr):
             fields = ("number", "state", "created_at", "closed_at", "merged_at",
@@ -237,6 +242,10 @@ class GitHubOutcomes(FixtureOutcomes):
                     error_body = exc.read(4096) if code == 403 else b""
                     rate_message = error_body.lower()
                     exc.close()
+                    repo = branch_request_repo(path) if code == 404 else None
+                    if repo is not None:
+                        payload = self._missing_branch(repo, destination, captured_at)
+                        break
                     if code == 404 and missing:
                         return None
                     limited = code == 429 or (code == 403 and (
@@ -280,7 +289,16 @@ class GitHubOutcomes(FixtureOutcomes):
                 except (UnicodeError, json.JSONDecodeError,
                     KeyError, TypeError, AttributeError):
                     raise ValueError("GitHub response was unavailable or malformed") from None
-        return self._record_response(key, payload)
+        return self._record_response(key, payload, path)
+
+    def _missing_branch(self, repo, destination, captured_at):
+        # A ref failure says nothing about repository access. Probe the repository
+        # itself before treating it as missing evidence.
+        self._get("/repos/" + repo)
+        payload = {"fetched_at": time.time(), "observed_at": captured_at,
+            "response": None, "gap": "branch_unavailable"}
+        _write(destination, payload)
+        return payload
 
     def _pages(self, path, key=None, *, evidence=False):
         collected = []
@@ -288,7 +306,12 @@ class GitHubOutcomes(FixtureOutcomes):
             raw = self._get(path + ("&" if "?" in path else "?") + "per_page=100&page="
                 + str(page), policy=evidence)
             if raw is None and evidence:
-                self._capture_gap("checks_unreadable", path)
+                if branch_request_repo(path) is None:
+                    self._capture_gap("checks_unreadable", path)
+                else:
+                    self._capture_incomplete.add(path)
+                return []
+            if raw is None and branch_request_repo(path) is not None:
                 return []
             rows = raw[key] if key else raw
             if not isinstance(rows, list):
@@ -354,6 +377,8 @@ class GitHubOutcomes(FixtureOutcomes):
                 for p in self._capture_incomplete), "pulls": entries,
             "commits": [c for c in commits.values()
                 if start <= utc(c["commit"]["committer"]["date"], "GitHub commit timestamp") < end]}
+        if self._branch_gaps.get(repo):
+            raw["branch_unavailable"] = sorted(self._branch_gaps[repo])
         self._load(raw, defer_policy=True)
         self._recordings[repo] = raw
         self._record_repo(repo)
@@ -467,15 +492,27 @@ class GitHubOutcomes(FixtureOutcomes):
         return results
 
     def _record_repo(self, repo):
+        if self._branch_gaps.get(repo):
+            self._recordings[repo]["branch_unavailable"] = sorted(self._branch_gaps[repo])
         if self.record:
             _write(self.record / (hashlib.sha256(repo.encode()).hexdigest() + ".json"),
                 self._recordings[repo])
 
-    def _record_response(self, key, payload):
+    def _record_response(self, key, payload, path):
         self._asof = min(self._asof,
             datetime.fromtimestamp(payload.get("observed_at", payload["fetched_at"]), timezone.utc))
         if self.record:
             _write(self.record / "responses" / (key + ".json"), payload)
+        if payload.get("gap") == "branch_unavailable":
+            repo = branch_request_repo(path)
+            identity = self._evidence_identity
+            self._evidence_identity = repo
+            self._capture_gap("branch_unavailable", path)
+            self._evidence_identity = identity
+            self._branch_gaps.setdefault(repo, set()).add(path)
+            if branch_commits_unavailable([path]) and repo in self.observations:
+                self.observations[repo] = replace(self.observations[repo], commits_complete=False)
+                self._recordings[repo]["commits_complete"] = False
         return payload["response"]
 
     def _cached_response(self, path):
@@ -487,7 +524,10 @@ class GitHubOutcomes(FixtureOutcomes):
             if destination.stat().st_size <= MAX_BYTES:
                 cached = json.loads(destination.read_text(encoding="utf-8"))
                 age = time.time() - cached["fetched_at"]
-                if 0 <= age < CACHE_SECONDS:
+                legacy_branch_gap = (cached.get("response") is None
+                    and branch_request_repo(path) is not None
+                    and cached.get("gap") != "branch_unavailable")
+                if 0 <= age < CACHE_SECONDS and not legacy_branch_gap:
                     payload = cached
                     self.cache_hits += 1
         except (OSError, ValueError, KeyError, TypeError):

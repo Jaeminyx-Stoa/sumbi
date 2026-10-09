@@ -790,6 +790,23 @@ runs for every item; snapshot-gap counts remain visible.
 
 Live pagination and result-count gaps use `pulls_capture_incomplete`,
 `pagination_incomplete`, `checks_capture_incomplete`, and `checks_unreadable`.
+An HTTP 404 on a branch-scoped commit listing, check/status or compare
+request triggers a repository-level readability request. If the repository is
+readable, the missing ref produces one `branch_unavailable` gap per request and
+capture continues. Full-SHA and non-branch requests retain their existing error
+handling. A repository-level 403/404 retains the unreadable-repository behavior.
+Branch gaps never establish success: incomplete commit listings leave merged
+work `immature` through the existing completeness gates, while open PRs remain
+`in_progress`. Fix-commit detection is incomplete; comparison uses the existing
+capture gates without a new blanket exclusion.
+Each missing-ref response is cached as `response: null` with
+`gap: "branch_unavailable"` and its observation time for the usual five-minute
+lifetime. Cache replay restores the same per-request gaps and completeness.
+Normalized repository recordings optionally contain `branch_unavailable`, an
+array of local request paths. Recorded replay validates their repository and
+branch scope, deduplicates the gap counts, and treats any commit-listing or
+compare gap as incomplete even if `commits_complete` was declared true. These private paths,
+branch names and error response prose never enter public reports.
 An unreadable check/status endpoint affects only its PR's evidence. Partial policy
 captures remain unknown. Incomplete checks cannot qualify as at-merge evidence; incomplete
 PR/commit captures prevent success under the existing coverage rules. Live and
