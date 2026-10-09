@@ -101,7 +101,7 @@ class HookDenialTests(unittest.TestCase):
         # Recognition does not add hook-specific failures to existing tool_errors.
         self.assertEqual(report["summary"]["counts"]["tool_errors"], 3)
         self.assertEqual(report["summary"]["counts"]["tool_results"], 8)
-        self.assertEqual(report["schema_version"], "1.3")
+        self.assertEqual(report["schema_version"], "1.4")
         self.assertEqual(set(report["hook_denials"]["by_agent"]), {"claude-code", "codex"})
         self.assertEqual(len(report["hook_denials"]["by_project_and_agent"]), 2)
         for row in report["hook_denials"]["by_project_and_agent"]:

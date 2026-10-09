@@ -2,6 +2,7 @@
 
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
+import ast
 import io
 import json
 from pathlib import Path
@@ -518,14 +519,14 @@ class CliTests(SyntheticHome):
         self.assertEqual(result, 0)
         self.assertEqual(stderr, "")
         self.assertIn("Reported tokens (observed): 263", stdout)
-        self.assertEqual(json.loads(output.read_text())["schema_version"], "1.3")
+        self.assertEqual(json.loads(output.read_text())["schema_version"], "1.4")
         self.assertIn("Harness friction: synthetic local note", review.read_text())
         self.assertNotIn("Harness friction:", stdout)
 
     def test_stdout_json_keeps_text_summary_on_stderr(self):
         result, stdout, stderr = self.invoke(["--json", "-", "--agents", "codex"])
         self.assertEqual(result, 0)
-        self.assertEqual(json.loads(stdout)["schema_version"], "1.3")
+        self.assertEqual(json.loads(stdout)["schema_version"], "1.4")
         self.assertIn("Sessions in window: 0", stderr)
         self.assertEqual(list(json.loads(stdout)["by_agent"]), ["codex"])
 
@@ -599,7 +600,12 @@ class ContractTests(unittest.TestCase):
             source = path.read_text(encoding="utf-8")
             self.assertNotIn("import socket", source)
             self.assertNotIn("urllib.request", source)
-            self.assertNotIn("requests", source.replace("user_input_requests", ""))
+            # Evidence labels can mention requests without importing the HTTP library.
+            for node in ast.walk(ast.parse(source)):
+                if isinstance(node, ast.Import):
+                    self.assertNotIn("requests", {alias.name.split(".")[0] for alias in node.names})
+                elif isinstance(node, ast.ImportFrom):
+                    self.assertNotEqual("requests", (node.module or "").split(".")[0])
 
 
 if __name__ == "__main__":

@@ -11,6 +11,9 @@ from sumbi.events.tool_paths import resolve_path
 
 KINDS = ("new_input", "cache_write", "cache_read", "output", "total")
 THRESHOLDS = (100_000, 200_000, 400_000)
+PRICE_RATIOS = (1, 5, 10, 20, 50)
+ESTIMATE_SUMS = ("actual_fresh", "inline_fresh", "actual_reused", "inline_reused",
+    "actual_carry", "inline_carry")
 SCRIPTS = {".sh", ".bash", ".py", ".ps1", ".js", ".mjs", ".cmd", ".bat"}
 
 
@@ -42,9 +45,13 @@ def _share(numerator, denominator):
     return numerator / denominator if numerator is not None and denominator else None
 
 
-def _p90(values):
+def _percentile(values, fraction):
     """Nearest-rank percentile, including small cohorts without interpolation."""
-    return sorted(values)[math.ceil(len(values) * .9) - 1] if values else None
+    return sorted(values)[math.ceil(len(values) * fraction) - 1] if values else None
+
+
+def _p90(values):
+    return _percentile(values, .9)
 
 
 def _depth(session, index):
@@ -77,30 +84,77 @@ def _request_records(session, window):
         key=lambda r: (r[0], r[1]))
 
 
+def _carry_requests(session, parent):
+    """Select carry requests only when their timing and boundaries are observed."""
+    if not session.times:
+        return "carry_activity_time_unobserved"
+    if None in parent.compaction_times:
+        return "carry_compaction_time_unobserved"
+    last_activity = max(session.times)
+    boundary = min((at for at in parent.compaction_times if at > last_activity), default=None)
+    for lower, upper in parent.request_timing_gaps:
+        if upper is not None and upper <= last_activity:
+            continue
+        if boundary is not None and lower is not None and lower >= boundary:
+            continue
+        return "carry_parent_requests_incomplete"
+    later = [r for r in parent.request_usage if r[0] > last_activity
+        and (boundary is None or r[0] < boundary)]
+    later_keys = {(r[0], r[1]) for r in later}
+    if any((at, order) not in later_keys for at, order, kind, _ in parent.attribution_events
+        if kind == "usage" and at > last_activity and (boundary is None or at < boundary)):
+        return "carry_parent_requests_incomplete"
+    return later
+
+
 def _estimate(session, parent, records):
-    if parent is None or session.start_at is None or not records:
-        return None
+    """Return input-kind estimates or one evidence reason; no prices are assumed."""
+    if parent is None or session.start_at is None:
+        return "parent_or_dispatch_unobserved"
     prior = [r for r in parent.request_usage if r[0] <= session.start_at]
     child = sorted(session.request_usage, key=lambda r: (r[0], r[1]))
-    if not prior or not child:
-        return None
+    if not prior:
+        return "parent_request_unobserved"
     parent_usage = [(at, order) for at, order, kind, _ in parent.attribution_events
         if kind == "usage" and at <= session.start_at]
     if parent_usage and max(parent_usage) not in {(r[0], r[1]) for r in prior}:
-        return None
-    child_usage = [(at, order) for at, order, kind, _ in session.attribution_events
-        if kind == "usage"]
-    if child_usage and min(child_usage) < (child[0][0], child[0][1]):
-        return None
+        return "parent_latest_request_unobserved"
     latest = max(r[0] for r in prior)
     contexts = {_context(r[2]) for r in prior if r[0] == latest}
-    if len(contexts) != 1:
-        return None
-    p, first = next(iter(contexts)), _context(child[0][2])
-    values = [_context(r[2]) for r in records]
-    if p is None or first is None or any(v is None for v in values) or not sum(values):
-        return None
-    return sum(p + value - first for value in values) / sum(values)
+    if len(contexts) != 1 or None in contexts:
+        return "parent_context_unobserved_or_conflicting"
+    if None in parent.compaction_times:
+        return "carry_compaction_time_unobserved"
+    if any(
+        latest < at <= session.start_at for at in parent.compaction_times):
+        return "parent_context_compacted"
+    if not child or {(r[0], r[1]) for r in records} != {(r[0], r[1]) for r in child}:
+        return "child_scope_incomplete"
+    child_keys = {(r[0], r[1]) for r in child}
+    if session.request_timing_gaps or any((at, order) not in child_keys for at, order, kind, _
+        in session.attribution_events if kind == "usage"):
+        return "child_requests_incomplete"
+    values = [_context(r[2]) for r in child]
+    # Codex has inclusive cached input but no separately reported cache writes.
+    if any(value is None or r[2].get("cache_read") is None
+        or session.agent != "codex" and r[2].get("cache_write") is None
+        for value, r in zip(values, child)):
+        return "child_token_kinds_unobserved"
+    later = _carry_requests(session, parent)
+    if isinstance(later, str):
+        return later
+    result = child[-1][2].get("output")
+    if result is None:
+        return "carry_returned_result_unobserved"
+    p, first, tail = next(iter(contexts)), values[0], len(later)
+    actual_fresh = sum((r[2]["new_input"] + (r[2].get("cache_write") or 0)) for r in child)
+    actual_carry = result * tail
+    inline_carry = (values[-1] - first) * tail
+    return {"actual_fresh": actual_fresh, "inline_fresh": max(0, actual_fresh - first),
+        "actual_reused": sum(r[2]["cache_read"] for r in child) + actual_carry,
+        "inline_reused": sum(p + previous - first for previous in [first, *values[:-1]])
+            + inline_carry,
+        "actual_carry": actual_carry, "inline_carry": inline_carry}
 
 
 def _friction(entries, window, attributor):
@@ -132,7 +186,9 @@ def _friction(entries, window, attributor):
 
 
 def _contexts(entries, parents, window):
-    averages, ratios, observed, skipped = [], [], [], 0
+    averages, ratios, observed = [], [], []
+    sums, reasons, classifications = Counter(), Counter(), Counter()
+    estimated_sessions = 0
     above = dict.fromkeys(map(str, THRESHOLDS), 0)
     request_total = 0
     for entry in entries:
@@ -154,23 +210,42 @@ def _contexts(entries, parents, window):
                 for threshold in THRESHOLDS:
                     if context > threshold:
                         above[str(threshold)] += total
-        ratio = _estimate(session, parents.get((session.agent, session.parent_raw_id)), records
-            ) if complete else None
-        if ratio is None:
-            skipped += 1
+        parent = parents.get((session.agent, session.parent_raw_id))
+        estimate = _estimate(session, parent, records) if complete else "child_requests_incomplete"
+        if isinstance(estimate, str):
+            reasons[estimate] += 1
         else:
-            ratios.append(ratio)
+            estimated_sessions += 1
+            sums.update(estimate)
+            fresh = estimate["actual_fresh"] - estimate["inline_fresh"]
+            reused = estimate["inline_reused"] - estimate["actual_reused"]
+            classifications["fresh_not_higher"] += fresh <= 0
+            classifications["reused_not_lower"] += reused <= 0
+            if fresh > 0 and reused > 0:
+                ratios.append(reused / fresh)
     return {"context": {"measurement": "observed", "observed_sessions": len(observed),
         "context_unobserved": len(entries) - len(observed),
         "session_average_median": median(averages) if averages else None,
         "session_average_p90": _p90(averages), "request_total_tokens": request_total,
         "sensitivity": {key: {"total_tokens": value,
             "share": _share(value, request_total)} for key, value in above.items()}},
-        "estimate": {"measurement": "estimated", "observed_sessions": len(ratios),
-            "context_unobserved": skipped, "median_inline_to_actual_context_ratio":
-                median(ratios) if ratios else None,
-            "sessions_ratio_below_one": sum(ratio < 1 for ratio in ratios),
-            "share_ratio_below_one": _share(sum(ratio < 1 for ratio in ratios), len(ratios))}}
+        "estimate": {"measurement": "estimated", "observed_sessions": estimated_sessions,
+            "unobserved_sessions": sum(reasons.values()),
+            "unobserved_reasons": dict(sorted(reasons.items())),
+            **{key + "_unobserved": sum(count for reason, count in reasons.items()
+                if reason.startswith(prefix)) for key, prefix in (
+                    ("parent_context", "parent_"), ("child_context", "child_"),
+                    ("carry", "carry_"))},
+            **{key: sums[key] for key in ESTIMATE_SUMS},
+            "break_even_sessions": len(ratios),
+            "break_even_ratio_median": median(ratios) if ratios else None,
+            "break_even_ratio_p10": _percentile(ratios, .1),
+            "break_even_ratio_p90": _p90(ratios),
+            "fresh_not_higher": classifications["fresh_not_higher"],
+            "reused_not_lower": classifications["reused_not_lower"],
+            "share_break_even_ratio_below": {str(threshold): _share(
+                sum(ratio < threshold for ratio in ratios), len(ratios))
+                for threshold in PRICE_RATIOS}}}
 
 
 def _models(entries):
@@ -302,11 +377,24 @@ def _group_text(name, group):
     for row in group["model_request"]["by_observed_model_and_request"]:
         lines.append(f"  Model {row['model']} ({row['request']}): sessions {row['sessions']}; "
             f"total tokens {row['total_tokens']}")
-    lines.extend(["  Inline/actual context (estimated): median "
-        + _display(estimate["median_inline_to_actual_context_ratio"])
-        + f"; observed {estimate['observed_sessions']}; unobserved {estimate['context_unobserved']}"
-        + f"; sessions below one {estimate['sessions_ratio_below_one']}; share "
-        + _display(estimate["share_ratio_below_one"]),
+    lines.extend(["  Delegation input comparison (estimated): "
+        + f"observed {estimate['observed_sessions']}; "
+        + f"unobserved {estimate['unobserved_sessions']}",
+        "  Unobserved estimate reasons (estimated): " + ("; ".join(
+            key + " " + str(value)
+            for key, value in estimate["unobserved_reasons"].items()) or "none"),
+        "  Input tokens and carry (estimated): " + "; ".join(
+            key + " " + str(estimate[key]) for key in ESTIMATE_SUMS),
+        "  Fresh:reused break-even ratio (estimated): median "
+        + _display(estimate["break_even_ratio_median"])
+        + f"; p10 {_display(estimate['break_even_ratio_p10'])}"
+        + f"; p90 {_display(estimate['break_even_ratio_p90'])}"
+        + f"; sessions {estimate['break_even_sessions']}"
+        + f"; fresh_not_higher {estimate['fresh_not_higher']}"
+        + f"; reused_not_lower {estimate['reused_not_lower']}",
+        "  Share below fresh:reused ratio (estimated, descriptive): " + "; ".join(
+            key + " " + _display(value) for key, value in
+            estimate["share_break_even_ratio_below"].items()),
         "  Workaround friction (observed): " + "; ".join(key + " " + _display(value)
             for key, value in group["workaround_friction"].items())])
     return lines
@@ -320,8 +408,10 @@ def text_lines(report):
         name = " ".join(str(group[key]) for key in ("bucket", "rule", "project_key", "agent")
             if group[key] is not None)
         lines.extend(_group_text(name, group))
-    lines.append("Delegation estimate measures context volume; it ignores model prices, "
-        "output tokens and caching behaviour.")
+    lines.append("Delegation input comparison is estimated: parent/child model price differences "
+        "are ignored; final output proxies the returned result; work context is assumed to "
+        "persist until parent compaction; cache expiry and partial hits are not modelled. "
+        "Output cost is excluded. Delegation is cheaper below the break-even fresh:reused ratio.")
     lines.append("Delegation shares use the unique union of children and direct parents; "
         "nested dispatchers enter that denominator once.")
     return lines

@@ -10,7 +10,7 @@ from sumbi.events.schema import (
     Record, SessionStart, Context, Metadata, Tokens, TokenUsage, ToolEvidence,
     ToolInput, ToolOutput, ToolStart, ToolEnd, CommandExecution, FileEdit,
     Counter, Request, SessionEnd, Resume, LocalText, Diagnostic, SourceIdentity, freeze,
-    RequestUsage,
+    RequestUsage, CompactionBoundary,
 )
 from .common import key, record_identity
 
@@ -97,6 +97,8 @@ def _item(payload, subtype, identity, when):
         yield _input(identity, kind, item, at=start or when, own_time=True)
     if kind == "AgentMessage":
         yield LocalText(freeze(item.get("content")))
+    if kind == "ContextCompaction" and subtype == "item_completed":
+        yield CompactionBoundary()
 
 
 def _event(payload, event, when):
@@ -145,6 +147,8 @@ def _event(payload, event, when):
         yield ToolEnd(key(identity), exit_code(payload) not in (None, 0))
     elif subtype in ("item_completed", "item_started"):
         yield from _item(payload, subtype, identity, when)
+    elif subtype == "context_compacted":
+        yield CompactionBoundary()
     elif subtype == "shutdown_complete":
         yield SessionEnd("observed")
     elif subtype in ("error", "request_user_input"):
@@ -186,6 +190,8 @@ def _response(payload, event):
         yield ToolEnd(key(identity), exit_code(payload) not in (None, 0))
     if subtype in ("message", "agent_message"):
         yield LocalText(freeze(payload.get("content")))
+    if subtype == "compaction":
+        yield CompactionBoundary()
 
 
 def _translate(event, payload, when, inherited):
@@ -241,6 +247,8 @@ def collect(home: Path, coverage: Coverage):
                 tuple(_translate(event, payload, when, inherited)),
                 timestamp_supplied="timestamp" in event, ordinal=integer(event.get("ordinal")),
                 before_dedup=before,
+                usage_record=kind == "event_msg" and payload.get("type") == "token_count"
+                and bool(mapping(payload.get("info"))),
                 fallback_id=str(event["ordinal"]) if "ordinal" in event else None,
                 fallback_source_identity=SourceIdentity(freeze(event["ordinal"]))
                 if "ordinal" in event else None)
