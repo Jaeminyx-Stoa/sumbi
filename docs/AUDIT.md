@@ -87,11 +87,9 @@ The scheduler entry is removable with `install --revert`, like any applied pract
 
 ## Command surface
 
-To be decided by the owner. The working assumption is flags on the existing `improve` command:
-- `--audit`: observe, detect and draft;
-- `--judge`: compare registered changes and propose verdicts.
-
-This avoids a new top-level command.
+Decided by the owner (10-09): flags on the existing `improve` command, with no new top-level command.
+- `sumbi improve --audit`: observe, detect and draft.
+- `sumbi improve --judge`: compare registered changes and propose verdicts.
 
 ## Privacy and safety
 
