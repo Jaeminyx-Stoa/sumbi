@@ -120,8 +120,11 @@ GUIDE = {
         "changed_behavior": (
             "Use the existing goal to name the accepted output and reuse the existing capacity "
             "probe. For the uncertain resource-heavy job, run a representative bounded pilot "
-            "within existing approvals, then choose execution from observed capacity and "
-            "coverage. Show real deliverable progress instead of completed preparation counts."
+            "within applicable existing approvals, then choose execution from observed capacity "
+            "and coverage. Show real deliverable progress instead of completed preparation "
+            "counts. Preserve the requested full scope and horizon. A pilot is not the "
+            "deliverable; disclose any reduced output, and obtain owner approval for a change "
+            "to the requested scope."
         ),
         "different_contexts": [
             {
@@ -142,7 +145,10 @@ GUIDE = {
                 "context": "money-or-security-path",
                 "action": (
                     "Keep required approval and independent review. Check the unsafe operation "
-                    "remains blocked and the legitimate approved operation still proceeds."
+                    "remains blocked and the legitimate approved operation still proceeds. "
+                    "When the action depends on live state, verify it at the time of action. "
+                    "Recorded hashes or cached proof cannot replace current money/security "
+                    "evidence."
                 ),
             },
         ],
