@@ -40,6 +40,9 @@ class _State:
     request_records: list = field(default_factory=list)
     dispatch_model_statuses: set = field(default_factory=set)
     spawn_depths: set = field(default_factory=set)
+    carry_last_time: datetime | None = None
+    carry_pending_gaps: list = field(default_factory=list)
+    carry_order_conflicting: bool = False
 
 
 def own_context_at_start(history, started_at, own_start):
@@ -309,6 +312,10 @@ def _fold(state, event, record, order, fallback, source_fallback, window, covera
             resolve_path(target, cwd) for target in event.targets)
     elif isinstance(event, e.Counter):
         session.count(event.kind, identity, when, window)
+        if event.kind == "compactions":
+            session.compaction_times.add(when)
+    elif isinstance(event, e.CompactionBoundary):
+        session.compaction_times.add(when)
     elif isinstance(event, e.Request):
         session.interval("request", identity,
             event.start or (when if event.endpoint == "start" else None),
@@ -400,6 +407,8 @@ def _explicit_metadata(state, window, coverage):
 
 def _finish(state, window, coverage, links):
     session = state.session
+    if state.carry_order_conflicting:
+        session.request_timing_gaps = [(None, None) for _ in session.request_timing_gaps]
     for identity, started in state.pending_cwds.items():
         if (execution := session.commands.get(identity)) is not None:
             execution.cwd = own_context_at_start(state.contexts, started, session.start_at)
@@ -496,6 +505,24 @@ def _state(states, record):
     return states[key]
 
 
+def _carry_timing(state, record):
+    """Bound missing request times without changing general activity evidence."""
+    gaps, when = state.session.request_timing_gaps, record.timestamp
+    if when is not None:
+        state.carry_order_conflicting |= state.carry_last_time is not None \
+            and when < state.carry_last_time
+        for index in state.carry_pending_gaps:
+            lower = gaps[index][0]
+            gaps[index] = (lower, when) if lower is None or lower <= when else (None, None)
+        state.carry_pending_gaps.clear()
+        state.carry_last_time = when
+    elif record.usage_record or any(isinstance(event, (e.TokenUsage, e.RequestUsage))
+        or isinstance(event, e.Request) and event.start is None and event.end is None
+        for event in record.events):
+        state.carry_pending_gaps.append(len(gaps))
+        gaps.append((state.carry_last_time, None))
+
+
 def build(records: Iterable[e.Record], window: Window, coverage: Coverage, *,
     local_review: bool = False, collect_links: bool = False,
     worker_links: bool = False, reason_salt: bytes | None = None) -> list[Session]:
@@ -527,12 +554,15 @@ def build(records: Iterable[e.Record], window: Window, coverage: Coverage, *,
                 coverage.duplicate_events += 1
                 continue
             session.seen.add(record.identity.digest)
+        _carry_timing(state, record)
         if record.observe_time:
             if record.timestamp is not None:
                 session.times.add(record.timestamp)
-            elif record.timestamp_supplied:
-                coverage.invalid_timestamps += 1
-                state.invalid |= state.explicit
+            else:
+                session.activity_timing_incomplete = True
+                if record.timestamp_supplied:
+                    coverage.invalid_timestamps += 1
+                    state.invalid |= state.explicit
         sequence = len(session.seen)
         order = position if state.explicit else (record.ordinal if record.ordinal is not None
             else sequence, sequence)

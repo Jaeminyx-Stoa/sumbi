@@ -216,6 +216,13 @@ class Counter:
 
 
 @dataclass(frozen=True)
+class CompactionBoundary:
+    """Local timing evidence, independent of public compaction counters."""
+
+    pass
+
+
+@dataclass(frozen=True)
 class Request:
     identity: str | None
     start: datetime | None = None
@@ -250,7 +257,7 @@ class Diagnostic:
 
 
 Event: TypeAlias = (SessionStart | Context | TokenUsage | ToolStart | ToolEnd |
-    CommandExecution | FileEdit | Counter | Request | SessionEnd |
+    CommandExecution | FileEdit | Counter | CompactionBoundary | Request | SessionEnd |
     Resume | LocalText | Metadata | ToolEvidence | Diagnostic | RequestUsage | ModelRequest)
 
 
