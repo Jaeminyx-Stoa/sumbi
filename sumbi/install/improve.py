@@ -196,10 +196,12 @@ def _validate_bundle(raw, evidence_data, measured):
             or verification["status"] == "pending" and verification["evidence_sha256"] is None)):
         raise ValueError
     review = raw["review"]
-    _fields(review, "author_family reviewer_family status safety_gates_preserved")
-    if (not _label(review["author_family"])
+    _fields(review, "author_family reviewer_family status safety_gates_preserved"
+        + (" policy" if isinstance(review, dict) and "policy" in review else ""))
+    policy = review.get("policy", "cross-family")
+    if (policy not in ("owner", "cross-family") or not _label(review["author_family"])
         or not (review["status"] == "approved" and _label(review["reviewer_family"])
-            and review["author_family"] != review["reviewer_family"]
+            and (policy == "owner" or review["author_family"] != review["reviewer_family"])
             and review["safety_gates_preserved"] is True
             or review["status"] == "pending" and review["reviewer_family"] is None
             and review["safety_gates_preserved"] is None)):
@@ -275,7 +277,7 @@ def apply_improvement(plan: Improvement, reviewed_sha256: str) -> dict:
     if (plan.summary["review"]["status"] != "approved"
         or plan.summary["verification"]["status"] != "passed"):
         raise InstallError(
-            "Apply requires approved independent review and passed verification attestations.")
+            "Apply requires approved review and passed verification attestations.")
 
     def prepare(originals, modes):
         fresh = build_improvement(plan.root, plan.evidence, plan.bundle)

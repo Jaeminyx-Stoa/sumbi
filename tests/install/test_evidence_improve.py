@@ -116,6 +116,7 @@ class EvidenceImproveTests(unittest.TestCase):
         for private in ["PRIVATE", "device.py", str(self.temp.name), "DO-NOT-EXPORT"]:
             self.assertNotIn(private, summary)
         self.assertEqual(plan.summary["change_count"], 1)
+        self.assertNotIn("policy", plan.summary["review"])
         self.assertEqual(set(plan.summary["targets"][0]), {"before_sha256", "after_sha256"})
         self.assertFalse((self.root / ".sumbi").exists())
 
@@ -179,6 +180,34 @@ class EvidenceImproveTests(unittest.TestCase):
         with self.assertRaises(InstallError):
             apply_improvement(plan, plan.bundle_sha256)
         self.assertEqual(self.target.read_bytes(), b"LIMIT = 1\n")
+
+    def test_explicit_owner_policy_accepts_owner_review_and_exact_apply(self):
+        self.raw["review"].update(policy="owner", reviewer_family="family-a")
+        self.save()
+        plan = self.plan()
+        self.assertEqual(plan.summary["review"]["policy"], "owner")
+        with self.assertRaises(InstallError):
+            apply_improvement(plan, "b" * 64)
+        apply_improvement(plan, plan.bundle_sha256)
+        self.assertEqual(self.target.read_bytes(), b"LIMIT = 2\n")
+
+    def test_cross_family_policy_still_rejects_same_family_and_unknown_policy(self):
+        self.raw["review"].update(policy="cross-family", reviewer_family="family-a")
+        self.save()
+        with self.assertRaises(InstallError):
+            self.plan()
+        self.raw["review"].update(policy="unknown", reviewer_family="family-b")
+        self.save()
+        with self.assertRaises(InstallError):
+            self.plan()
+
+    def test_owner_policy_can_be_proposed_pending_but_cannot_apply(self):
+        self.raw["review"].update(policy="owner", status="pending", reviewer_family=None,
+            safety_gates_preserved=None)
+        self.save()
+        plan = self.plan()
+        with self.assertRaises(InstallError):
+            apply_improvement(plan, plan.bundle_sha256)
 
     def test_stale_target_evidence_and_bundle_refused(self):
         plan = self.plan()

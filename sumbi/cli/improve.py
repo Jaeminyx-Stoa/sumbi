@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sys
 
+from sumbi.catalog.improve_guide import improvement_guide, guide_text
 from sumbi.install.errors import InstallError
 from sumbi.install.improve import observations, build_improvement, apply_improvement
 from sumbi.install.revert import revert_install
@@ -12,6 +13,8 @@ from sumbi.judge.registration import read_registration
 
 
 def configure_parser(parser):
+    parser.add_argument("--guide", action="store_true",
+        help="Read the default improvement work approach; no evidence required")
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--evidence", type=Path, help="Existing local collect JSON")
     parser.add_argument("--bundle", type=Path, help="Reviewed local change JSON")
@@ -25,8 +28,24 @@ def configure_parser(parser):
     parser.add_argument("--json", action="store_true", help="Print only allow-listed summary JSON")
 
 
+def _print_report(args, summary=None, kind="observations"):
+    if args.guide:
+        guide = improvement_guide()
+        if args.json:
+            print(json.dumps(guide if summary is None else {"guide": guide, kind: summary},
+                sort_keys=True))
+            return
+        print(guide_text(guide))
+    if summary is not None:
+        print(json.dumps(summary, sort_keys=True))
+
+
 def run(args):
     try:
+        if args.guide and not any((args.evidence, args.bundle, args.apply, args.revert,
+            args.reviewed_sha256, args.registration)):
+            _print_report(args)
+            return 0
         if args.revert:
             if any((args.evidence, args.bundle, args.reviewed_sha256, args.registration)):
                 raise InstallError(
@@ -46,7 +65,7 @@ def run(args):
             raise InstallError("Registration requires a reviewed bundle.")
         if not args.bundle:
             _, summary = observations(args.evidence)
-            print(json.dumps(summary, sort_keys=True))
+            _print_report(args, summary)
             return 0
         plan = build_improvement(args.root, args.evidence, args.bundle)
         if args.registration:
@@ -61,8 +80,9 @@ def run(args):
         summary = {**plan.summary, "status": "applied" if result else "proposed"}
         if result:
             summary["backup_id"] = result["backup_id"]
-        print(json.dumps(summary, sort_keys=True))
+        _print_report(args, summary, "proposal")
         if not args.json:
+            print("Use sumbi improve --guide to design and review the intervention.")
             print("Local review only: diff may contain private source/configuration text.")
             print("Diagnosis is a reviewed hypothesis; collect counts do not establish causality.")
             print("Review and verification are owner-local attestations, "

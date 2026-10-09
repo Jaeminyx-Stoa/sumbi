@@ -49,6 +49,7 @@ In the repository you want to seed:
 sumbi install              # Dry run: inspect the plan without applying it
 sumbi install --apply      # Apply additive practices and record a baseline
 sumbi collect --since 2030-01-01T00:00Z --until 2030-01-08T00:00Z
+sumbi improve --guide                     # Default improvement work approach
 sumbi improve --evidence out/collect.json  # Observations; no causal verdict
 sumbi deliver --ledger deliverables.csv --outcomes recorded-outcomes \
   --since 2030-01-01T00:00Z --until 2030-01-08T00:00Z

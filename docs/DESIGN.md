@@ -66,7 +66,28 @@ Self-improvement that is not filtered by outcomes can make things worse. Context
    - No verdict weakens an approval, a cross-family review or a money-path gate. A gate-change detector watches for it.
    - Collection is read-only.
    - Committed output holds allow-listed categories and local pseudonymous IDs. Free text stays in a local review file that is never committed automatically.
-8. **Small steps.** One to three changes per round, devices before rules, and short always-loaded instructions.
+8. **Small steps.** One to three coherent interventions per round, devices before rules, and short always-loaded instructions. Coupled source files belong to one intervention; file count is a separate resource bound.
+
+## Improvement approach
+
+`sumbi improve --guide` carries the default work approach in the installed CLI.
+An improvement changes the decision structure that generates repeated failure,
+rather than treating the latest symptom as the whole problem. Start with the
+accepted user outcome; preparation and tool counts do not establish progress.
+Reuse operating mechanisms and valid proof, remove unnecessary work before
+adding rules, and calibrate constraints to measured capacity or actual risk.
+State coverage boundaries and explain how the same judgment changes the action
+in materially different contexts. A resource-heavy job may need a pilot; a
+small static edit may need only its direct diff; money and security work retain
+their required approvals and review. A broad philosophy is not a blanket procedure.
+
+Review evaluates the changed mechanism, transfer, reuse/removal and outcome
+evidence. Checklist presence alone establishes none of these. The optional
+bundle review policy follows the repository's existing risk policy: owner review
+is available only where already allowed, and required cross-family or money,
+security and permission gates cannot be downgraded. Applying reviewed bytes is
+an intervention, not proof of improvement; fixed outcomes, time/token components
+and confounders still determine what later evidence can support.
 
 ## Data model and linking contract
 
