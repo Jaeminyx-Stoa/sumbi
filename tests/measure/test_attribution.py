@@ -426,6 +426,34 @@ class RepositoryRootChangeTests(unittest.TestCase):
         self.assertEqual(attributor.origin(str(outer / "src"))[0],
                          normalize_origin_for_test(self.URLS["outer"]))
 
+    def check_one_origin_timeout_is_not_shared(self, marker):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        for name in ("a", "b", "c"):
+            (outer / name).mkdir()
+        real = subprocess.run
+        failed = []
+
+        def flaky(command, *args, **kwargs):
+            if marker in command and not failed:
+                failed.append(command)
+                raise subprocess.TimeoutExpired(command, 5)
+            return real(command, *args, **kwargs)
+        attributor = Attributor([])
+        with patch("sumbi.measure.attribution.subprocess.run", side_effect=flaky):
+            self.assertEqual(attributor.origin(str(outer))[1], "origin_unavailable")
+            shared = [attributor.origin(str(outer / name)) for name in ("a", "b", "c")]
+        self.assertTrue(failed)
+        fresh = [Attributor([]).origin(str(outer / name)) for name in ("a", "b", "c")]
+        self.assertEqual(shared, fresh)
+        self.assertTrue(all(state == "origin" for _, state in shared))
+
+    def test_one_time_work_tree_check_timeout_is_not_shared(self):
+        self.check_one_origin_timeout_is_not_shared("--is-inside-work-tree")
+
+    def test_one_time_config_timeout_is_not_shared(self):
+        self.check_one_origin_timeout_is_not_shared("remote.origin.url")
+
     @unittest.skipUnless(hasattr(os, "mkfifo"), "FIFOs are POSIX only")
     def test_fifo_git_entry_is_never_opened(self):
         outer = self.base / "outer"

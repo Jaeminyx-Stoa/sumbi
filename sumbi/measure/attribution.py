@@ -37,6 +37,9 @@ class Attributor:
         self.origin_queries: dict[str, str] = {}
         # `.git` identity of a directory when its origin was read directly.
         self.origin_fingerprints: dict[str, object] = {}
+        # Origin reads that failed transiently (timeout, OS error, unexpected exit):
+        # cached for that path as before, but never shared with subdirectories.
+        self.origin_failures: set[str] = set()
 
     def repository_path(self, value: str) -> str:
         """Resolve an existing file/subdirectory to its local repository root."""
@@ -217,10 +220,11 @@ class Attributor:
                         self.cache.pop(root_key, None)
                         self.origin_queries.pop(root_key, None)
                     shared = self.origin(toplevel)
-                    self.cache[normalized] = shared
-                    self.origin_queries[normalized] = self.origin_queries[
-                        normalize_path(toplevel)]
-                    return shared
+                    if root_key not in self.origin_failures:
+                        self.cache[normalized] = shared
+                        self.origin_queries[normalized] = self.origin_queries[root_key]
+                        return shared
+                    # A transient failure at the root is never shared; ask for this path.
                 self.origin_fingerprints[normalized] = self._git_entry(cwd)
                 options = dict(
                     capture_output=True, text=True, timeout=5,
@@ -235,11 +239,16 @@ class Attributor:
                         origin = normalize_origin(result.stdout)
                         state = "origin" if origin else "unsupported_origin"
                         query = "checkout" if origin else "unknown"
+                    elif result.returncode not in (0, 1):
+                        self.origin_failures.add(normalized)
                 elif repo.returncode == 128 and repo.stderr.strip() == (
                     "fatal: not a git repository (or any of the parent directories): .git"):
                     query = "outside"
+                else:
+                    self.origin_failures.add(normalized)
         except (OSError, subprocess.TimeoutExpired, UnicodeError):
             state = "origin_unavailable"
+            self.origin_failures.add(normalized)
         self.cache[normalized] = origin, state
         self.origin_queries[normalized] = query
         return origin, state

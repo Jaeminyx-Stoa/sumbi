@@ -652,7 +652,9 @@ origin query, which is dropped and read again when the root's `.git` identity
 changed, and the root is handed to Git exactly as Git printed it. Only regular
 files are opened; a `.git` FIFO, socket or device is never read and counts as
 unprovable. Anything that cannot be proven is asked again; a timeout, OS error
-or unexpected Git failure is never cached.
+or unexpected Git failure is never cached as a root and never shared: an origin
+read that failed this way stays that path's answer, as before, while
+subdirectories ask Git for themselves.
 
 Assumption: repository layout (`.git` entries, objects, refs, permissions and
 origins) does not change during one collect run. The per-path cache that existed
