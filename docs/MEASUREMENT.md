@@ -649,13 +649,20 @@ existence, readability and identity of the gitdir it names. "Not a repository"
 holds only while no repository appears anywhere up the chain, up to a Git
 discovery ceiling. A subdirectory of a proven work tree reuses its root's
 origin query, which is dropped and read again when the root's `.git` identity
-changed, and the root is handed to Git exactly as Git printed it. Anything that
-cannot be proven is asked again; a timeout, OS error or unexpected Git failure
-is never cached. Under the assumption that the repository layout does not
-change between a check and its use, and the same per-path assumption as before
-(a path already asked is not asked again during one run), results equal
-querying every path alone; only the number of Git processes changes. A change
-that lands between a check and its use is not detected.
+changed, and the root is handed to Git exactly as Git printed it. Only regular
+files are opened; a `.git` FIFO, socket or device is never read and counts as
+unprovable. Anything that cannot be proven is asked again; a timeout, OS error
+or unexpected Git failure is never cached.
+
+Assumption: repository layout (`.git` entries, objects, refs, permissions and
+origins) does not change during one collect run. The per-path cache that existed
+before this sharing already relied on it, because a path asked once was never
+asked again during a run; sharing extends the same assumption to subdirectories
+of a proven root. The filesystem checks above catch the common ways it breaks,
+but they are not a full re-implementation of Git's repository discovery: for
+example, deleting `objects` or `refs`, or removing read access to `HEAD`, during
+a run is not detected. Under this assumption results equal querying every path
+alone; only the number of Git processes changes.
 
 Origin rules take priority. When any origin rules are configured, a known origin
 that matches none is explicitly `other` and cannot use a path fallback. An

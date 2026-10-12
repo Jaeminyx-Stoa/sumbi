@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 from support import IsolatedTemporaryDirectory
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -424,6 +425,23 @@ class RepositoryRootChangeTests(unittest.TestCase):
         self.assertEqual(second, Attributor([]).repository_path(str(outer)))
         self.assertEqual(attributor.origin(str(outer / "src"))[0],
                          normalize_origin_for_test(self.URLS["outer"]))
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "FIFOs are POSIX only")
+    def test_fifo_git_entry_is_never_opened(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        (outer / "pkg").mkdir()
+        os.mkfifo(outer / "pkg" / ".git")
+        attributor = Attributor([])
+        result = {}
+
+        def ask():
+            result["cached"] = [self.answers(attributor, outer / "pkg", step) for step in (1, 2)]
+        worker = threading.Thread(target=ask, daemon=True)
+        worker.start()
+        worker.join(30)
+        self.assertFalse(worker.is_alive(), "lookup blocked on a FIFO .git")
+        self.assertEqual(result["cached"][1], self.answers(Attributor([]), outer / "pkg", 2))
 
     def test_nested_repository_created_or_removed_during_a_run(self):
         outer = self.base / "outer"

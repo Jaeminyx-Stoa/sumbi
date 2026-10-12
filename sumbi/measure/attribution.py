@@ -6,6 +6,7 @@ import ntpath
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 from sumbi.core.paths import normalize_origin, normalize_path
 from sumbi.core.privacy import pseudonym
@@ -112,8 +113,12 @@ class Attributor:
         except (OSError, ValueError):
             return False
         try:
-            if os.path.isdir(path):
+            mode = os.stat(path).st_mode
+            if stat.S_ISDIR(mode):
                 git_dir, content = path, None
+            elif not stat.S_ISREG(mode):
+                # Never open a FIFO, socket or device: reading could block forever.
+                return False
             else:
                 with open(path, "rb") as handle:
                     content = handle.read(4096)
