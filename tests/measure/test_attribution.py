@@ -4,6 +4,7 @@ from datetime import timedelta
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 from support import IsolatedTemporaryDirectory
 import unittest
@@ -372,6 +373,125 @@ class RepositoryRootCacheTests(unittest.TestCase):
         roots, calls = self.toplevel_calls(Attributor([]), values)
         self.assertEqual(len(calls), 1)
         self.assertEqual(roots, {v: normalize_path(v) for v in values})
+
+
+class RepositoryRootChangeTests(unittest.TestCase):
+    """A shared answer must equal a fresh per-path query, also after the tree changes."""
+
+    URLS = {"outer": "https://example.invalid/synthetic/outer.git",
+            "inner": "https://example.invalid/synthetic/inner.git"}
+
+    def setUp(self):
+        temporary = IsolatedTemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name)
+
+    def repo(self, path, name):
+        path.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init", "-q", str(path)], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(path), "remote", "add", "origin", self.URLS[name]],
+                       check=True, capture_output=True)
+
+    def answers(self, attributor, directory, step):
+        """Paths never asked before `step`, so only shared state can answer them."""
+        child = directory / f"c{step}"
+        child.mkdir(exist_ok=True)
+        return (attributor.repository_path(str(directory / f"f{step}.txt")),
+                attributor.repository_path(str(child / "file.txt")),
+                attributor.origin(str(child)), attributor.event_link(str(child)))
+
+    def assertSameAsFresh(self, attributor, directory, step):
+        self.assertEqual(self.answers(attributor, directory, step),
+                         self.answers(Attributor([]), directory, step), str(directory))
+
+    def test_failed_root_query_is_retried_not_cached(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        (outer / "src").mkdir()
+        real = subprocess.run
+        calls = []
+
+        def flaky(command, *args, **kwargs):
+            calls.append(command)
+            if len(calls) == 1:
+                raise subprocess.TimeoutExpired(command, 5)
+            return real(command, *args, **kwargs)
+        attributor = Attributor([])
+        with patch("sumbi.measure.attribution.subprocess.run", side_effect=flaky):
+            first = attributor.repository_path(str(outer / "src" / "a.txt"))
+            second = attributor.repository_path(str(outer / "src" / "b.txt"))
+        self.assertEqual(first, normalize_path(str(outer / "src" / "a.txt")))
+        self.assertEqual(second, Attributor([]).repository_path(str(outer)))
+        self.assertEqual(attributor.origin(str(outer / "src"))[0],
+                         normalize_origin_for_test(self.URLS["outer"]))
+
+    def test_nested_repository_created_or_removed_during_a_run(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        (outer / "pkg").mkdir()
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, outer / "pkg", 1)
+        self.assertSameAsFresh(attributor, outer, 2)
+        self.repo(outer / "pkg", "inner")  # inner appears: now owns pkg
+        self.assertSameAsFresh(attributor, outer / "pkg", 3)
+        self.assertEqual(attributor.origin(str(outer / "pkg" / "c3"))[0],
+                         normalize_origin_for_test(self.URLS["inner"]))
+        shutil.rmtree(outer / "pkg" / ".git")  # inner disappears: outer owns pkg again
+        self.assertSameAsFresh(attributor, outer / "pkg", 4)
+        self.assertEqual(attributor.origin(str(outer / "pkg" / "c4"))[0],
+                         normalize_origin_for_test(self.URLS["outer"]))
+
+    def test_non_repository_becoming_a_repository(self):
+        plain = self.base / "plain"
+        (plain / "sub").mkdir(parents=True)
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, plain / "sub", 1)
+        self.repo(plain, "outer")
+        self.assertSameAsFresh(attributor, plain / "sub", 2)
+        self.assertSameAsFresh(attributor, plain, 3)
+
+    def test_repository_removed_during_a_run(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        (outer / "src").mkdir()
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, outer / "src", 1)
+        shutil.rmtree(outer / ".git")
+        self.assertSameAsFresh(attributor, outer / "src", 2)
+
+    def test_symlink_retargeted_during_a_run(self):
+        one, two = self.base / "one", self.base / "two"
+        self.repo(one, "outer")
+        self.repo(two, "inner")
+        link = self.base / "link"
+        try:
+            link.symlink_to(one, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks unavailable")
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, link, 1)
+        link.unlink()
+        link.symlink_to(two, target_is_directory=True)
+        self.assertSameAsFresh(attributor, link, 2)
+        self.assertEqual(attributor.origin(str(link / "c2"))[0], normalize_origin_for_test(self.URLS["inner"]))
+
+    @unittest.skipIf(os.name == "nt", "backslash is a path separator on Windows")
+    def test_backslash_in_a_posix_repository_name(self):
+        outer = self.base / "back" + chr(92) + "slash"
+        self.repo(outer, "outer")
+        (outer / "src").mkdir()
+        attributor = Attributor([])
+        attributor.repository_path(str(outer / "src" / "a.txt"))
+        attributor.repository_path(str(outer / "a.txt"))
+        root = attributor.origin(str(outer))
+        self.assertEqual(root[0], normalize_origin_for_test(self.URLS["outer"]))
+        self.assertEqual(attributor.origin(str(outer / "src")), root)
+        self.assertEqual(attributor.origin_queries[normalize_path(str(outer / "src"))], "checkout")
+
+
+def normalize_origin_for_test(url):
+    from sumbi.core.paths import normalize_origin
+    return normalize_origin(url)
 
 
 class PathEvidenceTests(unittest.TestCase):

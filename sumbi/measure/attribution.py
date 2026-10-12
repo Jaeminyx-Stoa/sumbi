@@ -29,7 +29,8 @@ class Attributor:
         self.rules = rules
         self.cache: dict[str, tuple[str | None, str]] = {}
         self.roots: dict[str, str] = {}
-        # One `git rev-parse --show-toplevel` per directory, keyed as git receives it.
+        # Definitive `git rev-parse --show-toplevel` answers per real directory:
+        # (git's own toplevel string or None, as git printed it). See _toplevel.
         self.toplevels: dict[str, str | None] = {}
         # Local query health is separate from the stable attribution labels.
         self.origin_queries: dict[str, str] = {}
@@ -47,25 +48,70 @@ class Attributor:
                 path = path.parent
             directory = path if path.is_dir() else path.parent
             if directory.is_dir():
-                root = self._toplevel(str(directory)) or root
+                top = self._toplevel(str(directory))
+                if top:
+                    root = normalize_path(top)
         self.roots[normalized] = root
         return root
 
     def _toplevel(self, directory: str) -> str | None:
-        """Ask git once per directory: files in one directory share its answer."""
-        if directory in self.toplevels:
-            return self.toplevels[directory]
-        toplevel = None
+        """Repository root for a directory, as git printed it (not normalized).
+
+        An answer is reused only while the filesystem proves it still holds: no
+        `.git` entry between the directory and the root, and one at the root (or,
+        for "not a repository", none on the whole chain). A timeout, an OS error
+        or any other failure is never cached, so the next lookup asks git again.
+        """
+        key = self._real(directory)
+        if key is not None and key in self.toplevels:
+            known = self.toplevels[key]
+            if self._unchanged(key, known):
+                return known
+            del self.toplevels[key]
+        top, definitive = None, False
         try:
             result = subprocess.run(["git", "-C", directory, "rev-parse", "--show-toplevel"],
                 capture_output=True, text=True, timeout=5,
-                env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+                env={**os.environ, "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C"})
             if result.returncode == 0 and result.stdout.strip():
-                toplevel = normalize_path(result.stdout.strip())
+                top, definitive = result.stdout.strip(), True
+            elif result.returncode == 128 and result.stderr.strip() == self.NOT_A_REPOSITORY:
+                definitive = True
         except (OSError, subprocess.TimeoutExpired, UnicodeError):
             pass
-        self.toplevels[directory] = toplevel
-        return toplevel
+        if definitive and key is not None:
+            self.toplevels[key] = top
+        return top
+
+    NOT_A_REPOSITORY = "fatal: not a git repository (or any of the parent directories): .git"
+
+    @staticmethod
+    def _real(directory: str) -> str | None:
+        try:
+            return os.path.realpath(directory)
+        except (OSError, ValueError):
+            return None
+
+    @staticmethod
+    def _unchanged(real: str, top: str | None) -> bool:
+        """Cheap filesystem proof that git would still give the cached answer."""
+        wanted = normalize_path(top) if top else None
+        current = real
+        while True:
+            if wanted is not None and normalize_path(current) == wanted:
+                return os.path.lexists(os.path.join(current, ".git"))
+            if os.path.lexists(os.path.join(current, ".git")):
+                return False
+            parent = os.path.dirname(current)
+            if parent == current:
+                return wanted is None
+            current = parent
+
+    def _known_toplevel(self, directory: str) -> str | None:
+        """A cached, still proven repository root; never starts a process."""
+        key = self._real(directory)
+        top = self.toplevels.get(key) if key is not None else None
+        return top if top and self._unchanged(key, top) else None
 
     def event_link(self, path: str) -> dict:
         root = self.repository_path(path)
@@ -89,9 +135,10 @@ class Attributor:
         try:
             if not normalized.startswith("//") and (os.name == "nt"
                 or not ntpath.splitdrive(cwd)[0]) and Path(cwd).is_dir():
-                toplevel = self.toplevels.get(str(Path(cwd)))
+                toplevel = self._known_toplevel(cwd)
                 if toplevel is not None and normalize_path(toplevel) != normalized:
-                    # A known work-tree subdirectory reads its repository's config.
+                    # A proven work-tree subdirectory reads its repository's config.
+                    # The root goes to git as printed, not as normalized for keys.
                     shared = self.origin(toplevel)
                     self.cache[normalized] = shared
                     self.origin_queries[normalized] = self.origin_queries[
