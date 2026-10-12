@@ -229,7 +229,7 @@ def _detail(name, group):
         if row["sessions"]:
             lines.append(_role_line(f"{name} {role_name}", row))
             lines.append("  Models: " + "; ".join(
-                "+".join(m["models"]) + f" sessions {m['sessions']} token share "
+                ("+".join(m["models"]) or "none") + f" sessions {m['sessions']} token share "
                 + _show(m["token_share"]) for m in row["models"][:5]))
             lines.append(_latency_line(role_name, row))
     lines.append(_fan_line(name, group["fan_out"]))
