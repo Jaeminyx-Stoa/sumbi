@@ -43,6 +43,12 @@ Until the owner publishes the repository, installation requires repository
 access. Package-index installation is a separate release step; this quickstart
 uses the source repository.
 
+Install into a dedicated virtual environment (or with `pipx`) rather than the
+user site. A user-site copy can shadow the code of a sumbi checkout you are
+developing whenever you run Python outside the checkout root. On Windows,
+application-control policies may block the console launcher that pip
+generates; `python -m sumbi` from the same environment runs the same CLI.
+
 In the repository you want to seed:
 
 ```sh
