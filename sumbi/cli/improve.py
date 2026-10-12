@@ -52,10 +52,12 @@ def configure_parser(parser):
         help="Collect report for the window after the change")
     external.add_argument("--signals", type=Path, metavar="FILE",
         help="External JSONL with ts and event labels; counts only")
+    external.add_argument("--project-key", metavar="KEY",
+        help="Read role metrics for this collect profile project key instead of all sessions")
 
 
 REGISTER_OPTIONS = ("applied_at", "change", "predict", "revert_if", "before_days", "after_days")
-CHECK_OPTIONS = ("before", "after", "signals")
+CHECK_OPTIONS = ("before", "after", "signals", "project_key")
 
 
 def _public(args, summary=None, kind="observations"):
@@ -144,7 +146,8 @@ def _check(args):
     if args.before is None or args.after is None:
         raise InstallError("Check requires --before and --after collect reports.")
     _check_destination(args)
-    summary = check_external(args.root, args.check, args.before, args.after, args.signals)
+    summary = check_external(args.root, args.check, args.before, args.after, args.signals,
+        args.project_key)
     _write_json(args, summary)
     print(json.dumps(summary, sort_keys=True))
     if not args.json:

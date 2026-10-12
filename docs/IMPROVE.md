@@ -20,7 +20,7 @@ sumbi improve --evidence collect.json --json-out out/observations.json
 sumbi improve --root . --register-external ID --applied-at UTC --change LABEL \
   --predict METRIC:DIRECTION:PERCENT --revert-if METRIC:DIRECTION:PERCENT \
   --before-days N --after-days N
-sumbi improve --root . --check ID --before before.json --after after.json [--signals FILE]
+sumbi improve --root . --check ID --before before.json --after after.json [--signals FILE] [--project-key KEY]
 ```
 
 With evidence alone, output is finite numeric observations: sessions, tool/API
@@ -108,6 +108,23 @@ Evidence references must match numeric values at supported pointers exactly:
 `/summary/time/active_seconds/value`, `/summary/time/wall_span_seconds/value`,
 and `/coverage/unattributed_share`. Hypothesis and rationale are local reviewed
 text, not conclusions computed from those counts.
+
+Collect's [usage profile](MEASUREMENT.md#usage-profile) can also be cited, under
+the same exact-number rule, so a bundle can point at one project's workers
+rather than home-wide totals. A profile pointer is
+`/profile/<scope>/roles/<role>/<leaf>` or `/profile/<scope>/fan_out/<leaf>`, where
+`<scope>` is `summary`, `by_agent/<agent>`, `projects/<ref>` or
+`projects/<ref>/agents/<agent>`, `<role>` is `orchestrator` or `worker`, and
+`<ref>` is the report's project key (or `other`/`unassigned`). Leaves are the
+profile's numeric fields: `sessions`, `sessions_per_day`, `tokens/<kind>`,
+`tokens_per_day/<kind>`, `session_total_tokens_median`, `counts/<kind>`,
+`tool_calls_per_day`, `tool_error_rate`, `compactions_per_day`,
+`cache_read_per_tool_call`, `active_seconds`, `active_seconds_per_day`,
+`tool_seconds_per_paired_call`, `compaction/<field>`, `long_tail/<field>`,
+`concentration/<field>` and `tool_latency/<class>/<field>`, plus fan-out
+`parents`, `children`, `children_max` and `children_median`. Model rows are
+lists and cannot be cited. A null value cannot be cited. A bundle cites at most
+32 pointers.
 
 IDs and family labels use `[a-z][a-z0-9-]{0,63}`. Prediction metrics are
 `tokens_per_success`, `time_per_success` or `success_rate`, with direction
@@ -264,7 +281,24 @@ naming these metrics are shown side by side, with `crossed` for a revert
 criterion whose observed change reaches its threshold in its direction.
 `tokens-per-success`, `time-per-success` and `success-rate` are
 `not-available` with reason `no-success-denominator`: collect has no success
-outcome. Other labels are `not-available` with reason `not-in-collect`. The
+outcome.
+
+Role metrics come from the collect [usage profile](MEASUREMENT.md#usage-profile)
+as reported, already per day or a share, not divided again. For each role
+(`orchestrator`, `worker`): `<role>-sessions-per-day`, `<role>-tokens-per-day`,
+`<role>-tool-calls-per-day`, `<role>-tool-error-rate`,
+`<role>-compactions-per-day`, `<role>-active-seconds-per-day`,
+`<role>-median-session-tokens`, `<role>-tool-seconds-per-paired-call`,
+`<role>-long-tail-share` (token share of sessions over the long-session
+threshold), `<role>-compacted-session-share`, `<role>-top-decile-share`, and
+`<role>-<class>-tool-median-seconds` for each tool class; plus
+`children-per-parent-max` and `children-per-parent-median`. They read
+`/profile/summary` by default. `--project-key KEY` reads
+`/profile/projects/KEY` instead, so a check can follow one repository's workers;
+`role_metrics_scope` in the output names the scope. A metric missing from a
+report (an absent project, a role with no sessions) is `not-reported`. Compare
+reports collected with the same `--long-session-minutes`. Other labels are
+`not-available` with reason `not-in-collect`. The
 verdict is always `observation-not-causal`; work volume, model mix and other
 changes in the same windows are not removed, and `crossed` is a prompt for the
 owner's review, not an automatic revert. Registrations are read only from
