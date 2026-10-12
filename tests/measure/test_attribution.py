@@ -483,11 +483,11 @@ class RepositoryRootChangeTests(unittest.TestCase):
         attributor = Attributor([])
         attributor.repository_path(str(outer / "src" / "a.txt"))
         attributor.repository_path(str(outer / "a.txt"))
-        root = attributor.origin(str(outer))
-        self.assertEqual(root[0], normalize_origin_for_test(self.URLS["outer"]))
-        self.assertEqual(attributor.origin(str(outer / "src")), root)
+        # The subdirectory is asked first, so its answer cannot come from a root query.
+        sub = attributor.origin(str(outer / "src"))
+        self.assertEqual(sub[0], normalize_origin_for_test(self.URLS["outer"]))
         self.assertEqual(attributor.origin_queries[normalize_path(str(outer / "src"))], "checkout")
-
+        self.assertEqual(attributor.origin(str(outer)), sub)
 
 def normalize_origin_for_test(url):
     from sumbi.core.paths import normalize_origin
