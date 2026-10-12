@@ -203,6 +203,67 @@ class WindowSkipTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             latest_time(path, ("timestamp",))
 
+    def escaped(self, record, name, spelled):
+        """Serialize `record` with the key `name` spelled as `spelled` (raw JSON escapes)."""
+        line = json.dumps(record)
+        self.assertEqual(line.count(json.dumps(name) + ":"), 1)
+        line = line.replace(json.dumps(name) + ":", '"' + spelled + '":')
+        self.assertEqual(json.loads(line), record)
+        return line
+
+    def write_lines(self, relative, lines, mtime):
+        path = self.home / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+        self.files[path] = mtime
+
+    def test_codex_escaped_completion_name_keeps_the_file(self):
+        start_ms = timestamp("2020-01-01T23:59:00Z").timestamp() * 1000
+        end_ms = timestamp("2020-01-02T00:01:30Z").timestamp() * 1000
+        record = self.completion("2020-01-01T10:00:00Z", type="item_completed",
+            started_at_ms=start_ms, completed_at_ms=end_ms, item={"type": "CommandExecution",
+                "id": "call-1", "command": ["true"], "cwd": str(self.cwd), "exit_code": 0})
+        self.write_lines(".codex/sessions/g/rollout-a.jsonl", [
+            json.dumps(self.meta("thread-a", "2020-01-01T09:00:00Z")),
+            self.escaped(record, "completed_at_ms", "completed_at_m\\u0073"),
+            json.dumps(self.token("2020-01-01T10:00:01Z", 5, 0, 1))], STALE)
+        skipping, reference = self.compare()
+        self.assertEqual(self.adapters(skipping)["codex"]["files_skipped"], 0)
+        self.assertEqual(reference["summary"]["sessions"], 1)
+        self.assertEqual(reference["summary"]["time"]["durations"]["tool"]["seconds"], 90.0)
+
+    def test_claude_escaped_timestamp_name_keeps_the_file(self):
+        self.write_lines(".claude/projects/g/main-a.jsonl", [
+            json.dumps(self.claude("2020-01-01T10:00:00Z", "a0")),
+            self.escaped(self.claude("2020-01-02T01:00:00Z", "a1"), "timestamp",
+                "timestam\\u0070")], STALE)
+        skipping, reference = self.compare()
+        self.assertEqual(self.adapters(skipping)["claude-code"]["files_skipped"], 0)
+        self.assertEqual(reference["summary"]["sessions"], 1)
+
+    def test_escapes_outside_time_names_still_skip(self):
+        record = self.claude("2020-01-01T10:00:00Z", "o1", "old")
+        record["message"]["content"] = [{"type": "text", "text": "\u001b[0m 안 \\u0074"}]
+        record["note"] = 1
+        self.write_lines(".claude/projects/g/old.jsonl",
+            [self.escaped(record, "note", "not\\u0065")], STALE)
+        self.assertIn("\\u001b", (self.home / ".claude/projects/g/old.jsonl").read_text("utf-8"))
+        skipping, _ = self.compare()
+        self.assertEqual(self.adapters(skipping)["claude-code"]["files_skipped"], 1)
+
+    def test_latest_time_refuses_escaped_time_names(self):
+        path = self.home / "scan.jsonl"
+        for spelled, fields in (("timestam\\u0070", ("timestamp",)),
+            ("\\u0073tarted_at", ("started_at",)), ("completed_at\\u005fms", ("completed_at",))):
+            with self.subTest(name=spelled):
+                path.write_text('{"payload": {"' + spelled + '": 1}}\n', encoding="utf-8")
+                with self.assertRaises(ValueError):
+                    latest_time(path, fields)
+        path.write_text('{"timestamp": "2020-01-01T00:00:01Z", "time\\u0073": 1, '
+            '"x": "\\"timestam\\u0070\\": 2"}\n', encoding="utf-8")
+        self.assertEqual(latest_time(path, ("timestamp", "started_at", "completed_at")),
+            timestamp("2020-01-01T00:00:01Z"))
+
     def test_minimum_date_window_collects_like_main(self):
         window = Window(timestamp("0001-01-01T00:00:00Z"), timestamp("0001-01-02T00:00:00Z"))
         self.assertEqual(self.compare(window)[0]["summary"]["sessions"], 0)

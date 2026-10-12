@@ -55,20 +55,24 @@ execution and request endpoints, which can lie after the record's own
 timestamp or stand in a record without one). The scan matches those names at
 any depth, so nested or unrelated fields can only keep a file in; values decode
 exactly as the translator decodes them, and a value it cannot decode, an
-unreadable file or a file without any time keeps the file in. A field name
-spelled with JSON escape sequences is not matched; the native writers do not
-emit them. Neither the
+unreadable file or a file without any time keeps the file in. Valid JSON may
+spell a key with `\u` escapes (`timestamp`), which the literal match cannot
+see, so on any line containing `\u` each escaped key is decoded, and one that
+decodes to any of those names keeps the file in. Neither the
 modification time nor the scan ever supplies an event time, identity or window
 membership; those still come from the records the translator folds. The scan
 costs a byte search per line and full JSON decoding only of the matched
-values. A skipped file's first record (Codex: up to its first session header)
+values and of escaped keys. A skipped file's first record (Codex: up to its first session header)
 is read to learn which session identities it holds. The file
 is read in full after all when it shares a session identity with any read file
 or holds the parent of a read session, repeating until no read session's
 identity or parent remains in a skipped file. Each reported session, and every
 parent used by delegation, is therefore folded from all of its files in the
 original order, so sessions, summaries, spend, delegation and hook denials are
-the same as without skipping. Skipping is off when `since` lies in the future
+the same as without skipping over the same log contents. (Two runs compare only
+over a frozen copy of the logs: a session still being appended to gains times
+after `until`, which lengthens its clipped wall span to the window end in either
+mode.) Skipping is off when `since` lies in the future
 (every file would pass the prefilter) and for `sumbi-events` logs.
 
 Claude sources are the JSONL files directly inside each project directory and
