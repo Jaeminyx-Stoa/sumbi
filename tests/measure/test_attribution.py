@@ -477,7 +477,7 @@ class RepositoryRootChangeTests(unittest.TestCase):
 
     @unittest.skipIf(os.name == "nt", "backslash is a path separator on Windows")
     def test_backslash_in_a_posix_repository_name(self):
-        outer = self.base / "back" + chr(92) + "slash"
+        outer = self.base / ("back" + chr(92) + "slash")
         self.repo(outer, "outer")
         (outer / "src").mkdir()
         attributor = Attributor([])
