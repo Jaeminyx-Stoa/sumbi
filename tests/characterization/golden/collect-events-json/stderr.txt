@@ -26,6 +26,26 @@ Spend unassigned: 0 tokens (observed); share 0.000000
 Unassigned token share: 0.000000
 Evidence token shares: cwd 1.000000; tool_path 0.000000; previous_event 0.000000; unassigned 0.000000
 Unattributed token share: 0.000000
+Profile window 2 days; long sessions over 60 active minutes; roles by parent or worker header (open events: explicit role)
+Profile all orchestrator: sessions 2 (1/day); tokens 80 (40/day); tool calls 0; error rate unobserved; compactions 0; active seconds/day 2; long sessions 0 (token share 0); top decile share 0.5
+  Models: none sessions 2 token share 1
+  Tool latency orchestrator (median/p90 seconds): none
+Profile all worker: sessions 2 (1/day); tokens 260 (130/day); tool calls 2; error rate 0; compactions 0; active seconds/day 6; long sessions 0 (token share 0); top decile share 0.5
+  Models: model_99051c601e033380bf6cd425 sessions 2 token share 1
+  Tool latency worker (median/p90 seconds): none
+Profile all fan-out: parents 2; children 2; per parent max 1; median 1
+Profile sumbi-events:agent_9e260e54ae0e8fd149c80532 worker: sessions 2 (1/day); tokens 260 (130/day); tool calls 2; error rate 0; compactions 0; active seconds/day 6; long sessions 0 (token share 0); top decile share 0.5
+  Models: model_99051c601e033380bf6cd425 sessions 2 token share 1
+  Tool latency worker (median/p90 seconds): none
+Profile sumbi-events:agent_9e260e54ae0e8fd149c80532 fan-out: parents 2; children 2; per parent max 1; median 1
+Profile sumbi-events:agent_dafcddd422574acb5f48fb2b orchestrator: sessions 2 (1/day); tokens 80 (40/day); tool calls 0; error rate unobserved; compactions 0; active seconds/day 2; long sessions 0 (token share 0); top decile share 0.5
+  Models: none sessions 2 token share 1
+  Tool latency orchestrator (median/p90 seconds): none
+Profile sumbi-events:agent_dafcddd422574acb5f48fb2b fan-out: parents 0; children 0; per parent max unobserved; median unobserved
+Profile project project_e3db46d1b932ef2c778ba7cc orchestrator: sessions 2 (1/day); tokens 80 (40/day); tool calls 0; error rate unobserved; compactions 0; active seconds/day 2; long sessions 0 (token share 0); top decile share 0.5
+Profile project project_e3db46d1b932ef2c778ba7cc worker: sessions 2 (1/day); tokens 260 (130/day); tool calls 2; error rate 0; compactions 0; active seconds/day 6; long sessions 0 (token share 0); top decile share 0.5
+Profile project project_e3db46d1b932ef2c778ba7cc fan-out: parents 2; children 2; per parent max 1; median 1
+Project profile tokens are that project's allocated tokens; counts, time and tool latency are whole-session values and repeat across projects.
 Delegation all (observed): dispatched 2; dispatching parents 2; parent unobserved 0
   Nesting depth: 1 2
   dispatched: new_input 200; cache_write 0; cache_read 40; output 20; total 260
@@ -139,17 +159,12 @@ Hook denials sumbi-events:agent_dafcddd422574acb5f48fb2b (observed): sessions 0;
   Top reason IDs: none
   First-call denials: sessions 0; denied sessions 0; share unobserved
   Recovery: recovered 0; unrecovered 0
-Hook denials project project_e3db46d1b932ef2c778ba7cc sumbi-events:agent_9e260e54ae0e8fd149c80532 (observed): sessions 0; denials 0; timeouts 0
-  Per 100 tool calls: denials 0; timeouts 0; inner_denials_in_exec 0
-  Denials by class: command_form 0; path_scope 0; size_limit 0; tool_not_allowed 0; wait_timeout 0; other 0
-  Top reason IDs: none
-  First-call denials: sessions 0; denied sessions 0; share unobserved
-  Recovery: recovered 0; unrecovered 0
-Hook denials project project_e3db46d1b932ef2c778ba7cc sumbi-events:agent_dafcddd422574acb5f48fb2b (observed): sessions 0; denials 0; timeouts 0
-  Per 100 tool calls: denials unobserved; timeouts unobserved; inner_denials_in_exec 0
-  Denials by class: command_form 0; path_scope 0; size_limit 0; tool_not_allowed 0; wait_timeout 0; other 0
-  Top reason IDs: none
-  First-call denials: sessions 0; denied sessions 0; share unobserved
-  Recovery: recovered 0; unrecovered 0
+Hook denials: 2 project/agent rows: no hook denials
 Hook reason IDs: supplied key (HMAC-SHA256).
 Hook classes are a heuristic; other hook events are invisible. Reason text stays local and is never emitted.
+Key summary: window 2030-01-01T00:00:00Z to 2030-01-03T00:00:00Z (2 days); sessions 4; reported tokens 340
+  orchestrator: sessions 2; tokens/day 40; long sessions 0/2 (token share 0); top decile share 0.5
+  worker: sessions 2; tokens/day 130; long sessions 0/2 (token share 0); top decile share 0.5
+  Fan-out: parents 2; children per parent max 1; median 1
+  Tool latency orchestrator (median/p90 seconds): none
+  Tool latency worker (median/p90 seconds): none

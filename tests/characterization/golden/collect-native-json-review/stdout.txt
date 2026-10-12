@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.5",
+  "schema_version": "1.6",
   "pseudonyms": {
     "salted": true,
     "algorithm": "hmac-sha256"
@@ -1471,5 +1471,1341 @@
         "unrecovered": 0
       }
     ]
+  },
+  "profile": {
+    "measurement": "observed",
+    "window_days": 0.006944444444444444,
+    "long_session_minutes": 60.0,
+    "role_rule": "parent_or_worker_header; sumbi-events explicit role",
+    "summary": {
+      "roles": {
+        "orchestrator": {
+          "sessions": 2,
+          "sessions_per_day": 288.0,
+          "tokens": {
+            "new_input": 78,
+            "cache_write": 25,
+            "cache_read": 102,
+            "output": 52,
+            "reasoning_output": 12,
+            "total": 257
+          },
+          "tokens_per_day": {
+            "new_input": 11232.0,
+            "cache_write": 3600.0,
+            "cache_read": 14688.0,
+            "output": 7488.0,
+            "reasoning_output": 1728.0,
+            "total": 37008.0
+          },
+          "session_total_tokens_median": 128.5,
+          "counts": {
+            "tool_calls": 6,
+            "tool_results": 6,
+            "tool_errors": 3,
+            "compactions": 2
+          },
+          "tool_calls_per_day": 864.0,
+          "tool_error_rate": 0.5,
+          "compactions_per_day": 288.0,
+          "cache_read_per_tool_call": 17.0,
+          "active_seconds": 1200.0,
+          "active_seconds_per_day": 172800.0,
+          "tool_seconds_per_paired_call": 80.0,
+          "compaction": {
+            "sessions": 2,
+            "total_tokens": 257,
+            "token_share": 1.0
+          },
+          "long_tail": {
+            "sessions": 0,
+            "total_tokens": 0,
+            "token_share": 0.0
+          },
+          "concentration": {
+            "top_decile_sessions": 1,
+            "top_decile_total_tokens": 168,
+            "top_decile_share": 0.6536964980544747
+          },
+          "models": [
+            {
+              "models": [
+                "model-a",
+                "model-b"
+              ],
+              "sessions": 2,
+              "total_tokens": 257,
+              "token_share": 1.0
+            }
+          ],
+          "tool_latency": {
+            "read": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "edit": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "search": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "shell": {
+              "paired_calls": 2,
+              "median_seconds": 60.0,
+              "p90_seconds": 60.0
+            },
+            "agent": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "web": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "mcp": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "other": {
+              "paired_calls": 4,
+              "median_seconds": 90.0,
+              "p90_seconds": 180.0
+            },
+            "unnamed": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            }
+          }
+        },
+        "worker": {
+          "sessions": 1,
+          "sessions_per_day": 144.0,
+          "tokens": {
+            "new_input": 1,
+            "cache_write": 0,
+            "cache_read": 2,
+            "output": 3,
+            "reasoning_output": null,
+            "total": 6
+          },
+          "tokens_per_day": {
+            "new_input": 144.0,
+            "cache_write": 0.0,
+            "cache_read": 288.0,
+            "output": 432.0,
+            "reasoning_output": null,
+            "total": 864.0
+          },
+          "session_total_tokens_median": 6,
+          "counts": {
+            "tool_calls": 0,
+            "tool_results": 0,
+            "tool_errors": 0,
+            "compactions": 0
+          },
+          "tool_calls_per_day": 0.0,
+          "tool_error_rate": null,
+          "compactions_per_day": 0.0,
+          "cache_read_per_tool_call": null,
+          "active_seconds": 0,
+          "active_seconds_per_day": 0.0,
+          "tool_seconds_per_paired_call": null,
+          "compaction": {
+            "sessions": 0,
+            "total_tokens": 0,
+            "token_share": 0.0
+          },
+          "long_tail": {
+            "sessions": 0,
+            "total_tokens": 0,
+            "token_share": 0.0
+          },
+          "concentration": {
+            "top_decile_sessions": 1,
+            "top_decile_total_tokens": 6,
+            "top_decile_share": 1.0
+          },
+          "models": [
+            {
+              "models": [
+                "model-a"
+              ],
+              "sessions": 1,
+              "total_tokens": 6,
+              "token_share": 1.0
+            }
+          ],
+          "tool_latency": {
+            "read": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "edit": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "search": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "shell": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "agent": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "web": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "mcp": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "other": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            },
+            "unnamed": {
+              "paired_calls": 0,
+              "median_seconds": null,
+              "p90_seconds": null
+            }
+          }
+        }
+      },
+      "fan_out": {
+        "parents": 1,
+        "children": 1,
+        "children_max": 1,
+        "children_median": 1
+      }
+    },
+    "by_agent": {
+      "claude-code": {
+        "roles": {
+          "orchestrator": {
+            "sessions": 1,
+            "sessions_per_day": 144.0,
+            "tokens": {
+              "new_input": 13,
+              "cache_write": 25,
+              "cache_read": 37,
+              "output": 14,
+              "reasoning_output": null,
+              "total": 89
+            },
+            "tokens_per_day": {
+              "new_input": 1872.0,
+              "cache_write": 3600.0,
+              "cache_read": 5328.0,
+              "output": 2016.0,
+              "reasoning_output": null,
+              "total": 12816.0
+            },
+            "session_total_tokens_median": 89,
+            "counts": {
+              "tool_calls": 3,
+              "tool_results": 3,
+              "tool_errors": 2,
+              "compactions": 1
+            },
+            "tool_calls_per_day": 432.0,
+            "tool_error_rate": 0.6666666666666666,
+            "compactions_per_day": 144.0,
+            "cache_read_per_tool_call": 12.333333333333334,
+            "active_seconds": 600.0,
+            "active_seconds_per_day": 86400.0,
+            "tool_seconds_per_paired_call": 100.0,
+            "compaction": {
+              "sessions": 1,
+              "total_tokens": 89,
+              "token_share": 1.0
+            },
+            "long_tail": {
+              "sessions": 0,
+              "total_tokens": 0,
+              "token_share": 0.0
+            },
+            "concentration": {
+              "top_decile_sessions": 1,
+              "top_decile_total_tokens": 89,
+              "top_decile_share": 1.0
+            },
+            "models": [
+              {
+                "models": [
+                  "model-a",
+                  "model-b"
+                ],
+                "sessions": 1,
+                "total_tokens": 89,
+                "token_share": 1.0
+              }
+            ],
+            "tool_latency": {
+              "read": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "edit": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "search": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "shell": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "agent": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "web": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "mcp": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "other": {
+                "paired_calls": 3,
+                "median_seconds": 120.0,
+                "p90_seconds": 180.0
+              },
+              "unnamed": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              }
+            }
+          },
+          "worker": {
+            "sessions": 1,
+            "sessions_per_day": 144.0,
+            "tokens": {
+              "new_input": 1,
+              "cache_write": 0,
+              "cache_read": 2,
+              "output": 3,
+              "reasoning_output": null,
+              "total": 6
+            },
+            "tokens_per_day": {
+              "new_input": 144.0,
+              "cache_write": 0.0,
+              "cache_read": 288.0,
+              "output": 432.0,
+              "reasoning_output": null,
+              "total": 864.0
+            },
+            "session_total_tokens_median": 6,
+            "counts": {
+              "tool_calls": 0,
+              "tool_results": 0,
+              "tool_errors": 0,
+              "compactions": 0
+            },
+            "tool_calls_per_day": 0.0,
+            "tool_error_rate": null,
+            "compactions_per_day": 0.0,
+            "cache_read_per_tool_call": null,
+            "active_seconds": 0,
+            "active_seconds_per_day": 0.0,
+            "tool_seconds_per_paired_call": null,
+            "compaction": {
+              "sessions": 0,
+              "total_tokens": 0,
+              "token_share": 0.0
+            },
+            "long_tail": {
+              "sessions": 0,
+              "total_tokens": 0,
+              "token_share": 0.0
+            },
+            "concentration": {
+              "top_decile_sessions": 1,
+              "top_decile_total_tokens": 6,
+              "top_decile_share": 1.0
+            },
+            "models": [
+              {
+                "models": [
+                  "model-a"
+                ],
+                "sessions": 1,
+                "total_tokens": 6,
+                "token_share": 1.0
+              }
+            ],
+            "tool_latency": {
+              "read": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "edit": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "search": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "shell": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "agent": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "web": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "mcp": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "other": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "unnamed": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              }
+            }
+          }
+        },
+        "fan_out": {
+          "parents": 1,
+          "children": 1,
+          "children_max": 1,
+          "children_median": 1
+        }
+      },
+      "codex": {
+        "roles": {
+          "orchestrator": {
+            "sessions": 1,
+            "sessions_per_day": 144.0,
+            "tokens": {
+              "new_input": 65,
+              "cache_write": null,
+              "cache_read": 65,
+              "output": 38,
+              "reasoning_output": 12,
+              "total": 168
+            },
+            "tokens_per_day": {
+              "new_input": 9360.0,
+              "cache_write": null,
+              "cache_read": 9360.0,
+              "output": 5472.0,
+              "reasoning_output": 1728.0,
+              "total": 24192.0
+            },
+            "session_total_tokens_median": 168,
+            "counts": {
+              "tool_calls": 3,
+              "tool_results": 3,
+              "tool_errors": 1,
+              "compactions": 1
+            },
+            "tool_calls_per_day": 432.0,
+            "tool_error_rate": 0.3333333333333333,
+            "compactions_per_day": 144.0,
+            "cache_read_per_tool_call": 21.666666666666668,
+            "active_seconds": 600.0,
+            "active_seconds_per_day": 86400.0,
+            "tool_seconds_per_paired_call": 60.0,
+            "compaction": {
+              "sessions": 1,
+              "total_tokens": 168,
+              "token_share": 1.0
+            },
+            "long_tail": {
+              "sessions": 0,
+              "total_tokens": 0,
+              "token_share": 0.0
+            },
+            "concentration": {
+              "top_decile_sessions": 1,
+              "top_decile_total_tokens": 168,
+              "top_decile_share": 1.0
+            },
+            "models": [
+              {
+                "models": [
+                  "model-a",
+                  "model-b"
+                ],
+                "sessions": 1,
+                "total_tokens": 168,
+                "token_share": 1.0
+              }
+            ],
+            "tool_latency": {
+              "read": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "edit": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "search": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "shell": {
+                "paired_calls": 2,
+                "median_seconds": 60.0,
+                "p90_seconds": 60.0
+              },
+              "agent": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "web": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "mcp": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "other": {
+                "paired_calls": 1,
+                "median_seconds": 60.0,
+                "p90_seconds": 60.0
+              },
+              "unnamed": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              }
+            }
+          },
+          "worker": {
+            "sessions": 0,
+            "sessions_per_day": 0.0,
+            "tokens": {
+              "new_input": null,
+              "cache_write": null,
+              "cache_read": null,
+              "output": null,
+              "reasoning_output": null,
+              "total": 0
+            },
+            "tokens_per_day": {
+              "new_input": null,
+              "cache_write": null,
+              "cache_read": null,
+              "output": null,
+              "reasoning_output": null,
+              "total": 0.0
+            },
+            "session_total_tokens_median": null,
+            "counts": {
+              "tool_calls": 0,
+              "tool_results": 0,
+              "tool_errors": 0,
+              "compactions": 0
+            },
+            "tool_calls_per_day": 0.0,
+            "tool_error_rate": null,
+            "compactions_per_day": 0.0,
+            "cache_read_per_tool_call": null,
+            "active_seconds": 0,
+            "active_seconds_per_day": 0.0,
+            "tool_seconds_per_paired_call": null,
+            "compaction": {
+              "sessions": 0,
+              "total_tokens": 0,
+              "token_share": null
+            },
+            "long_tail": {
+              "sessions": 0,
+              "total_tokens": 0,
+              "token_share": null
+            },
+            "concentration": {
+              "top_decile_sessions": 0,
+              "top_decile_total_tokens": 0,
+              "top_decile_share": null
+            },
+            "models": [],
+            "tool_latency": {
+              "read": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "edit": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "search": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "shell": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "agent": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "web": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "mcp": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "other": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "unnamed": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              }
+            }
+          }
+        },
+        "fan_out": {
+          "parents": 0,
+          "children": 0,
+          "children_max": null,
+          "children_median": null
+        }
+      }
+    },
+    "projects": {
+      "project_e3db46d1b932ef2c778ba7cc": {
+        "bucket": "project",
+        "rules": [
+          "sample"
+        ],
+        "roles": {
+          "orchestrator": {
+            "sessions": 2,
+            "sessions_per_day": 288.0,
+            "tokens": {
+              "new_input": 78,
+              "cache_write": 25,
+              "cache_read": 102,
+              "output": 52,
+              "reasoning_output": 12,
+              "total": 257
+            },
+            "tokens_per_day": {
+              "new_input": 11232.0,
+              "cache_write": 3600.0,
+              "cache_read": 14688.0,
+              "output": 7488.0,
+              "reasoning_output": 1728.0,
+              "total": 37008.0
+            },
+            "session_total_tokens_median": 128.5,
+            "counts": {
+              "tool_calls": 6,
+              "tool_results": 6,
+              "tool_errors": 3,
+              "compactions": 2
+            },
+            "tool_calls_per_day": 864.0,
+            "tool_error_rate": 0.5,
+            "compactions_per_day": 288.0,
+            "cache_read_per_tool_call": 17.0,
+            "active_seconds": 1200.0,
+            "active_seconds_per_day": 172800.0,
+            "tool_seconds_per_paired_call": 80.0,
+            "compaction": {
+              "sessions": 2,
+              "total_tokens": 257,
+              "token_share": 1.0
+            },
+            "long_tail": {
+              "sessions": 0,
+              "total_tokens": 0,
+              "token_share": 0.0
+            },
+            "concentration": {
+              "top_decile_sessions": 1,
+              "top_decile_total_tokens": 168,
+              "top_decile_share": 0.6536964980544747
+            },
+            "models": [
+              {
+                "models": [
+                  "model-a",
+                  "model-b"
+                ],
+                "sessions": 2,
+                "total_tokens": 257,
+                "token_share": 1.0
+              }
+            ],
+            "tool_latency": {
+              "read": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "edit": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "search": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "shell": {
+                "paired_calls": 2,
+                "median_seconds": 60.0,
+                "p90_seconds": 60.0
+              },
+              "agent": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "web": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "mcp": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "other": {
+                "paired_calls": 4,
+                "median_seconds": 90.0,
+                "p90_seconds": 180.0
+              },
+              "unnamed": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              }
+            }
+          },
+          "worker": {
+            "sessions": 1,
+            "sessions_per_day": 144.0,
+            "tokens": {
+              "new_input": 1,
+              "cache_write": 0,
+              "cache_read": 2,
+              "output": 3,
+              "reasoning_output": null,
+              "total": 6
+            },
+            "tokens_per_day": {
+              "new_input": 144.0,
+              "cache_write": 0.0,
+              "cache_read": 288.0,
+              "output": 432.0,
+              "reasoning_output": null,
+              "total": 864.0
+            },
+            "session_total_tokens_median": 6,
+            "counts": {
+              "tool_calls": 0,
+              "tool_results": 0,
+              "tool_errors": 0,
+              "compactions": 0
+            },
+            "tool_calls_per_day": 0.0,
+            "tool_error_rate": null,
+            "compactions_per_day": 0.0,
+            "cache_read_per_tool_call": null,
+            "active_seconds": 0,
+            "active_seconds_per_day": 0.0,
+            "tool_seconds_per_paired_call": null,
+            "compaction": {
+              "sessions": 0,
+              "total_tokens": 0,
+              "token_share": 0.0
+            },
+            "long_tail": {
+              "sessions": 0,
+              "total_tokens": 0,
+              "token_share": 0.0
+            },
+            "concentration": {
+              "top_decile_sessions": 1,
+              "top_decile_total_tokens": 6,
+              "top_decile_share": 1.0
+            },
+            "models": [
+              {
+                "models": [
+                  "model-a"
+                ],
+                "sessions": 1,
+                "total_tokens": 6,
+                "token_share": 1.0
+              }
+            ],
+            "tool_latency": {
+              "read": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "edit": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "search": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "shell": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "agent": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "web": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "mcp": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "other": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              },
+              "unnamed": {
+                "paired_calls": 0,
+                "median_seconds": null,
+                "p90_seconds": null
+              }
+            }
+          }
+        },
+        "fan_out": {
+          "parents": 1,
+          "children": 1,
+          "children_max": 1,
+          "children_median": 1
+        },
+        "agents": {
+          "claude-code": {
+            "roles": {
+              "orchestrator": {
+                "sessions": 1,
+                "sessions_per_day": 144.0,
+                "tokens": {
+                  "new_input": 13,
+                  "cache_write": 25,
+                  "cache_read": 37,
+                  "output": 14,
+                  "reasoning_output": null,
+                  "total": 89
+                },
+                "tokens_per_day": {
+                  "new_input": 1872.0,
+                  "cache_write": 3600.0,
+                  "cache_read": 5328.0,
+                  "output": 2016.0,
+                  "reasoning_output": null,
+                  "total": 12816.0
+                },
+                "session_total_tokens_median": 89,
+                "counts": {
+                  "tool_calls": 3,
+                  "tool_results": 3,
+                  "tool_errors": 2,
+                  "compactions": 1
+                },
+                "tool_calls_per_day": 432.0,
+                "tool_error_rate": 0.6666666666666666,
+                "compactions_per_day": 144.0,
+                "cache_read_per_tool_call": 12.333333333333334,
+                "active_seconds": 600.0,
+                "active_seconds_per_day": 86400.0,
+                "tool_seconds_per_paired_call": 100.0,
+                "compaction": {
+                  "sessions": 1,
+                  "total_tokens": 89,
+                  "token_share": 1.0
+                },
+                "long_tail": {
+                  "sessions": 0,
+                  "total_tokens": 0,
+                  "token_share": 0.0
+                },
+                "concentration": {
+                  "top_decile_sessions": 1,
+                  "top_decile_total_tokens": 89,
+                  "top_decile_share": 1.0
+                },
+                "models": [
+                  {
+                    "models": [
+                      "model-a",
+                      "model-b"
+                    ],
+                    "sessions": 1,
+                    "total_tokens": 89,
+                    "token_share": 1.0
+                  }
+                ],
+                "tool_latency": {
+                  "read": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "edit": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "search": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "shell": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "agent": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "web": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "mcp": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "other": {
+                    "paired_calls": 3,
+                    "median_seconds": 120.0,
+                    "p90_seconds": 180.0
+                  },
+                  "unnamed": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  }
+                }
+              },
+              "worker": {
+                "sessions": 1,
+                "sessions_per_day": 144.0,
+                "tokens": {
+                  "new_input": 1,
+                  "cache_write": 0,
+                  "cache_read": 2,
+                  "output": 3,
+                  "reasoning_output": null,
+                  "total": 6
+                },
+                "tokens_per_day": {
+                  "new_input": 144.0,
+                  "cache_write": 0.0,
+                  "cache_read": 288.0,
+                  "output": 432.0,
+                  "reasoning_output": null,
+                  "total": 864.0
+                },
+                "session_total_tokens_median": 6,
+                "counts": {
+                  "tool_calls": 0,
+                  "tool_results": 0,
+                  "tool_errors": 0,
+                  "compactions": 0
+                },
+                "tool_calls_per_day": 0.0,
+                "tool_error_rate": null,
+                "compactions_per_day": 0.0,
+                "cache_read_per_tool_call": null,
+                "active_seconds": 0,
+                "active_seconds_per_day": 0.0,
+                "tool_seconds_per_paired_call": null,
+                "compaction": {
+                  "sessions": 0,
+                  "total_tokens": 0,
+                  "token_share": 0.0
+                },
+                "long_tail": {
+                  "sessions": 0,
+                  "total_tokens": 0,
+                  "token_share": 0.0
+                },
+                "concentration": {
+                  "top_decile_sessions": 1,
+                  "top_decile_total_tokens": 6,
+                  "top_decile_share": 1.0
+                },
+                "models": [
+                  {
+                    "models": [
+                      "model-a"
+                    ],
+                    "sessions": 1,
+                    "total_tokens": 6,
+                    "token_share": 1.0
+                  }
+                ],
+                "tool_latency": {
+                  "read": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "edit": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "search": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "shell": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "agent": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "web": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "mcp": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "other": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "unnamed": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  }
+                }
+              }
+            },
+            "fan_out": {
+              "parents": 1,
+              "children": 1,
+              "children_max": 1,
+              "children_median": 1
+            }
+          },
+          "codex": {
+            "roles": {
+              "orchestrator": {
+                "sessions": 1,
+                "sessions_per_day": 144.0,
+                "tokens": {
+                  "new_input": 65,
+                  "cache_write": null,
+                  "cache_read": 65,
+                  "output": 38,
+                  "reasoning_output": 12,
+                  "total": 168
+                },
+                "tokens_per_day": {
+                  "new_input": 9360.0,
+                  "cache_write": null,
+                  "cache_read": 9360.0,
+                  "output": 5472.0,
+                  "reasoning_output": 1728.0,
+                  "total": 24192.0
+                },
+                "session_total_tokens_median": 168,
+                "counts": {
+                  "tool_calls": 3,
+                  "tool_results": 3,
+                  "tool_errors": 1,
+                  "compactions": 1
+                },
+                "tool_calls_per_day": 432.0,
+                "tool_error_rate": 0.3333333333333333,
+                "compactions_per_day": 144.0,
+                "cache_read_per_tool_call": 21.666666666666668,
+                "active_seconds": 600.0,
+                "active_seconds_per_day": 86400.0,
+                "tool_seconds_per_paired_call": 60.0,
+                "compaction": {
+                  "sessions": 1,
+                  "total_tokens": 168,
+                  "token_share": 1.0
+                },
+                "long_tail": {
+                  "sessions": 0,
+                  "total_tokens": 0,
+                  "token_share": 0.0
+                },
+                "concentration": {
+                  "top_decile_sessions": 1,
+                  "top_decile_total_tokens": 168,
+                  "top_decile_share": 1.0
+                },
+                "models": [
+                  {
+                    "models": [
+                      "model-a",
+                      "model-b"
+                    ],
+                    "sessions": 1,
+                    "total_tokens": 168,
+                    "token_share": 1.0
+                  }
+                ],
+                "tool_latency": {
+                  "read": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "edit": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "search": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "shell": {
+                    "paired_calls": 2,
+                    "median_seconds": 60.0,
+                    "p90_seconds": 60.0
+                  },
+                  "agent": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "web": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "mcp": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "other": {
+                    "paired_calls": 1,
+                    "median_seconds": 60.0,
+                    "p90_seconds": 60.0
+                  },
+                  "unnamed": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  }
+                }
+              },
+              "worker": {
+                "sessions": 0,
+                "sessions_per_day": 0.0,
+                "tokens": {
+                  "new_input": null,
+                  "cache_write": null,
+                  "cache_read": null,
+                  "output": null,
+                  "reasoning_output": null,
+                  "total": 0
+                },
+                "tokens_per_day": {
+                  "new_input": null,
+                  "cache_write": null,
+                  "cache_read": null,
+                  "output": null,
+                  "reasoning_output": null,
+                  "total": 0.0
+                },
+                "session_total_tokens_median": null,
+                "counts": {
+                  "tool_calls": 0,
+                  "tool_results": 0,
+                  "tool_errors": 0,
+                  "compactions": 0
+                },
+                "tool_calls_per_day": 0.0,
+                "tool_error_rate": null,
+                "compactions_per_day": 0.0,
+                "cache_read_per_tool_call": null,
+                "active_seconds": 0,
+                "active_seconds_per_day": 0.0,
+                "tool_seconds_per_paired_call": null,
+                "compaction": {
+                  "sessions": 0,
+                  "total_tokens": 0,
+                  "token_share": null
+                },
+                "long_tail": {
+                  "sessions": 0,
+                  "total_tokens": 0,
+                  "token_share": null
+                },
+                "concentration": {
+                  "top_decile_sessions": 0,
+                  "top_decile_total_tokens": 0,
+                  "top_decile_share": null
+                },
+                "models": [],
+                "tool_latency": {
+                  "read": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "edit": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "search": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "shell": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "agent": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "web": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "mcp": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "other": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  },
+                  "unnamed": {
+                    "paired_calls": 0,
+                    "median_seconds": null,
+                    "p90_seconds": null
+                  }
+                }
+              }
+            },
+            "fan_out": {
+              "parents": 0,
+              "children": 0,
+              "children_max": null,
+              "children_median": null
+            }
+          }
+        }
+      }
+    }
   }
 }
