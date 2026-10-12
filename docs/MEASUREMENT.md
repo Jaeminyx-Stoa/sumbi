@@ -41,8 +41,39 @@ All event windows are `[since, until)`. Bounds must be UTC ISO timestamps with
 `Z` or `+00:00`. The collectors scan whole files, including pre-window events for
 baselines and post-window events for completed pairs and message deduplication.
 Broken JSON, invalid UTF-8 and non-object lines increase coverage counters and
-do not stop subsequent records from being read. There is no modification-time
-filter, line cap or model-search cap.
+do not stop subsequent records from being read. There is no line cap or
+model-search cap.
+
+`sumbi collect` (and the install baseline) may skip a Claude or Codex file whose
+modification time precedes `since` and in which every time the translator could
+read also precedes `since`. The modification time is only a cheap prefilter:
+some writers leave it at the file's creation time while they keep appending.
+The deciding evidence is a raw scan of the whole file for every field the
+translator turns into a time: record `timestamp` values for both adapters, plus
+Codex `started_at`, `completed_at`, `started_at_ms` and `completed_at_ms` (tool,
+execution and request endpoints, which can lie after the record's own
+timestamp or stand in a record without one). The scan matches those names at
+any depth, so nested or unrelated fields can only keep a file in; values decode
+exactly as the translator decodes them, and a value it cannot decode, an
+unreadable file or a file without any time keeps the file in. Valid JSON may
+spell a key with `\u` escapes (`timestamp`), which the literal match cannot
+see, so on any line containing `\u` each escaped key is decoded, and one that
+decodes to any of those names keeps the file in. Neither the
+modification time nor the scan ever supplies an event time, identity or window
+membership; those still come from the records the translator folds. The scan
+costs a byte search per line and full JSON decoding only of the matched
+values and of escaped keys. A skipped file's first record (Codex: up to its first session header)
+is read to learn which session identities it holds. The file
+is read in full after all when it shares a session identity with any read file
+or holds the parent of a read session, repeating until no read session's
+identity or parent remains in a skipped file. Each reported session, and every
+parent used by delegation, is therefore folded from all of its files in the
+original order, so sessions, summaries, spend, delegation and hook denials are
+the same as without skipping over the same log contents. (Two runs compare only
+over a frozen copy of the logs: a session still being appended to gains times
+after `until`, which lengthens its clipped wall span to the window end in either
+mode.) Skipping is off when `since` lies in the future
+(every file would pass the prefilter) and for `sumbi-events` logs.
 
 Claude sources are the JSONL files directly inside each project directory and
 all JSONL files below its subagent directories, including nested histories.
@@ -126,6 +157,17 @@ interval overlapping it. Sessions without usage are retained for coverage.
 Parallel session and operation durations are summed separately; none of these
 totals represent the time a person waited. Tool and request durations can overlap
 and must not be added to each other or to active time.
+
+Collect schema **1.5** adds `time.events` to each session row: the first and last
+recorded session event inside the window (`first_at`, `last_at`), floored to the
+UTC minute (`resolution: minute_floor`) and written as `YYYY-MM-DDTHH:MM:00Z`.
+Both are null when the session entered the window only through an overlapping
+interval. Because flooring preserves comparisons with minute-aligned bounds, one
+report can be re-split at any whole minute M within its window: a session has an
+in-window event before M exactly when `first_at < M`, and one at or after M exactly
+when `last_at >= M`. Token, count and time totals remain whole-window values; a
+session crossing M is not divided. Schema 1.5 also adds adapter coverage
+`files_skipped` (see below). All other fields keep their meanings.
 
 ## Delegation
 
@@ -562,11 +604,15 @@ free-text label shapes are fingerprinted. Labels and rule names should themselve
 be chosen for public use. Unknown record types are counted by bounded type label;
 the report does not claim to understand their content.
 
-Coverage includes files scanned, lines read, broken lines, exact duplicates,
-unknown types, unreadable files, invalid timestamps, invalid token records,
-inherited session metadata, sessions read, sessions in the window and reported
-spend shares. These are collection diagnostics, not an outcome or completeness
-verdict. The deliverable ledger and comparison command remain out of M1a scope.
+Coverage includes files scanned, files skipped, lines read, broken lines, exact
+duplicates, unknown types, unreadable files, invalid timestamps, invalid token
+records, inherited session metadata, sessions read, sessions in the window and
+reported spend shares. These are collection diagnostics, not an outcome or
+completeness verdict. `files_scanned` counts files read in full and
+`files_skipped` counts pre-window files left unread, so together they are all
+discovered files. Line, duplicate, unknown-type and other per-record counters
+and `sessions_read` describe only the files read in full; they can be smaller
+than a run over the same home that skips nothing. The deliverable ledger and comparison command remain out of M1a scope.
 
 ## Install baselines
 

@@ -93,7 +93,11 @@ Refactoring must pass the existing corpus without regenerating it.
 For a new agent adapter, add a translator under `events/adapters/`, register it
 and its log root in `events/registry.py`, and test frozen observations plus the
 shared session fold. Accounting and outcome decisions belong in the builder
-and outcome layers, rather than the translator.
+and outcome layers, rather than the translator. A per-file adapter can also
+expose `sources(home)`, `read(home, path, coverage)`, a `latest(home, path)`
+time scan and a cheap `session_keys(home, path)` probe; `builder.collect_window`
+then leaves pre-window files unread unless a read session needs them (see
+[MEASUREMENT](MEASUREMENT.md#windows-tokens-and-repeated-records)).
 
 For a new outcome source, implement `OutcomeSource` under `outcomes/` and return
 fixed `Unit` records with explicit completeness and ordering. Add its comparison

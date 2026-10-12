@@ -27,6 +27,14 @@ class Coverage:
             for name, value in vars(self).items()}
 
 
+def _decode(raw: bytes):
+    try:
+        event = json.loads(raw.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return event if isinstance(event, dict) else None
+
+
 def records(path: Path, coverage: Coverage, *, ignore_blank: bool = False):
     """Continue after broken JSON, invalid UTF-8 and non-object records."""
     coverage.files_scanned += 1
@@ -36,13 +44,23 @@ def records(path: Path, coverage: Coverage, *, ignore_blank: bool = False):
                 coverage.lines_read += 1
                 if ignore_blank and not raw.strip():
                     continue
-                try:
-                    event = json.loads(raw.decode("utf-8"))
-                    if not isinstance(event, dict):
-                        raise ValueError("Expected object")
-                except (ValueError, UnicodeDecodeError):
+                event = _decode(raw)
+                if event is None:
                     coverage.broken_lines += 1
                     continue
                 yield event
     except OSError:
         coverage.unreadable_files += 1
+
+
+def first_records(path: Path):
+    """Yield the same objects as `records`, lazily and without coverage counts.
+
+    Identity probes stop early; an OSError propagates so the caller can fall back
+    to a full, counted read of that file.
+    """
+    with path.open("rb") as stream:
+        for raw in stream:
+            event = _decode(raw)
+            if event is not None:
+                yield event

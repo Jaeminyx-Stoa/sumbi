@@ -15,9 +15,9 @@ Active sensitivity (estimated seconds): 2 minutes 1200; 5 minutes 1200; 10 minut
 Paired tool durations (observed): 480 seconds; pairs 6; unpaired starts 0; unpaired ends 0
 Paired request durations (observed): 120 seconds; pairs 1; unpaired starts 0; unpaired ends 0
 Parallel session times are summed; they are not human waiting time.
-Coverage claude-code: files_scanned 2; lines_read 18; broken_lines 1; duplicate_events 1; unreadable_files 0; invalid_timestamps 0; invalid_token_records 0; inherited_session_meta 0; sessions_read 2; sessions_in_window 2
+Coverage claude-code: files_scanned 2; lines_read 18; broken_lines 1; duplicate_events 1; unreadable_files 0; invalid_timestamps 0; invalid_token_records 0; inherited_session_meta 0; files_skipped 0; sessions_read 2; sessions_in_window 2
   Unknown record types: fixture_record 1
-Coverage codex: files_scanned 2; lines_read 25; broken_lines 0; duplicate_events 3; unreadable_files 0; invalid_timestamps 0; invalid_token_records 0; inherited_session_meta 0; sessions_read 1; sessions_in_window 1
+Coverage codex: files_scanned 2; lines_read 25; broken_lines 0; duplicate_events 3; unreadable_files 0; invalid_timestamps 0; invalid_token_records 0; inherited_session_meta 0; files_skipped 0; sessions_read 1; sessions_in_window 1
   Unknown record types: fixture_record 1
 Spend other: 0 tokens (observed); share 0.000000
   Evidence events: cwd 0; tool_path 0; previous_event 0; unassigned 0; fallback token share 0.000000

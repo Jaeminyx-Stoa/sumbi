@@ -3,7 +3,7 @@ Named rules retain snapshot, cumulative usage, execution pairing, context, and d
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Iterable
 
 from sumbi.core.paths import execution_cwd
@@ -591,3 +591,69 @@ def collect(adapter, home, window, coverage, *, local_review=False, collect_link
     return build(adapter.collect(home, coverage), window, coverage,
         local_review=local_review, collect_links=collect_links, worker_links=worker_links,
         reason_salt=reason_salt)
+
+
+def collect_window(adapter, home, window, coverage, *, local_review=False, reason_salt=None):
+    """Like `collect`, but skip files that cannot change any session it returns.
+
+    A file is pre-window when its modification time precedes `since` (a cheap
+    prefilter only) and every time its translator could read from it, found by
+    the adapter's `latest` scan, precedes `since` as well. It is read only when it
+    shares a session identity with a read file or holds a read session's parent.
+    Every returned session is therefore folded from all of its files in the
+    original order. Returns (sessions, files_skipped).
+    """
+    # Every file predates a future window, so the prefilter cannot help there.
+    if not hasattr(adapter, "session_keys") or window.since > datetime.now(timezone.utc):
+        return collect(adapter, home, window, coverage, local_review=local_review,
+            reason_salt=reason_salt), 0
+    paths = adapter.sources(home)
+    probes, by_key, needed = {}, {}, set()
+    for path in paths:
+        try:
+            # Some writers leave modification times at creation: the scan decides.
+            stale = path.stat().st_mtime < window.since.timestamp() and (
+                (latest := adapter.latest(home, path)) is not None and latest < window.since)
+            probes[path] = adapter.session_keys(home, path)
+        except (OSError, ValueError):
+            # Unreadable or undecodable time evidence: read the file in full.
+            stale = False
+        if not stale:
+            needed.add(path)
+        for raw_id in probes.get(path, ((), ()))[0]:
+            by_key.setdefault(raw_id, []).append(path)
+    wanted = set()
+    for path in needed:
+        wanted.update(*probes.get(path, ((), ())))
+    while True:
+        _close(needed, wanted, probes, by_key)
+        measured = Coverage()
+        stream = (record for path in paths if path in needed
+            for record in adapter.read(home, path, measured))
+        sessions = build(stream, window, measured, local_review=local_review,
+            reason_salt=reason_salt)
+        # Parents are verified on folded sessions; a probe sees only the first header.
+        found = {s.raw_id for s in sessions} | {s.parent_raw_id for s in sessions
+            if s.parent_raw_id}
+        if not any(p not in needed for key in found for p in by_key.get(key, ())):
+            break
+        wanted |= found
+    for name, value in vars(measured).items():
+        if isinstance(value, int):
+            setattr(coverage, name, getattr(coverage, name) + value)
+        else:
+            getattr(coverage, name).update(value)
+    return sessions, len(paths) - len(needed)
+
+
+def _close(needed, wanted, probes, by_key):
+    """Add files holding wanted identities until their own identities add nothing."""
+    pending = list(wanted)
+    while pending:
+        for path in by_key.get(pending.pop(), ()):
+            if path not in needed:
+                needed.add(path)
+                for raw_id in (key for group in probes[path] for key in group):
+                    if raw_id not in wanted:
+                        wanted.add(raw_id)
+                        pending.append(raw_id)

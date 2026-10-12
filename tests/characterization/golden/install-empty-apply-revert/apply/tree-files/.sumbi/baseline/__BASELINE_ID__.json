@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.4",
+  "schema_version": "1.5",
   "pseudonyms": {
     "salted": true,
     "algorithm": "hmac-sha256"
@@ -218,6 +218,7 @@
         "invalid_token_records": 0,
         "inherited_session_meta": 0,
         "unknown_record_types": {},
+        "files_skipped": 0,
         "sessions_read": 0,
         "sessions_in_window": 0,
         "sessions_selected": 0
@@ -232,6 +233,7 @@
         "invalid_token_records": 0,
         "inherited_session_meta": 0,
         "unknown_record_types": {},
+        "files_skipped": 0,
         "sessions_read": 0,
         "sessions_in_window": 0,
         "sessions_selected": 0
