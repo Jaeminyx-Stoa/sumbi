@@ -10,7 +10,7 @@ import unittest
 import urllib.error
 from unittest.mock import Mock, patch
 
-from support import IsolatedTemporaryDirectory, isolate_github_destinations
+from support import IsolatedTemporaryDirectory, github_sleep, isolate_github_destinations
 from worker_github_fixtures import (REPO, at, codex_worker, claude_worker, execution, pull,
     push_output, recording, repository, save, stream)
 from sumbi.core.records import Coverage
@@ -772,7 +772,7 @@ class WorkerGitHubTests(unittest.TestCase):
                         io.BytesIO(b'{"message":"Not accessible"}'))
                 with patch("sumbi.outcomes.github.live.github_token", return_value="synthetic-token"), \
                     patch("urllib.request.OpenerDirector.open", side_effect=response), \
-                    patch("sumbi.outcomes.github.live.time.sleep") as sleep:
+                    github_sleep() as sleep:
                     report = deliver_workers(self.home, self.window, [], provider,
                         repo_owners=["example"], salt=b"synthetic-key")
                 sleep.assert_not_called()

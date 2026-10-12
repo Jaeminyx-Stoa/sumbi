@@ -7,6 +7,14 @@ synthetic inputs and recorded GitHub responses; they never need network access.
 python -m unittest discover -s tests
 ```
 
+One module or test can also be run by dotted name from the repo root, with no
+extra environment (`tests/__init__.py` puts `tests/` on `sys.path` so the shared
+`support` and `worker_github_fixtures` helpers resolve):
+
+```sh
+python -m unittest tests.outcomes.test_worker_github
+```
+
 ## Layout
 
 Tests mirror the package layers in `core/`, `events/`, `sessions/`, `measure/`,
