@@ -1,4 +1,4 @@
-﻿"""Test package marker.
+"""Test package marker.
 
 Test modules import shared helpers (``support``, ``worker_github_fixtures``) as
 top-level modules, which is how ``unittest discover -s tests`` sees them. When a
