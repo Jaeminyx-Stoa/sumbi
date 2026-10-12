@@ -169,6 +169,86 @@ when `last_at >= M`. Token, count and time totals remain whole-window values; a
 session crossing M is not divided. Schema 1.5 also adds adapter coverage
 `files_skipped` (see below). All other fields keep their meanings.
 
+## Usage profile
+
+Collect schema **1.6** adds `profile` and its text lines. All other fields keep
+their meanings. The section answers the usual before/after questions per role
+without a hand-written script: sessions, tokens, tools, compaction, active time,
+the long tail, concentration, fan-out, model mix and tool latency.
+
+**Groups.** `summary` covers every session row, `by_agent` each agent label, and
+`projects` each project reference, with `agents` inside each project. A
+project reference is the pseudonymous `project_key` for project buckets and the
+bucket name (`other`, `unassigned`) otherwise; `rules` lists matching rule labels.
+Membership follows the billable-event allocations used by spend, delegation
+and hook denials: a session enters every project it has events in, or its
+session project candidate when it has none. **Project tokens are that project's
+allocated tokens**, while counts, active time, tool durations and latency are the
+session's whole in-window values, so they repeat across projects and project rows
+are not additive partitions. Summary and agent groups use whole-session tokens.
+
+**Roles.** A native Claude Code or Codex session is a `worker` when it has a
+parent session or a worker session header (the rule install placement already
+uses); otherwise it is an `orchestrator`. An open-event (`sumbi-events`) session
+keeps its explicit `role`, even with a parent ID. Each group has
+`roles.orchestrator` and `roles.worker`.
+
+**Per role.** `sessions`, the reported token kinds and `total` (`tokens`), the
+median session total, the tool call, result, error and compaction counts, active
+seconds and summed paired tool seconds come from the session rows above.
+`*_per_day` values divide by the window length in days (`window_days`), so
+unequal windows stay comparable. `tool_error_rate` is errors per tool result,
+null without results; `cache_read_per_tool_call` divides reported cache reads by
+tool calls; `tool_seconds_per_paired_call` divides summed paired tool seconds by
+paired intervals. `compaction` gives the number and token share of sessions with
+at least one compaction.
+`long_tail` counts sessions whose estimated active time is strictly above
+`long_session_minutes` (default 60; `sumbi collect --long-session-minutes N`
+changes it) and their token sum and share. `concentration` ranks sessions by
+tokens and takes `ceil(n / 10)` of them (the delegation rule), with their token
+share. `models` lists each distinct observed model label set with its session
+count and token share, largest first; a session with no observed model has an
+empty set. Shares are null when the role spent no tokens.
+
+**Fan-out.** For each group, sessions with a parent ID are grouped by that
+parent: `parents` (distinct parent IDs, observed or not), `children`,
+`children_max` and `children_median` (null without children).
+
+**Tool latency.** Per role and fixed class, `paired_calls` counts named tool
+calls started in the window whose result is paired by call ID (the pairing hook
+denials already use); `median_seconds` is the ordinary median and `p90_seconds`
+the nearest-rank 90th percentile of call start to result. Calls without a result
+are excluded. Its purpose is the before/after comparison: harness devices such as
+hooks can turn a light tool from a fraction of a second into seconds, which totals
+hide. Tool names never leave memory; only these classes are reported:
+
+| Class | Built-in names (case-insensitive, namespace prefix removed) |
+| --- | --- |
+| `read` | read, read_file, view_image, ls, list_dir, notebookread |
+| `edit` | write, edit, multiedit, notebookedit, write_file, apply_patch, filechange |
+| `search` | glob, grep, grep_files, toolsearch |
+| `shell` | bash, bashoutput, killshell, killbash, powershell, shell, exec, exec_command, commandexecution, local_shell_call, write_stdin |
+| `agent` | task, agent, sendmessage, taskoutput, taskstop, spawn_agent, send_input, close_agent, resume_agent, wait_agent |
+| `web` | webfetch, websearch, web_fetch, web_search, web_search_call |
+| `mcp` | any name starting with `mcp__` |
+| `other` | any other name |
+| `unnamed` | a paired call whose input carried no name |
+
+Open-event logs carry no tool names, so their latency classes stay empty.
+
+**Text.** One line per role and group, model and latency lines for the summary
+and each agent, and fan-out lines. Hook-denial project rows with no denials and
+no timeouts fold into one line. The output ends with `Key summary` lines (window,
+sessions, tokens, each role's long tail and decile share, fan-out and tool
+latency) so the tail of the text shows the headline numbers.
+
+**Differences from ad hoc scripts.** A script that selects sessions by the
+session `project` candidate and sums whole-session tokens can differ from the
+allocation-based project rows above, mainly for sessions whose events belong to
+several projects. A decile computed as `max(1, n // 10)` differs from
+`ceil(n / 10)` when `n` is not a multiple of ten. An error rate per tool call
+differs slightly from errors per tool result.
+
 ## Delegation
 
 Collect schema **1.2** adds `delegation` and delegation text lines. Existing collect

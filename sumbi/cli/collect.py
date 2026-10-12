@@ -18,7 +18,8 @@ def run(args, window, agents, rules):
         salt = read_salt(args.salt_file)
         report, review = collect(args.home, window, agents=agents, rules=rules,
             idle_minutes=args.idle_minutes,
-            local_review=bool(args.local_review), salt=salt)
+            local_review=bool(args.local_review), salt=salt,
+            long_session_minutes=args.long_session_minutes)
         data = json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
         if args.json == "-":
             print(data, end="")

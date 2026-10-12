@@ -75,7 +75,9 @@ collect again to tell which one is your repository. Rule semantics are in
 For the full before/after round, see [docs/CYCLE.md](docs/CYCLE.md).
 
 Replace the example UTC bounds with your measurement window. Collection prints
-a summary and writes `out/collect.json`. Install keeps its baseline and backups
+a summary and writes `out/collect.json`; the summary ends with `Key summary`
+lines (sessions, tokens, per-role long tail, fan-out, tool latency by class)
+from the [usage profile](docs/MEASUREMENT.md#usage-profile). Install keeps its baseline and backups
 local through `.sumbi/.gitignore`. The intervention ledger is outside those
 ignores and contains relative target paths; review it before committing or
 sharing it.

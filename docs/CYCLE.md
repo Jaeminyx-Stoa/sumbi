@@ -41,7 +41,12 @@ paths below are synthetic.
      --project sample --match-path '*/sample' --json ../sumbi-out/after.json
    ```
 6. **Compare.** Read the two reports side by side on the same fields (sessions,
-   errors, compactions, tokens by kind, active time). With a declared success
+   errors, compactions, tokens by kind, active time). The
+   [usage profile](MEASUREMENT.md#usage-profile) splits these per project and
+   role (orchestrator or worker) with the long tail, top-decile share, fan-out,
+   model mix and tool latency by class; the closing `Key summary` lines of the
+   text output repeat the headline numbers. An external registration reads the
+   same values with `sumbi improve --check ID --project-key KEY`. With a declared success
    source, run `sumbi compare` using the pre-registration; it proposes a verdict
    and flags confounders. Then pick the next intervention, or revert.
 

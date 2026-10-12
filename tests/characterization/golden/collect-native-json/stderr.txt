@@ -28,6 +28,29 @@ Spend unassigned: 0 tokens (observed); share 0.000000
 Unassigned token share: 0.000000
 Evidence token shares: cwd 1.000000; tool_path 0.000000; previous_event 0.000000; unassigned 0.000000
 Unattributed token share: 0.000000
+Profile window 0.00694444 days; long sessions over 60 active minutes; roles by parent or worker header (open events: explicit role)
+Profile all orchestrator: sessions 2 (288/day); tokens 257 (37008/day); tool calls 6; error rate 0.5; compactions 2; active seconds/day 172800; long sessions 0 (token share 0); top decile share 0.653696
+  Models: model-a+model-b sessions 2 token share 1
+  Tool latency orchestrator (median/p90 seconds): shell 60/60 n 2; other 90/180 n 4
+Profile all worker: sessions 1 (144/day); tokens 6 (864/day); tool calls 0; error rate unobserved; compactions 0; active seconds/day 0; long sessions 0 (token share 0); top decile share 1
+  Models: model-a sessions 1 token share 1
+  Tool latency worker (median/p90 seconds): none
+Profile all fan-out: parents 1; children 1; per parent max 1; median 1
+Profile claude-code orchestrator: sessions 1 (144/day); tokens 89 (12816/day); tool calls 3; error rate 0.666667; compactions 1; active seconds/day 86400; long sessions 0 (token share 0); top decile share 1
+  Models: model-a+model-b sessions 1 token share 1
+  Tool latency orchestrator (median/p90 seconds): other 120/180 n 3
+Profile claude-code worker: sessions 1 (144/day); tokens 6 (864/day); tool calls 0; error rate unobserved; compactions 0; active seconds/day 0; long sessions 0 (token share 0); top decile share 1
+  Models: model-a sessions 1 token share 1
+  Tool latency worker (median/p90 seconds): none
+Profile claude-code fan-out: parents 1; children 1; per parent max 1; median 1
+Profile codex orchestrator: sessions 1 (144/day); tokens 168 (24192/day); tool calls 3; error rate 0.333333; compactions 1; active seconds/day 86400; long sessions 0 (token share 0); top decile share 1
+  Models: model-a+model-b sessions 1 token share 1
+  Tool latency orchestrator (median/p90 seconds): shell 60/60 n 2; other 60/60 n 1
+Profile codex fan-out: parents 0; children 0; per parent max unobserved; median unobserved
+Profile project sample project_e3db46d1b932ef2c778ba7cc orchestrator: sessions 2 (288/day); tokens 257 (37008/day); tool calls 6; error rate 0.5; compactions 2; active seconds/day 172800; long sessions 0 (token share 0); top decile share 0.653696
+Profile project sample project_e3db46d1b932ef2c778ba7cc worker: sessions 1 (144/day); tokens 6 (864/day); tool calls 0; error rate unobserved; compactions 0; active seconds/day 0; long sessions 0 (token share 0); top decile share 1
+Profile project sample project_e3db46d1b932ef2c778ba7cc fan-out: parents 1; children 1; per parent max 1; median 1
+Project profile tokens are that project's allocated tokens; counts, time and tool latency are whole-session values and repeat across projects.
 Delegation all (observed): dispatched 1; dispatching parents 1; parent unobserved 0
   Nesting depth: 1 1
   dispatched: new_input 1; cache_write 0; cache_read 2; output 3; total 6
@@ -141,17 +164,12 @@ Hook denials codex (observed): sessions 0; denials 0; timeouts 0
   Top reason IDs: none
   First-call denials: sessions 0; denied sessions 0; share unobserved
   Recovery: recovered 0; unrecovered 0
-Hook denials project sample project_e3db46d1b932ef2c778ba7cc claude-code (observed): sessions 0; denials 0; timeouts 0
-  Per 100 tool calls: denials 0; timeouts 0; inner_denials_in_exec 0
-  Denials by class: command_form 0; path_scope 0; size_limit 0; tool_not_allowed 0; wait_timeout 0; other 0
-  Top reason IDs: none
-  First-call denials: sessions 0; denied sessions 0; share unobserved
-  Recovery: recovered 0; unrecovered 0
-Hook denials project sample project_e3db46d1b932ef2c778ba7cc codex (observed): sessions 0; denials 0; timeouts 0
-  Per 100 tool calls: denials 0; timeouts 0; inner_denials_in_exec 0
-  Denials by class: command_form 0; path_scope 0; size_limit 0; tool_not_allowed 0; wait_timeout 0; other 0
-  Top reason IDs: none
-  First-call denials: sessions 0; denied sessions 0; share unobserved
-  Recovery: recovered 0; unrecovered 0
+Hook denials: 2 project/agent rows: no hook denials
 Hook reason IDs: supplied key (HMAC-SHA256).
 Hook classes are a heuristic; other hook events are invisible. Reason text stays local and is never emitted.
+Key summary: window 2030-01-01T00:00:00Z to 2030-01-01T00:10:00Z (0.00694444 days); sessions 3; reported tokens 263
+  orchestrator: sessions 2; tokens/day 37008; long sessions 0/2 (token share 0); top decile share 0.653696
+  worker: sessions 1; tokens/day 864; long sessions 0/1 (token share 0); top decile share 1
+  Fan-out: parents 1; children per parent max 1; median 1
+  Tool latency orchestrator (median/p90 seconds): shell 60/60 n 2; other 90/180 n 4
+  Tool latency worker (median/p90 seconds): none
