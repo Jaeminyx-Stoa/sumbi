@@ -639,18 +639,23 @@ same host/repository identity, removing credentials, transport, default ports,
 trailing slashes and `.git`. Hosts are case-insensitive; repository path case is
 preserved. Windows paths normalize separators, dot segments and case; POSIX paths
 preserve case. Origins and paths are cached during a run. A directory's
-repository root is shared between files only while the filesystem proves the
-same answer Git would give each file: the cache is keyed by the resolved real
-directory (a retargeted link is a new key), and a cached root is reused only if
-no `.git` file or directory appears between the directory and that root and the
-root still has one; a cached "not a repository" holds only while no `.git`
-exists on the whole chain. A subdirectory of a proven work tree reuses its
-root's origin query, since both read the same repository configuration, and the
-root is handed to Git exactly as Git printed it. Anything else is asked again:
-a timeout, OS error or unexpected Git failure is never cached, and a changed or
-unverifiable tree is re-queried. Results equal querying every path alone; only
-the number of Git processes changes. The one remaining sharing is the origin
-setting of an unchanged repository, read once per path as before.
+repository root is shared between files only while the filesystem still proves
+the answer Git would give: the cache is keyed by the resolved real directory (a
+retargeted link is a new key); between the directory and the root there must be
+no `.git` entry and no bare-repository marks (HEAD, objects and refs together);
+and the root's `.git` must be the one cached. That identity is the inode and
+config file of a `.git` directory, or for a `.git` file its content plus the
+existence, readability and identity of the gitdir it names. "Not a repository"
+holds only while no repository appears anywhere up the chain, up to a Git
+discovery ceiling. A subdirectory of a proven work tree reuses its root's
+origin query, which is dropped and read again when the root's `.git` identity
+changed, and the root is handed to Git exactly as Git printed it. Anything that
+cannot be proven is asked again; a timeout, OS error or unexpected Git failure
+is never cached. Under the assumption that the repository layout does not
+change between a check and its use, and the same per-path assumption as before
+(a path already asked is not asked again during one run), results equal
+querying every path alone; only the number of Git processes changes. A change
+that lands between a check and its use is not detected.
 
 Origin rules take priority. When any origin rules are configured, a known origin
 that matches none is explicitly `other` and cannot use a path fallback. An

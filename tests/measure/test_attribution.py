@@ -475,6 +475,57 @@ class RepositoryRootChangeTests(unittest.TestCase):
         self.assertSameAsFresh(attributor, link, 2)
         self.assertEqual(attributor.origin(str(link / "c2"))[0], normalize_origin_for_test(self.URLS["inner"]))
 
+    def separate(self, path, name, git_dir):
+        subprocess.run(["git", "init", "-q", "--separate-git-dir", str(git_dir), str(path)],
+                       check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(path), "remote", "add", "origin", self.URLS[name]],
+                       check=True, capture_output=True)
+
+    def test_gitdir_file_whose_target_is_removed(self):
+        root = self.base / "root"
+        root.mkdir()
+        self.separate(root, "outer", self.base / "meta")
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, root, 1)
+        shutil.rmtree(self.base / "meta")  # the .git file stays, its target is gone
+        self.assertSameAsFresh(attributor, root, 2)
+
+    def test_gitdir_file_pointed_at_another_repository(self):
+        root = self.base / "root"
+        root.mkdir()
+        self.separate(root, "outer", self.base / "meta1")
+        other = self.base / "other"
+        other.mkdir()
+        self.separate(other, "inner", self.base / "meta2")
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, root, 1)
+        (root / ".git").unlink()
+        (root / ".git").write_text("gitdir: " + str(self.base / "meta2") + chr(10), encoding="utf-8")
+        self.assertSameAsFresh(attributor, root, 2)
+        self.assertEqual(attributor.origin(str(root / "c2"))[0],
+                         normalize_origin_for_test(self.URLS["inner"]))
+
+    def test_nested_bare_repository_created_during_a_run(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        (outer / "pkg").mkdir()
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, outer / "pkg", 1)
+        subprocess.run(["git", "init", "-q", "--bare", str(outer / "pkg")],
+                       check=True, capture_output=True)
+        self.assertSameAsFresh(attributor, outer / "pkg", 2)
+
+    def test_root_recreated_at_the_same_path_reads_its_new_origin(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, outer, 1)
+        shutil.rmtree(outer / ".git")
+        self.repo(outer, "inner")
+        self.assertSameAsFresh(attributor, outer, 2)
+        self.assertEqual(attributor.origin(str(outer / "c2"))[0],
+                         normalize_origin_for_test(self.URLS["inner"]))
+
     @unittest.skipIf(os.name == "nt", "backslash is a path separator on Windows")
     def test_backslash_in_a_posix_repository_name(self):
         outer = self.base / ("back" + chr(92) + "slash")
