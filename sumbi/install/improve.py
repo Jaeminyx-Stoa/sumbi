@@ -127,6 +127,11 @@ def _lookup(report, pointer):
 def observations(path: Path) -> tuple[bytes, dict]:
     """Project a collect report to finite numeric observations, never causal claims."""
     data, report = _load(Path(path), 16 * MAX_BYTES)
+    return data, project(data, report)
+
+
+def project(data: bytes, report) -> dict:
+    """Validate already-read collect bytes and project them; never re-read the file."""
     try:
         if not isinstance(report, dict) or report.get("schema_version") != SCHEMA_VERSION:
             raise ValueError
@@ -147,7 +152,7 @@ def observations(path: Path) -> tuple[bytes, dict]:
                 raise ValueError
             findings.append({"id": label, "pointer": pointer, "value": value,
                 "kind": "observation"})
-        return data, {"version": 1, "evidence_sha256": digest(data),
+        return {"version": 1, "evidence_sha256": digest(data),
             "findings": findings, "causality": "not-established",
             "outcome_verdict": "not-available-from-collect"}
     except (ValueError, TypeError, KeyError, AttributeError, OverflowError):

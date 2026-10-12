@@ -12,7 +12,7 @@ from sumbi.cli.improve import configure_parser as configure_improve, run as run_
 from sumbi.events.registry import ADAPTERS, log_roots
 
 
-from sumbi.cli.common import configure_collection
+from sumbi.cli.common import configure_collection, inside_log_roots
 from sumbi.cli.collect import run as run_collect
 from sumbi.cli.deliver import run as run_deliver, configure_parser as configure_deliver
 from sumbi.cli.compare import run as run_compare, configure_parser as configure_compare
@@ -75,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
             root.error("--intervention-id requires --interventions")
         if args.interventions is not None and args.interventions.resolve() in resolved:
             root.error("Compare output must not overwrite interventions")
-    if any(p.is_relative_to(source.resolve()) for p in resolved for source in sources):
+    if any(inside_log_roots(p, args.home) for p in resolved):
         root.error("Output destinations must be outside session-log directories")
     if args.command == "compare":
         return run_compare(args, root, window, agents, rules, resolved, sources, registration)

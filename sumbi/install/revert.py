@@ -176,6 +176,13 @@ def _rollback(root: Path, written: list) -> bool:
     return failed
 
 
+def backup_targets(repository: Path | str, backup_id: str) -> list[str]:
+    """Relative paths a revert may restore, from the validated backup manifest."""
+    if not isinstance(backup_id, str) or not BACKUP_ID.fullmatch(backup_id):
+        raise InstallError("Backup ID must be an install timestamp ID.")
+    return [entry["path"] for entry in _manifest(Path(repository).resolve(), backup_id)]
+
+
 def revert_install(repository: Path | str, backup_id: str) -> dict:
     """Restore unchanged files or remove unchanged blocks from edited existing files."""
     if not isinstance(backup_id, str) or not BACKUP_ID.fullmatch(backup_id):
