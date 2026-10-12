@@ -46,6 +46,7 @@ Times normalize to UTC. Measurement windows are `[since, until)`. A session's
 dispatch needs a known timestamp. Unknown edit or command completion timestamps
 remain incomplete evidence rather than disappearing from the outcome ledger.
 File names and file modification times do not establish event identity or time.
+Collect never skips these logs by modification time; it reads every file.
 
 Session IDs are global across files and emitter agents in this home. A parent
 may use a different agent. Emitters must coordinate IDs or provide a distinct

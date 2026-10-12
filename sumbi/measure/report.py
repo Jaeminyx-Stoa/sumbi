@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sumbi.sessions.builder import collect as collect_sessions
+from sumbi.sessions.builder import collect_window
 
 from pathlib import Path
 
@@ -72,11 +72,12 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
     hook_key = reason_key()
     for agent in agents if agents is not None else DEFAULT_AGENTS:
         measured = Coverage()
-        found = collect_sessions(ADAPTERS[agent], home, window, measured,
+        found, skipped = collect_window(ADAPTERS[agent], home, window, measured,
             local_review=local_review, reason_salt=hook_key)
         found_sessions.extend(found)
         included = [s for s in found if s.in_window(window)]
-        coverage[agent] = {**measured.as_dict(), "sessions_read": len(found),
+        coverage[agent] = {**measured.as_dict(), "files_skipped": skipped,
+            "sessions_read": len(found),
             "sessions_in_window": len(included)}
         selected_count = 0
         for session in included:

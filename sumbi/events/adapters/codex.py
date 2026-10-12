@@ -3,7 +3,7 @@
 from pathlib import Path
 import re
 
-from sumbi.core.records import Coverage, records
+from sumbi.core.records import Coverage, first_records, records
 from sumbi.core.values import epoch, integer, mapping, timestamp
 from sumbi.events.edit_targets import file_change_targets, patch_targets
 from sumbi.events.schema import (
@@ -12,7 +12,7 @@ from sumbi.events.schema import (
     Counter, Request, SessionEnd, Resume, LocalText, Diagnostic, SourceIdentity, freeze,
     RequestUsage, CompactionBoundary,
 )
-from .common import key, record_identity
+from .common import key, latest, record_identity
 
 KNOWN = {"session_meta", "turn_context", "event_msg", "response_item", "compacted",
     "token_usage_record", "inter_agent_communication_metadata", "world_state"}
@@ -223,32 +223,66 @@ def _translate(event, payload, when, inherited):
         yield from _response(payload, event)
 
 
+def sources(home: Path) -> list[Path]:
+    """Return rollout files in collection order."""
+    return sorted((home / ".codex/sessions").rglob("rollout-*.jsonl"))
+
+
 def collect(home: Path, coverage: Coverage):
-    for path in sorted((home / ".codex/sessions").rglob("rollout-*.jsonl")):
-        raw_id, meta_seen = None, False
-        for event in records(path, coverage):
-            kind, payload = event.get("type"), mapping(event.get("payload"))
-            inherited = False
-            before = ()
-            if kind == "session_meta" and not meta_seen:
-                raw_id = str(payload.get("id") or payload.get("session_id") or path.stem)
-                meta_seen = True
-            elif kind == "session_meta" and str(payload.get("id")
-                or payload.get("session_id")) != raw_id:
-                inherited = True
-                coverage.inherited_session_meta += 1
-            if kind == "session_meta" and not inherited and payload.get("cli_version"):
-                before = (Metadata(cli_version=freeze(payload["cli_version"]),
-                    supplied=("cli_version",)),)
-            if raw_id is None:
-                raw_id = path.stem
-            when = timestamp(event.get("timestamp"))
-            yield Record("codex", raw_id, when, record_identity(event),
-                tuple(_translate(event, payload, when, inherited)),
-                timestamp_supplied="timestamp" in event, ordinal=integer(event.get("ordinal")),
-                before_dedup=before,
-                usage_record=kind == "event_msg" and payload.get("type") == "token_count"
-                and bool(mapping(payload.get("info"))),
-                fallback_id=str(event["ordinal"]) if "ordinal" in event else None,
-                fallback_source_identity=SourceIdentity(freeze(event["ordinal"]))
-                if "ordinal" in event else None)
+    for path in sources(home):
+        yield from read(home, path, coverage)
+
+
+def _header_id(payload, path):
+    return str(payload.get("id") or payload.get("session_id") or path.stem)
+
+
+def session_keys(home: Path, path: Path):
+    """Return (session IDs, parent IDs) `read` would emit, stopping at the first header.
+
+    Records before the first header belong to the file-stem identity. The parent
+    comes from that header only; the builder verifies parents after folding.
+    Raises OSError when the rollout cannot be probed.
+    """
+    keys = set()
+    for event in first_records(path):
+        payload = mapping(event.get("payload"))
+        if event.get("type") != "session_meta":
+            keys.add(path.stem)
+            continue
+        keys.add(_header_id(payload, path))
+        subagent = mapping(mapping(payload.get("source")).get("subagent"))
+        parent = mapping(subagent.get("thread_spawn")).get("parent_thread_id")
+        return frozenset(keys), frozenset((parent,) if isinstance(parent, str) else ())
+    return frozenset(keys), frozenset()
+
+
+def read(home: Path, path: Path, coverage: Coverage):
+    """Yield one rollout's records under its first header identity."""
+    raw_id, meta_seen = None, False
+    for event in records(path, coverage):
+        kind, payload = event.get("type"), mapping(event.get("payload"))
+        inherited = False
+        before = ()
+        if kind == "session_meta" and not meta_seen:
+            raw_id = _header_id(payload, path)
+            meta_seen = True
+        elif kind == "session_meta" and str(payload.get("id")
+            or payload.get("session_id")) != raw_id:
+            inherited = True
+            coverage.inherited_session_meta += 1
+        if kind == "session_meta" and not inherited and payload.get("cli_version"):
+            before = (Metadata(cli_version=freeze(payload["cli_version"]),
+                supplied=("cli_version",)),)
+        if raw_id is None:
+            raw_id = path.stem
+        when = timestamp(event.get("timestamp"))
+        yield Record("codex", raw_id, when, record_identity(event),
+            tuple(_translate(event, payload, when, inherited)),
+            timestamp_supplied="timestamp" in event, ordinal=integer(event.get("ordinal")),
+            before_dedup=before,
+            usage_record=kind == "event_msg" and payload.get("type") == "token_count"
+            and bool(mapping(payload.get("info"))),
+            fallback_id=str(event["ordinal"]) if "ordinal" in event else None,
+            fallback_source_identity=SourceIdentity(freeze(event["ordinal"]))
+            if "ordinal" in event else None)

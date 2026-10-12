@@ -4,14 +4,14 @@ from pathlib import Path
 import json
 import re
 
-from sumbi.core.records import Coverage, records
+from sumbi.core.records import Coverage, first_records, records
 from sumbi.core.values import integer, mapping, timestamp
 from sumbi.events.schema import (
     Record, SessionStart, Context, Metadata, Tokens, TokenUsage, ToolEvidence,
     ToolInput, ToolOutput, ToolStart, ToolEnd, CommandExecution, FileEdit,
     Counter, Request, LocalText, Diagnostic, SourceIdentity, freeze, ModelRequest,
 )
-from .common import key, record_identity
+from .common import key, latest, record_identity
 
 KNOWN = {"assistant", "user", "system", "progress", "attachment", "summary",
     "file-history-snapshot", "file-history-delta", "queue-operation", "pr-link",
@@ -133,47 +133,70 @@ def _translate(event, when, parent, child, spawn_depth=None):
     yield from _blocks(event, kind, blocks, when)
 
 
-def collect(home: Path, coverage: Coverage):
-    """Yield records in file order, retaining native stream identity hints."""
+def sources(home: Path) -> list[Path]:
+    """Return every Claude stream once, in collection order."""
     root = home / ".claude/projects"
     files = sorted(root.glob("*/*.jsonl")) + sorted(root.glob("*/**/subagents/**/*.jsonl"))
-    for path in dict.fromkeys(files):
-        parts = path.relative_to(root).parts
-        child = "subagents" in parts
-        indices = [i for i, part in enumerate(parts) if part == "subagents"]
-        index = indices[-1] if child else None
-        parent_hint = parts[index - 1] if child else path.stem
-        agent_hint = path.stem.removeprefix("agent-")
-        raw_id = None
-        parent = None
-        status, spawn_depth, parent_agent = _subagent_metadata(path) if child else (
-            "unknown", None, None)
-        for event in records(path, coverage):
-            if raw_id is None:
-                child = child or (path.stem.startswith("agent-")
-                    and event.get("isSidechain") is True)
-                if child and index is None:
-                    status, spawn_depth, parent_agent = _subagent_metadata(path)
-                parent = str(event.get("sessionId") or parent_hint)
-                workflow = child and index is not None and parts[index + 1] == "workflows"
-                if workflow:
-                    parent = parent_hint
-                base = parent
-                if parent_agent is not None:
-                    parent = base + ":subagent:" + parent_agent
-                elif len(indices) > 1 and ":subagent:" not in parent:
-                    for ancestor in indices[:-1]:
-                        parent += ":subagent:" + parts[ancestor + 1].removeprefix("agent-")
-                namespace = base if parent_agent is not None else parent
-                raw_id = namespace + ":subagent:" + str(event.get("agentId")
-                    or agent_hint) if child else parent
-            when = timestamp(event.get("timestamp"))
-            yield Record("claude-code", raw_id, when, record_identity(event),
-                (ModelRequest(status), *tuple(_translate(event, when, parent, child, spawn_depth))),
-                timestamp_supplied="timestamp" in event, fallback_id=key(event.get("uuid") or None),
-                parent_session_id=parent if child else None, worker=child,
-                usage_record=event.get("type") == "assistant"
-                and bool(mapping(mapping(event.get("message")).get("usage"))))
+    return list(dict.fromkeys(files))
+
+
+def collect(home: Path, coverage: Coverage):
+    """Yield records in file order, retaining native stream identity hints."""
+    for path in sources(home):
+        yield from read(home, path, coverage)
+
+
+def _stream(home, path, event):
+    """Fix one stream's identity from its path and first record, as `read` does."""
+    parts = path.relative_to(home / ".claude/projects").parts
+    child = "subagents" in parts
+    indices = [i for i, part in enumerate(parts) if part == "subagents"]
+    index = indices[-1] if child else None
+    parent_hint = parts[index - 1] if child else path.stem
+    status, spawn_depth, parent_agent = _subagent_metadata(path) if child else (
+        "unknown", None, None)
+    child = child or (path.stem.startswith("agent-") and event.get("isSidechain") is True)
+    if child and index is None:
+        status, spawn_depth, parent_agent = _subagent_metadata(path)
+    parent = str(event.get("sessionId") or parent_hint)
+    if child and index is not None and parts[index + 1] == "workflows":
+        parent = parent_hint
+    base = parent
+    if parent_agent is not None:
+        parent = base + ":subagent:" + parent_agent
+    elif len(indices) > 1 and ":subagent:" not in parent:
+        for ancestor in indices[:-1]:
+            parent += ":subagent:" + parts[ancestor + 1].removeprefix("agent-")
+    namespace = base if parent_agent is not None else parent
+    raw_id = namespace + ":subagent:" + str(event.get("agentId")
+        or path.stem.removeprefix("agent-")) if child else parent
+    return raw_id, parent, child, status, spawn_depth
+
+
+def read(home: Path, path: Path, coverage: Coverage):
+    """Yield one stream's records; every record shares the first record's identity."""
+    raw_id = None
+    for event in records(path, coverage):
+        if raw_id is None:
+            raw_id, parent, child, status, spawn_depth = _stream(home, path, event)
+        when = timestamp(event.get("timestamp"))
+        yield Record("claude-code", raw_id, when, record_identity(event),
+            (ModelRequest(status), *tuple(_translate(event, when, parent, child, spawn_depth))),
+            timestamp_supplied="timestamp" in event, fallback_id=key(event.get("uuid") or None),
+            parent_session_id=parent if child else None, worker=child,
+            usage_record=event.get("type") == "assistant"
+            and bool(mapping(mapping(event.get("message")).get("usage"))))
+
+
+def session_keys(home: Path, path: Path):
+    """Return (session IDs, parent IDs) `read` would emit, reading only the first record.
+
+    Raises OSError when the stream cannot be probed; callers then read it in full.
+    """
+    for event in first_records(path):
+        raw_id, parent, child, _, _ = _stream(home, path, event)
+        return frozenset((raw_id,)), frozenset((parent,) if child else ())
+    return frozenset(), frozenset()
 
 
 def _subagent_metadata(path):

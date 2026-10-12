@@ -18,6 +18,11 @@ COUNT_KINDS = ("compactions", "tool_calls", "tool_results", "tool_errors", "api_
     "user_input_requests", "counter_resets")
 
 
+def _minute(when: datetime) -> str:
+    """Floor to the UTC minute; comparisons with minute-aligned bounds stay exact."""
+    return when.replace(second=0, microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 @dataclass
 class CommandExecution:
     """Agent-neutral machine execution evidence. Commands stay local only."""
@@ -283,6 +288,7 @@ class Session:
                     for key, t in self.ends.items())}
         total = sum(self.tokens[k] or 0 for k in TOKEN_KINDS if k != "reasoning_output")
         allocations = self.allocations(window, attributor, idle_minutes)
+        inside = [t for t in times if window.contains(t)]
         result = {"id": self.id(),
             "parent_id": pseudonym("session", self.agent + ":" + self.parent_raw_id)
             if self.parent_raw_id else None, "agent": self.public_agent(),
@@ -297,7 +303,10 @@ class Session:
             "time": {"wall_span": {"measurement": "observed", "seconds": round(span, 6)},
                 "active": {"measurement": "estimated", "idle_minutes": idle_minutes,
                     "seconds": active[format(idle_minutes, "g")],
-                    "sensitivity_seconds": active}, "durations": durations}}
+                    "sensitivity_seconds": active}, "durations": durations,
+                "events": {"measurement": "observed", "resolution": "minute_floor",
+                    "first_at": _minute(inside[0]) if inside else None,
+                    "last_at": _minute(inside[-1]) if inside else None}}}
         if self.agent == "sumbi-events":
             events = [values for at, _, kind, (values, *_) in self.attribution_events
                 if kind == "usage" and window.contains(at)]
