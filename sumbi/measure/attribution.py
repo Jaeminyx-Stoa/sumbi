@@ -29,6 +29,8 @@ class Attributor:
         self.rules = rules
         self.cache: dict[str, tuple[str | None, str]] = {}
         self.roots: dict[str, str] = {}
+        # One `git rev-parse --show-toplevel` per directory, keyed as git receives it.
+        self.toplevels: dict[str, str | None] = {}
         # Local query health is separate from the stable attribution labels.
         self.origin_queries: dict[str, str] = {}
 
@@ -45,17 +47,25 @@ class Attributor:
                 path = path.parent
             directory = path if path.is_dir() else path.parent
             if directory.is_dir():
-                try:
-                    result = subprocess.run(["git", "-C", str(directory), "rev-parse",
-                        "--show-toplevel"],
-                        capture_output=True, text=True, timeout=5,
-                        env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
-                    if result.returncode == 0 and result.stdout.strip():
-                        root = normalize_path(result.stdout.strip())
-                except (OSError, subprocess.TimeoutExpired, UnicodeError):
-                    pass
+                root = self._toplevel(str(directory)) or root
         self.roots[normalized] = root
         return root
+
+    def _toplevel(self, directory: str) -> str | None:
+        """Ask git once per directory: files in one directory share its answer."""
+        if directory in self.toplevels:
+            return self.toplevels[directory]
+        toplevel = None
+        try:
+            result = subprocess.run(["git", "-C", directory, "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True, timeout=5,
+                env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"})
+            if result.returncode == 0 and result.stdout.strip():
+                toplevel = normalize_path(result.stdout.strip())
+        except (OSError, subprocess.TimeoutExpired, UnicodeError):
+            pass
+        self.toplevels[directory] = toplevel
+        return toplevel
 
     def event_link(self, path: str) -> dict:
         root = self.repository_path(path)
@@ -79,6 +89,14 @@ class Attributor:
         try:
             if not normalized.startswith("//") and (os.name == "nt"
                 or not ntpath.splitdrive(cwd)[0]) and Path(cwd).is_dir():
+                toplevel = self.toplevels.get(str(Path(cwd)))
+                if toplevel is not None and normalize_path(toplevel) != normalized:
+                    # A known work-tree subdirectory reads its repository's config.
+                    shared = self.origin(toplevel)
+                    self.cache[normalized] = shared
+                    self.origin_queries[normalized] = self.origin_queries[
+                        normalize_path(toplevel)]
+                    return shared
                 options = dict(
                     capture_output=True, text=True, timeout=5,
                     env={**os.environ, "GIT_OPTIONAL_LOCKS": "0", "LC_ALL": "C"},

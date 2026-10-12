@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from sumbi.events.tool_paths import resolve_path, shell_paths, tool_evidence
 from sumbi.measure.attribution import Attributor, ProjectRule
+from sumbi.core.paths import normalize_path
 from sumbi.core.time import Window
 from sumbi.core.values import timestamp
 from sumbi.measure.report import collect, text_summary
@@ -298,6 +299,79 @@ class EventAttributionTests(unittest.TestCase):
         output = json.dumps(salted) + text_summary(salted)
         for private in (str(self.home), "SYNTHETIC_SECRET", "synthetic-salt", "private.txt", "fixture-session", "cd "):
             self.assertNotIn(private, output)
+
+
+class RepositoryRootCacheTests(unittest.TestCase):
+    """Git is asked once per directory; nested repositories keep their own roots."""
+
+    def setUp(self):
+        temporary = IsolatedTemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name)
+        self.outer, self.inner = self.base / "outer", self.base / "outer" / "inner"
+        self.plain = self.base / "plain"
+        for repo in (self.outer, self.inner):
+            repo.mkdir(parents=True)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
+        (self.outer / "src").mkdir()
+        self.plain.mkdir()
+        for path in (self.outer / "a.txt", self.outer / "b.txt", self.outer / "src" / "c.txt",
+                     self.inner / "d.txt", self.inner / "e.txt", self.plain / "f.txt"):
+            path.write_text("synthetic\n", encoding="utf-8")
+
+    def toplevel_calls(self, attributor, values):
+        with patch("sumbi.measure.attribution.subprocess.run", wraps=subprocess.run) as run:
+            roots = {value: attributor.repository_path(value) for value in values}
+        calls = [c.args[0] for c in run.call_args_list if "--show-toplevel" in c.args[0]]
+        return roots, calls
+
+    def test_files_in_one_directory_share_one_query_and_nested_roots_stay_apart(self):
+        values = [str(self.outer / "a.txt"), str(self.outer / "b.txt"),
+                  str(self.outer / "missing.txt"), str(self.outer / "src" / "c.txt"),
+                  str(self.inner / "d.txt"), str(self.inner / "e.txt"), str(self.inner),
+                  str(self.plain / "f.txt"), str(self.plain)]
+        cached, calls = self.toplevel_calls(Attributor([]), values)
+        # outer, outer/src, inner and plain: one query each, whatever the file count.
+        self.assertEqual(len(calls), 4)
+        outer, inner = (Attributor([]).repository_path(str(p)) for p in (self.outer, self.inner))
+        self.assertNotEqual(outer, inner)
+        self.assertEqual({cached[v] for v in values[:4]}, {outer})
+        self.assertEqual({cached[v] for v in values[4:7]}, {inner})
+        for value in values[7:]:
+            self.assertEqual(cached[value], normalize_path(value))
+        # Each answer equals a fresh attributor's, which queries git for that value alone.
+        for value in values:
+            self.assertEqual(Attributor([]).repository_path(value), cached[value], value)
+
+    def test_work_tree_subdirectories_share_their_repository_origin(self):
+        for repo, url in ((self.outer, "https://example.invalid/synthetic/outer.git"),
+                          (self.inner, "git@example.invalid:synthetic/inner.git")):
+            subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", url],
+                           check=True, capture_output=True)
+        (self.inner / "deep").mkdir()
+        cwds = [str(self.outer / "src"), str(self.outer), str(self.inner / "deep"),
+                str(self.inner), str(self.plain)]
+        attributor = Attributor([])
+        with patch("sumbi.measure.attribution.subprocess.run", wraps=subprocess.run) as run:
+            links = {cwd: attributor.event_link(cwd) for cwd in cwds}
+        origin_calls = [c.args[0] for c in run.call_args_list if "--show-toplevel" not in c.args[0]]
+        # Two queries each for outer and inner, one for plain; subdirectories reuse their root's.
+        self.assertEqual(len(origin_calls), 5)
+        for cwd in cwds:
+            fresh = Attributor([])
+            self.assertEqual(fresh.event_link(cwd), links[cwd], cwd)
+            self.assertEqual(fresh.origin(cwd), attributor.origin(cwd), cwd)
+            key = normalize_path(cwd)
+            self.assertEqual(fresh.origin_queries[key], attributor.origin_queries[key], cwd)
+        self.assertNotEqual(attributor.origin(str(self.outer / "src")),
+                            attributor.origin(str(self.inner / "deep")))
+        self.assertEqual(attributor.origin_queries[normalize_path(str(self.plain))], "outside")
+
+    def test_failed_queries_are_cached_per_directory_too(self):
+        values = [str(self.plain / "f.txt"), str(self.plain / "g.txt")]
+        roots, calls = self.toplevel_calls(Attributor([]), values)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(roots, {v: normalize_path(v) for v in values})
 
 
 class PathEvidenceTests(unittest.TestCase):

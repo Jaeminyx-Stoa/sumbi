@@ -558,7 +558,11 @@ origin. No remote request is made. HTTPS and SSH origin forms normalize to the
 same host/repository identity, removing credentials, transport, default ports,
 trailing slashes and `.git`. Hosts are case-insensitive; repository path case is
 preserved. Windows paths normalize separators, dot segments and case; POSIX paths
-preserve case. Origins and paths are cached during a run.
+preserve case. Origins and paths are cached during a run: Git is asked for a
+repository root once per directory, and a subdirectory of a known working tree
+reuses that repository's origin query, since both read the same repository
+configuration. Results are the same as querying every path; only the number of
+Git processes changes.
 
 Origin rules take priority. When any origin rules are configured, a known origin
 that matches none is explicitly `other` and cannot use a path fallback. An
