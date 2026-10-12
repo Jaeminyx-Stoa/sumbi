@@ -11,6 +11,7 @@ import stat
 from sumbi import SCHEMA_VERSION
 from sumbi.core.json import unique_object
 from sumbi.core.time import Window
+from sumbi.measure.profile import FAN_OUT_LEAVES, ROLE_LEAVES, ROLES
 from .apply import apply_transaction, _protect_local_artifacts, _save_backup
 from .errors import InstallError
 from .configuration import load_configuration
@@ -39,6 +40,13 @@ METRICS = {
     "/summary/time/wall_span_seconds/value": "summed-wall-seconds",
     "/coverage/unattributed_share": "unattributed-share",
 }
+MAX_REFS = 32
+# Profile pointers: /profile/<scope>/roles/<role>/<leaf> or /profile/<scope>/fan_out/<leaf>,
+# scope = summary | by_agent/<agent> | projects/<ref> | projects/<ref>/agents/<agent>.
+PROFILE_SCOPE = re.compile(r"/profile/(?:summary|by_agent/[^/]+|projects/[a-z0-9_]+"
+    r"(?:/agents/[^/]+)?)/")
+PROFILE_LEAVES = frozenset([*(f"roles/{role}/{leaf}" for role in ROLES for leaf in ROLE_LEAVES),
+    *(f"fan_out/{leaf}" for leaf in FAN_OUT_LEAVES)])
 SUFFIXES = {".py", ".js", ".ts", ".tsx", ".jsx", ".json", ".toml", ".yaml",
     ".yml", ".md", ".txt", ".ini", ".cfg", ".sh"}
 PRIVATE_PARTS = {".git", ".sumbi", ".ssh", ".aws", ".azure", ".gnupg", "sessions",
@@ -124,6 +132,17 @@ def _lookup(report, pointer):
     return value
 
 
+def profile_value(report, pointer):
+    """A finite nonnegative profile number at an allow-listed pointer, else None."""
+    if not isinstance(pointer, str) or len(pointer) > 512:
+        return None
+    scope = PROFILE_SCOPE.match(pointer)
+    if scope is None or pointer[scope.end():] not in PROFILE_LEAVES:
+        return None
+    value = _lookup(report, pointer)
+    return value if _number(value) else None
+
+
 def observations(path: Path) -> tuple[bytes, dict]:
     """Project a collect report to finite numeric observations, never causal claims."""
     data, report = _load(Path(path), 16 * MAX_BYTES)
@@ -202,14 +221,18 @@ def _validate_bundle(raw, evidence_data, measured):
         raise ValueError
     refs = raw["evidence_refs"]
     available = {row["pointer"]: row["value"] for row in measured["findings"]}
-    if not isinstance(refs, list) or not 1 <= len(refs) <= len(METRICS):
+    report = json.loads(evidence_data, object_pairs_hook=unique_object)
+    if not isinstance(refs, list) or not 1 <= len(refs) <= MAX_REFS:
         raise ValueError
     seen = set()
     for ref in refs:
         _fields(ref, "pointer value")
         pointer = ref["pointer"]
-        if (not isinstance(pointer, str) or pointer not in available or pointer in seen
-            or not _number(ref["value"]) or ref["value"] != available[pointer]):
+        expected = available.get(pointer) if isinstance(pointer, str) else None
+        if expected is None:
+            expected = profile_value(report, pointer)
+        if (expected is None or pointer in seen
+            or not _number(ref["value"]) or ref["value"] != expected):
             raise ValueError
         seen.add(pointer)
     diagnosis = raw["diagnosis"]

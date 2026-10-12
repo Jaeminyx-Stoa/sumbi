@@ -118,12 +118,48 @@ class ExternalInterventionTests(unittest.TestCase):
         predictions = {row["metric"]: row for row in summary["predictions"]}
         self.assertEqual(predictions["tokens-per-day"]["observed_direction"], "decrease")
         self.assertEqual(predictions["tokens-per-success"]["reason"], "no-success-denominator")
-        self.assertEqual(predictions["worker-long-tail-share"]["reason"], "not-in-collect")
+        # A known profile metric absent from these minimal reports is not reported.
+        self.assertEqual(predictions["worker-long-tail-share"]["reason"], "not-reported")
         self.assertTrue(summary["revert_if"][0]["crossed"])
         self.assertFalse(summary["windows"]["after"]["matches_registration"])
         self.assertTrue(summary["windows"]["before"]["matches_registration"])
         self.assertNotIn("DO-NOT-EXPORT", output)
         self.assertNotIn("signals", summary)
+
+    def test_role_metrics_read_profile_summary_or_one_project(self):
+        def profiled(path, share, project_share, median_seconds):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            role = {"long_tail": {"token_share": share}, "tokens_per_day": {"total": 10},
+                "tool_latency": {"shell": {"median_seconds": median_seconds}}}
+            data["profile"] = {"summary": {"roles": {"worker": role},
+                "fan_out": {"children_max": 4}},
+                "projects": {"project_abc": {"roles": {"worker": {
+                    "long_tail": {"token_share": project_share}}}}}}
+            path.write_text(json.dumps(data), encoding="utf-8")
+        profiled(self.before, 0.5, 0.8, 0.1)
+        profiled(self.after, 0.25, 0.2, 2.0)
+        self.assertEqual(self.register()[0], 0)
+        code, output, errors = self.check("--json")
+        self.assertEqual((code, errors), (0, ""))
+        summary = json.loads(output)
+        self.assertEqual(summary["role_metrics_scope"], "all")
+        predictions = {row["metric"]: row for row in summary["predictions"]}
+        tail = predictions["worker-long-tail-share"]
+        self.assertEqual((tail["status"], tail["before"], tail["after"]), ("observed", 0.5, 0.25))
+        self.assertEqual(tail["change_percent"], -50)
+        metrics = {row["id"]: row for row in summary["metrics"]}
+        self.assertEqual(metrics["worker-tokens-per-day"]["after"], 10)  # Already per day.
+        self.assertEqual(metrics["worker-shell-tool-median-seconds"]["after"], 2.0)
+        self.assertEqual(metrics["children-per-parent-max"]["before"], 4)
+        self.assertIsNone(metrics["orchestrator-long-tail-share"]["before"])
+        code, output, _ = self.check("--json", "--project-key", "project_abc")
+        summary = json.loads(output)
+        self.assertEqual(summary["role_metrics_scope"], "project_abc")
+        tail = {row["metric"]: row for row in summary["predictions"]}["worker-long-tail-share"]
+        self.assertEqual((tail["before"], tail["after"]), (0.8, 0.2))
+        code, _, errors = self.check("--project-key", "../Project")
+        self.assertEqual(code, 1)
+        self.assertIn("Project must be", errors)
 
     def test_signal_counts_and_invalid_labels(self):
         self.assertEqual(self.register()[0], 0)

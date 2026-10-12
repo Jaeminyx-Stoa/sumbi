@@ -17,6 +17,7 @@ from sumbi.core.json import unique_object
 from sumbi.core.values import epoch
 from .errors import InstallError
 from .files import _checked, _write, read_bytes, safe_path
+from sumbi.measure.profile import ROLES, TOOL_CLASSES
 from .improve import LABEL, MAX_BYTES, _load, _lookup, _number, project
 from .planner import digest
 from .revert import LEDGER
@@ -39,7 +40,26 @@ PER_DAY = {
     "estimated-active-seconds-per-day": "/summary/time/active_seconds/value",
 }
 RATIOS = {"tool-error-rate": ("/summary/counts/tool_errors", "/summary/counts/tool_results")}
-COST_METRICS = (*PER_DAY, *RATIOS)
+# Role metrics read the collect profile as reported (already per day or a share),
+# from /profile/summary or, with a project reference, /profile/projects/<ref>.
+PROFILE = {
+    **{f"{role}-{name}": f"roles/{role}/{leaf}" for role in ROLES for name, leaf in (
+        ("sessions-per-day", "sessions_per_day"), ("tokens-per-day", "tokens_per_day/total"),
+        ("tool-calls-per-day", "tool_calls_per_day"), ("tool-error-rate", "tool_error_rate"),
+        ("compactions-per-day", "compactions_per_day"),
+        ("active-seconds-per-day", "active_seconds_per_day"),
+        ("median-session-tokens", "session_total_tokens_median"),
+        ("tool-seconds-per-paired-call", "tool_seconds_per_paired_call"),
+        ("long-tail-share", "long_tail/token_share"),
+        ("compacted-session-share", "compaction/token_share"),
+        ("top-decile-share", "concentration/top_decile_share"),
+        *((f"{c}-tool-median-seconds", f"tool_latency/{c}/median_seconds")
+            for c in TOOL_CLASSES))},
+    "children-per-parent-max": "fan_out/children_max",
+    "children-per-parent-median": "fan_out/children_median",
+}
+PROJECT_REF = re.compile(r"[a-z0-9_]{1,64}")
+COST_METRICS = (*PER_DAY, *RATIOS, *PROFILE)
 
 
 def _utc_text(when: datetime) -> str:
@@ -189,24 +209,29 @@ def _expectation(value, size_key):
     return value
 
 
-def _report(path: Path):
+def _report(path: Path, scope: str = "/profile/summary/"):
     """Validate, hash and measure one byte snapshot with the observation projection."""
     data, report = _load(Path(path), 16 * MAX_BYTES)
     project(data, report)
     window = report["window"]
     since, until = _when(window["since"]), _when(window["until"])
     values = {}
-    for pointer in {*PER_DAY.values(), *(p for pair in RATIOS.values() for p in pair)}:
+    for pointer in {*PER_DAY.values(), *(p for pair in RATIOS.values() for p in pair),
+        *(scope + leaf for leaf in PROFILE.values())}:
         value = _lookup(report, pointer)
         if value is not None and not _number(value):
             raise InstallError(
                 "Evidence must be a supported collect report with numeric metrics.")
         values[pointer] = value
+    for metric, leaf in PROFILE.items():
+        values[metric] = values.pop(scope + leaf)
     return {"sha256": digest(data), "since": since, "until": until,
         "days": (until - since).total_seconds() / DAY, "values": values}
 
 
 def _metric(report, metric):
+    if metric in PROFILE:
+        return report["values"][metric]
     if metric in PER_DAY:
         value = report["values"][PER_DAY[metric]]
         return None if value is None else value / report["days"]
@@ -287,10 +312,15 @@ def count_signals(path: Path, before: tuple, after: tuple) -> dict:
 
 
 def check_external(repository: Path | str, intervention_id: str, before_path: Path,
-    after_path: Path, signals: Path | None = None) -> dict:
+    after_path: Path, signals: Path | None = None, project_ref: str | None = None) -> dict:
     """Show registered predictions and base cost metrics side by side; no causal claim."""
     row = read_external(repository, intervention_id)
-    before, after = _report(before_path), _report(after_path)
+    if project_ref is not None and not (isinstance(project_ref, str)
+        and PROJECT_REF.fullmatch(project_ref)):
+        raise InstallError("Project must be a collect profile project key or bucket.")
+    scope = ("/profile/summary/" if project_ref is None
+        else "/profile/projects/" + project_ref + "/")
+    before, after = _report(before_path, scope), _report(after_path, scope)
     applied = _when(row["applied_at"])
     if before["until"] > applied or after["since"] < applied:
         raise InstallError("Before evidence must end, and after evidence start, "
@@ -313,6 +343,7 @@ def check_external(repository: Path | str, intervention_id: str, before_path: Pa
         "preregistered": row["preregistered"],
         "evidence": {"before_sha256": before["sha256"], "after_sha256": after["sha256"]},
         "windows": windows, "metrics": metrics,
+        "role_metrics_scope": "all" if project_ref is None else project_ref,
         "predictions": [_expected(p, "rough_size_percent", before, after)
             for p in row["predictions"]],
         "revert_if": [_expected(r, "threshold_percent", before, after) for r in row["revert_if"]],

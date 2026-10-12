@@ -94,6 +94,38 @@ class EvidenceImproveTests(unittest.TestCase):
         self.assertNotIn("cache-write-tokens", findings)
         self.assertEqual(findings["reported-tokens"], 100)
 
+    def test_profile_pointers_need_exact_allow_listed_numbers(self):
+        worker = {"long_tail": {"token_share": 0.53, "sessions": 26},
+            "tool_latency": {"shell": {"median_seconds": None}}, "models": [{"sessions": 3}]}
+        self.report["profile"] = {"summary": {"roles": {"worker": worker},
+            "fan_out": {"children_max": 223}}, "by_agent": {"claude-code": {"roles": {
+                "worker": worker}}},
+            "projects": {"project_abc": {"roles": {"worker": worker}, "agents": {
+                "sumbi-events:agent_x": {"roles": {"worker": worker}}}}}}
+        self.evidence.write_text(json.dumps(self.report))
+        accepted = [("/profile/projects/project_abc/roles/worker/long_tail/token_share", 0.53),
+            ("/profile/summary/fan_out/children_max", 223),
+            ("/profile/by_agent/claude-code/roles/worker/long_tail/sessions", 26),
+            ("/profile/projects/project_abc/agents/sumbi-events:agent_x/roles/worker/"
+                "long_tail/token_share", 0.53)]
+        self.raw["evidence_sha256"] = digest(self.evidence.read_bytes())
+        self.raw["evidence_refs"] = [{"pointer": p, "value": v} for p, v in accepted]
+        self.save()
+        self.assertEqual(self.plan().summary["evidence_refs"], self.raw["evidence_refs"])
+        refused = [("/profile/projects/project_abc/roles/worker/long_tail/token_share", 0.5),
+            ("/profile/projects/project_abc/roles/worker/long_tail/token_share", True),
+            ("/profile/summary/roles/worker/tool_latency/shell/median_seconds", 0),
+            ("/profile/summary/roles/worker/models/0/sessions", 3),
+            ("/profile/summary/roles/lead/long_tail/sessions", 26),
+            ("/profile/projects/Project-ABC/roles/worker/long_tail/sessions", 26),
+            ("/profile/projects/project_missing/roles/worker/long_tail/sessions", 26)]
+        for pointer, value in refused:
+            with self.subTest(pointer=pointer, value=value):
+                self.raw["evidence_refs"] = [{"pointer": pointer, "value": value}]
+                self.save()
+                with self.assertRaises(InstallError):
+                    self.plan()
+
     def test_empty_collect_is_honest_no_outcome(self):
         self.report["summary"]["sessions"] = 0
         self.report["summary"]["counts"] = {"tool_errors": 0}
