@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import tempfile
 
+from sumbi.events.registry import log_roots
 from sumbi.measure.attribution import ProjectRule
 from sumbi.core.values import timestamp
 
@@ -48,6 +49,11 @@ def idle(value: str) -> float:
     if not math.isfinite(number) or number <= 0:
         raise argparse.ArgumentTypeError("Idle minutes must be a positive finite number")
     return number
+
+
+def inside_log_roots(path: Path, home: Path) -> bool:
+    """True when a resolved output path is inside a local agent-log directory."""
+    return any(path.is_relative_to(source.resolve()) for source in log_roots(home))
 
 
 def atomic_write(path: Path, text: str, *, private: bool = False):
