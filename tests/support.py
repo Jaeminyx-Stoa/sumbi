@@ -4,7 +4,30 @@ import os
 from pathlib import Path
 import stat
 import tempfile
-from unittest.mock import patch
+from contextlib import contextmanager
+from unittest.mock import Mock, patch
+
+
+@contextmanager
+def github_sleep():
+    """Yield a Mock that sees only the GitHub adapter's sleeps.
+
+    ``sumbi.outcomes.github.live.time`` is the process-wide ``time`` module, so
+    patching ``live.time.sleep`` also counts unrelated callers: on a loaded host
+    ``subprocess`` polls a timed wait with ``time.sleep``. Give the adapter its
+    own module view instead; every other attribute stays the real clock.
+    """
+    import time
+
+    sleep = Mock()
+
+    class Clock:
+        def __getattr__(self, name):
+            return getattr(time, name)
+    clock = Clock()
+    clock.sleep = sleep
+    with patch("sumbi.outcomes.github.live.time", clock):
+        yield sleep
 
 
 def require_file_modes(test, root, modes):

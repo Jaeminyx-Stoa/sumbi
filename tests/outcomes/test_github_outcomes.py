@@ -9,7 +9,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
-from support import IsolatedTemporaryDirectory, isolate_github_destinations
+from support import IsolatedTemporaryDirectory, github_sleep, isolate_github_destinations
 import unittest
 from unittest.mock import patch
 import urllib.error
@@ -149,7 +149,7 @@ class GitHubTests(unittest.TestCase):
             return self.respond(request, **kwargs)
 
         self.open.side_effect = limited
-        with patch("sumbi.outcomes.github.live.time.sleep") as sleep:
+        with github_sleep() as sleep:
             self.adapter()
         sleep.assert_called_once_with(3)
 
@@ -157,7 +157,7 @@ class GitHubTests(unittest.TestCase):
         error = urllib.error.HTTPError("https://api.github.com", 429, "private", {"Retry-After": "2"}, io.BytesIO())
         self.open.side_effect = [error, *[io.BytesIO(json.dumps(self.routes[p]).encode()) for p in (
             "/repos/example/sample/pulls", "/repos/example/sample/commits", "/repos/example/sample/commits")]]
-        with patch("sumbi.outcomes.github.live.time.sleep") as sleep:
+        with github_sleep() as sleep:
             self.adapter()
         sleep.assert_called_once_with(3)
 
@@ -171,7 +171,7 @@ class GitHubTests(unittest.TestCase):
     def test_permission_403_does_not_wait_for_reset(self):
         self.open.side_effect = urllib.error.HTTPError("https://api.github.com", 403, "private", {
             "X-RateLimit-Remaining": "99", "X-RateLimit-Reset": str(END.timestamp() + 100)}, io.BytesIO(b"access denied"))
-        with patch("sumbi.outcomes.github.live.time.sleep") as sleep, self.assertRaisesRegex(ValueError, "HTTP 403"):
+        with github_sleep() as sleep, self.assertRaisesRegex(ValueError, "HTTP 403"):
             self.adapter()
         sleep.assert_not_called()
 
