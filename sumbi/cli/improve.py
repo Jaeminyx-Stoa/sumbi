@@ -2,6 +2,7 @@
 
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -10,7 +11,7 @@ from sumbi.cli.common import atomic_write, idle, inside_log_roots, utc
 from sumbi.install.errors import InstallError
 from sumbi.install.external import (check_external, parse_expectation, register_external)
 from sumbi.install.improve import observations, build_improvement, apply_improvement
-from sumbi.install.revert import revert_install
+from sumbi.install.revert import backup_targets, revert_install
 from sumbi.judge.registration import read_registration
 
 
@@ -90,8 +91,20 @@ def _check_destination(args, *protected):
     target = args.json_out.resolve()
     inputs = [args.evidence, args.bundle, args.registration, args.before, args.after,
         args.signals, *protected]
-    if (any(path is not None and Path(path).resolve() == target for path in inputs)
+
+    def same(path):
+        path = Path(path).resolve()
+        if os.path.normcase(path) == os.path.normcase(target):
+            return True
+        try:
+            return target.exists() and path.exists() and os.path.samefile(path, target)
+        except OSError:
+            return True  # Unknown identity is treated as a collision.
+
+    if (any(path is not None and same(path) for path in inputs)
         or target.is_relative_to((args.root / ".sumbi").resolve())
+        or os.path.normcase(target).startswith(
+            os.path.normcase((args.root / ".sumbi").resolve()) + os.sep)
         or inside_log_roots(target, Path.home())):
         raise InstallError("JSON output must not overwrite inputs, .sumbi state "
             "or session-log directories.")
@@ -140,6 +153,23 @@ def _check(args):
     return 0
 
 
+def _revert(args):
+    if any((args.evidence, args.bundle, args.reviewed_sha256, args.registration)):
+        raise InstallError(
+            "Revert cannot be combined with evidence, bundle, or review options.")
+    if args.json_out is not None:
+        # Refuse before restoring: a restored or refused target must survive.
+        root = args.root.resolve()
+        _check_destination(args, *(root / name for name in backup_targets(root, args.revert)))
+    result = revert_install(args.root, args.revert)
+    # Revert's file paths are local; public JSON substitutes counts only.
+    public = {"backup_id": result["backup_id"], "refused": result["refused"],
+        "files": len(result["files"])}
+    _write_json(args, public)
+    print(json.dumps(public if args.json else result, sort_keys=True))
+    return 1 if result["refused"] else 0
+
+
 def run(args):
     try:
         if args.register_external:
@@ -157,17 +187,7 @@ def run(args):
             _print_report(args)
             return 0
         if args.revert:
-            if any((args.evidence, args.bundle, args.reviewed_sha256, args.registration)):
-                raise InstallError(
-                    "Revert cannot be combined with evidence, bundle, or review options.")
-            _check_destination(args)
-            result = revert_install(args.root, args.revert)
-            # Revert's file paths are local; public JSON substitutes counts only.
-            public = {"backup_id": result["backup_id"], "refused": result["refused"],
-                "files": len(result["files"])}
-            _write_json(args, public)
-            print(json.dumps(public if args.json else result, sort_keys=True))
-            return 1 if result["refused"] else 0
+            return _revert(args)
         if not args.evidence:
             raise InstallError("Improve requires --evidence from an existing collect report.")
         if args.apply and (not args.bundle or not args.reviewed_sha256):

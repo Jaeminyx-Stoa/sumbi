@@ -4,14 +4,17 @@ from contextlib import redirect_stdout, redirect_stderr
 from datetime import datetime, timezone
 from io import StringIO
 import json
+import os
 from pathlib import Path
 import unittest
 from unittest.mock import patch
 
 from sumbi import SCHEMA_VERSION
 from sumbi.cli import main
+from sumbi.install import external
 from sumbi.install.errors import InstallError
 from sumbi.install.external import check_external, read_external, register_external
+from sumbi.install.planner import digest
 from sumbi.judge.interventions import exposure_gap
 from support import IsolatedTemporaryDirectory
 
@@ -200,6 +203,102 @@ class ExternalInterventionTests(unittest.TestCase):
         code, _, errors = invoke("--evidence", self.before, "--signals", self.before)
         self.assertEqual(code, 1)
         self.assertIn("need --register-external or --check", errors)
+
+    def applied_bundle(self):
+        """Apply one reviewed synthetic harness change; return its backup ID."""
+        (self.root / ".sumbi").mkdir(exist_ok=True)
+        (self.root / ".sumbi/config.toml").write_text('[harness]\npaths = ["device.py"]\n',
+            encoding="utf-8")
+        target = self.root / "device.py"
+        target.write_bytes(b"LIMIT = 1\n")
+        after = "LIMIT = 2\n"
+        bundle = self.base / "bundle.json"
+        bundle.write_text(json.dumps({"version": 1, "intervention_id": "device-fix",
+            "evidence_sha256": digest(self.before.read_bytes()),
+            "evidence_refs": [{"pointer": "/summary/sessions", "value": 10}],
+            "diagnosis": {"id": "capacity", "hypothesis": "H", "rationale": "R"},
+            "prediction": {"metric": "tokens_per_success", "direction": "decrease",
+                "rough_size_percent": 10},
+            "verification": {"id": "unit-check", "status": "passed",
+                "evidence_sha256": "a" * 64, "declaration": "V"},
+            "review": {"author_family": "family-a", "reviewer_family": "family-b",
+                "status": "approved", "safety_gates_preserved": True},
+            "changes": [{"path": "device.py", "before_sha256": digest(b"LIMIT = 1\n"),
+                "after_sha256": digest(after.encode()), "after_text": after}]}),
+            encoding="utf-8")
+        sha = digest(bundle.read_bytes())
+        code, _, errors = invoke("--root", self.root, "--evidence", self.before, "--bundle",
+            bundle, "--apply", "--reviewed-sha256", sha, "--json-out", target)
+        self.assertEqual(code, 1)  # Output over a bundle target is refused before apply.
+        self.assertIn("must not overwrite", errors)
+        self.assertEqual(target.read_bytes(), b"LIMIT = 1\n")
+        code, output, errors = invoke("--root", self.root, "--evidence", self.before,
+            "--bundle", bundle, "--apply", "--reviewed-sha256", sha, "--json")
+        self.assertEqual((code, errors), (0, ""))
+        return json.loads(output)["backup_id"]
+
+    def test_revert_json_out_refuses_restore_targets_before_reverting(self):
+        backup = self.applied_bundle()
+        target = self.root / "device.py"
+        code, _, errors = invoke("--root", self.root, "--revert", backup, "--json-out", target)
+        self.assertEqual(code, 1)
+        self.assertIn("must not overwrite", errors)
+        self.assertEqual(target.read_bytes(), b"LIMIT = 2\n")  # Neither reverted nor replaced.
+        # An owner edit that revert would refuse must not be replaced by JSON either.
+        target.write_bytes(b"LIMIT = 3\n")
+        code, _, errors = invoke("--root", self.root, "--revert", backup, "--json-out",
+            self.root / "DEVICE.PY" if os.name == "nt" else target)
+        self.assertEqual(code, 1)
+        self.assertEqual(target.read_bytes(), b"LIMIT = 3\n")
+        target.write_bytes(b"LIMIT = 2\n")
+        code, output, errors = invoke("--root", self.root, "--revert", backup, "--json",
+            "--json-out", self.base / "revert.json")
+        self.assertEqual((code, errors), (0, ""))
+        self.assertEqual(target.read_bytes(), b"LIMIT = 1\n")
+        self.assertEqual((self.base / "revert.json").read_text(encoding="utf-8"), output)
+
+    def test_registration_rejects_extra_expectation_fields_before_writing(self):
+        for field in ("predictions", "revert_if"):
+            arguments = {"predictions": [{"metric": "tokens-per-day", "direction": "decrease",
+                "rough_size_percent": 5}], "revert_if": [{"metric": "sessions-per-day",
+                "direction": "decrease", "threshold_percent": 50}]}
+            arguments[field][0]["note"] = "PRIVATE-FREE-TEXT"
+            with self.assertRaises(InstallError) as caught:
+                register_external(self.root, intervention_id="extra-round",
+                    applied_at=datetime(2030, 1, 3, tzinfo=timezone.utc), changes=["a-change"],
+                    before_days=1.0, after_days=1.0, **arguments)
+            self.assertNotIn("PRIVATE", str(caught.exception))
+            self.assertFalse((self.root / ".sumbi/interventions.jsonl").exists())
+
+    def test_check_measures_and_hashes_one_snapshot(self):
+        self.assertEqual(self.register()[0], 0)
+        original = self.before.read_bytes()
+        real = external._load
+
+        def load_then_replace(path, limit):
+            result = real(path, limit)
+            if Path(path) == self.before:
+                self.before.write_text(json.dumps(report("2030-01-01T00:00:00Z",
+                    "2030-01-03T00:00:00Z", 999, 99999)), encoding="utf-8")
+            return result
+
+        with patch.object(external, "_load", side_effect=load_then_replace):
+            summary = check_external(self.root, "cap-round", self.before, self.after)
+        self.assertEqual(summary["evidence"]["before_sha256"], digest(original))
+        metrics = {row["id"]: row for row in summary["metrics"]}
+        self.assertEqual(metrics["sessions-per-day"]["before"], 5)
+
+    def test_out_of_range_numeric_signal_time_is_unreadable(self):
+        self.assertEqual(self.register()[0], 0)
+        signals = self.base / "events.jsonl"
+        signals.write_text('{"ts": 1' + "0" * 400 + ', "event": "cap"}\n'
+            + '{"ts": 1e400, "event": "cap"}\n'
+            + '{"ts": "2030-01-02T00:00:00Z", "event": "warn"}\n', encoding="utf-8")
+        code, output, errors = self.check("--signals", signals, "--json")
+        self.assertEqual((code, errors), (0, ""))
+        counted = json.loads(output)["signals"]
+        self.assertEqual(counted["unreadable_lines"], 2)
+        self.assertEqual(counted["before"]["labels"], {"warn": 1})
 
     def test_check_refuses_unknown_crossing_and_tampered_rows(self):
         code, _, errors = self.check()

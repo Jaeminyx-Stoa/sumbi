@@ -17,7 +17,7 @@ from sumbi.core.json import unique_object
 from sumbi.core.values import epoch
 from .errors import InstallError
 from .files import _checked, _write, read_bytes, safe_path
-from .improve import LABEL, MAX_BYTES, _load, _lookup, _number, observations
+from .improve import LABEL, MAX_BYTES, _load, _lookup, _number, project
 from .planner import digest
 from .revert import LEDGER
 
@@ -114,9 +114,17 @@ def _record(identity, applied_at, changes, predictions, revert_if, before_days, 
     if (not changes or len(changes) > MAX_ITEMS or len(set(changes)) != len(changes)
         or any(not isinstance(c, str) or not LABEL.fullmatch(c) for c in changes)):
         raise InstallError("Change labels must be 1-16 unique bounded labels.")
-    for name, items in (("Predictions", predictions), ("Revert criteria", revert_if)):
-        if not items or len(items) > MAX_ITEMS:
+    for name, items, size_key in (("Predictions", predictions, "rough_size_percent"),
+        ("Revert criteria", revert_if, "threshold_percent")):
+        if not isinstance(items, list) or not items or len(items) > MAX_ITEMS:
             raise InstallError(name + " need 1-16 entries.")
+        try:
+            for item in items:
+                _expectation(item, size_key)
+        except ValueError:
+            # Extra fields could carry free text into the ledger.
+            raise InstallError(name + " must contain only metric, direction and "
+                "percentage fields.") from None
     for days in (before_days, after_days):
         if type(days) not in (int, float) or not math.isfinite(days) or days <= 0:
             raise InstallError("Window days must be positive and finite.")
@@ -182,9 +190,9 @@ def _expectation(value, size_key):
 
 
 def _report(path: Path):
-    """Validate with the existing observation projection, then keep needed fields."""
-    data, _ = observations(path)
-    _, report = _load(Path(path), 16 * MAX_BYTES)
+    """Validate, hash and measure one byte snapshot with the observation projection."""
+    data, report = _load(Path(path), 16 * MAX_BYTES)
+    project(data, report)
     window = report["window"]
     since, until = _when(window["since"]), _when(window["until"])
     values = {}
@@ -254,7 +262,10 @@ def count_signals(path: Path, before: tuple, after: tuple) -> dict:
         except (ValueError, RecursionError):
             unreadable += 1
             continue
-        when = epoch(row.get("ts")) if isinstance(row, dict) else None
+        try:
+            when = epoch(row.get("ts")) if isinstance(row, dict) else None
+        except OverflowError:
+            when = None  # An integer too large for a float, such as 10**400.
         if when is None:
             unreadable += 1
             continue

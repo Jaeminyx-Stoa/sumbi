@@ -192,7 +192,8 @@ added by an older PowerShell. Standard output is unchanged, so text mode still
 prints the local review diff. The name differs from collect's `--json OUT`
 because improve's `--json` is already a format flag. Output may not replace an
 input file (evidence, bundle, registration, before/after reports, signals), a
-bundle target, anything under the repository's `.sumbi/` or a local agent-log
+bundle target, a file the revert backup manifest may restore (checked before
+reverting), anything under the repository's `.sumbi/` or a local agent-log
 directory under the home directory, using collect's log-root check. Apply
 writes the file after the transaction; a failed write reports an error but does
 not undo an applied change.
