@@ -39,6 +39,7 @@ def report(since, until, sessions, tokens, *, tool_results=10, tool_errors=1):
         "coverage": {"unattributed_share": 0.0}, "private-free-text": "DO-NOT-EXPORT"}
 
 
+KEY = "project_" + "ab" * 12  # Collect's pseudonymous project-key shape.
 REGISTER = ("--applied-at", "2030-01-03T00:00:00Z", "--change", "worker-time-cap",
     "--predict", "tokens-per-day:decrease:30", "--predict", "tokens-per-success:decrease:10",
     "--predict", "worker-long-tail-share:decrease:70",
@@ -133,7 +134,7 @@ class ExternalInterventionTests(unittest.TestCase):
                 "tool_latency": {"shell": {"median_seconds": median_seconds}}}
             data["profile"] = {"summary": {"roles": {"worker": role},
                 "fan_out": {"children_max": 4}},
-                "projects": {"project_abc": {"roles": {"worker": {
+                "projects": {KEY: {"roles": {"worker": {
                     "long_tail": {"token_share": project_share}}}}}}
             path.write_text(json.dumps(data), encoding="utf-8")
         profiled(self.before, 0.5, 0.8, 0.1)
@@ -152,14 +153,16 @@ class ExternalInterventionTests(unittest.TestCase):
         self.assertEqual(metrics["worker-shell-tool-median-seconds"]["after"], 2.0)
         self.assertEqual(metrics["children-per-parent-max"]["before"], 4)
         self.assertIsNone(metrics["orchestrator-long-tail-share"]["before"])
-        code, output, _ = self.check("--json", "--project-key", "project_abc")
+        code, output, _ = self.check("--json", "--project-key", KEY)
         summary = json.loads(output)
-        self.assertEqual(summary["role_metrics_scope"], "project_abc")
+        self.assertEqual(summary["role_metrics_scope"], KEY)
         tail = {row["metric"]: row for row in summary["predictions"]}["worker-long-tail-share"]
         self.assertEqual((tail["before"], tail["after"]), (0.8, 0.2))
-        code, _, errors = self.check("--project-key", "../Project")
-        self.assertEqual(code, 1)
-        self.assertIn("Project must be", errors)
+        for bad in ("../Project", "project_abc", "PRIVATE words"):
+            code, output, errors = self.check("--project-key", bad)
+            self.assertEqual(code, 1)
+            self.assertIn("Project must be", errors)
+            self.assertNotIn(bad, output + errors)
 
     def test_signal_counts_and_invalid_labels(self):
         self.assertEqual(self.register()[0], 0)

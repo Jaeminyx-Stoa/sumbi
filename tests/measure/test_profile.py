@@ -109,6 +109,23 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual([(m["models"], m["sessions"], m["token_share"]) for m in models],
             [(["m-big"], 1, 0.75), (["m-small"], 1, 0.25), ([], 1, 0.0)])
 
+    def test_model_rows_beyond_five_are_folded_visibly(self):
+        pairs = [make(f"s{i}", total=100 - i, models=(f"m-{i}",)) for i in range(7)]
+        text = "\n".join(text_lines(run(pairs)))
+        line = next(l for l in text.splitlines() if l.startswith("  Models:"))
+        self.assertIn("m-4 sessions 1", line)
+        self.assertNotIn("m-5 ", line)
+        self.assertIn("2 more model sets sessions 2 token share " + format(
+            (95 + 94) / sum(range(94, 101)), ".6g"), line)
+
+    def test_project_without_usage_keeps_its_rule_label(self):
+        pairs = [make("idle", total=0, allocations=[],
+            project=link("project_a", rule="sample"))]
+        project = run(pairs)["projects"]["project_a"]
+        self.assertEqual(project["rules"], ["sample"])
+        self.assertIn("Profile project sample project_a orchestrator",
+            "\n".join(text_lines(run(pairs))))
+
     def test_tool_classes_and_quantiles(self):
         self.assertEqual([tool_class(n) for n in ("Read", "Edit", "Grep", "Bash",
             "functions.exec_command", "Task", "WebFetch", "mcp__srv__do", "TodoWrite", None)],

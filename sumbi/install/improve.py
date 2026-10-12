@@ -43,8 +43,12 @@ METRICS = {
 MAX_REFS = 32
 # Profile pointers: /profile/<scope>/roles/<role>/<leaf> or /profile/<scope>/fan_out/<leaf>,
 # scope = summary | by_agent/<agent> | projects/<ref> | projects/<ref>/agents/<agent>.
-PROFILE_SCOPE = re.compile(r"/profile/(?:summary|by_agent/[^/]+|projects/[a-z0-9_]+"
-    r"(?:/agents/[^/]+)?)/")
+# Only public identifiers: collect's agent labels (open-event agents are pseudonyms)
+# and project references (pseudonymous project keys or the two non-project buckets).
+AGENT_ID = r"(?:claude-code|codex|sumbi-events:agent_[0-9a-f]{24})"
+PROJECT_REF = r"(?:project_[0-9a-f]{24}|other|unassigned)"
+PROFILE_SCOPE = re.compile(rf"/profile/(?:summary|by_agent/{AGENT_ID}|projects/{PROJECT_REF}"
+    rf"(?:/agents/{AGENT_ID})?)/")
 PROFILE_LEAVES = frozenset([*(f"roles/{role}/{leaf}" for role in ROLES for leaf in ROLE_LEAVES),
     *(f"fan_out/{leaf}" for leaf in FAN_OUT_LEAVES)])
 SUFFIXES = {".py", ".js", ".ts", ".tsx", ".jsx", ".json", ".toml", ".yaml",
@@ -136,7 +140,7 @@ def profile_value(report, pointer):
     """A finite nonnegative profile number at an allow-listed pointer, else None."""
     if not isinstance(pointer, str) or len(pointer) > 512:
         return None
-    scope = PROFILE_SCOPE.match(pointer)
+    scope = PROFILE_SCOPE.match(pointer)  # match() anchors the start; leaves end it.
     if scope is None or pointer[scope.end():] not in PROFILE_LEAVES:
         return None
     value = _lookup(report, pointer)

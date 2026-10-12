@@ -18,7 +18,8 @@ from sumbi.core.values import epoch
 from .errors import InstallError
 from .files import _checked, _write, read_bytes, safe_path
 from sumbi.measure.profile import ROLES, TOOL_CLASSES
-from .improve import LABEL, MAX_BYTES, _load, _lookup, _number, project
+from .improve import (LABEL, MAX_BYTES, PROJECT_REF as IMPROVE_PROJECT_REF, _load, _lookup,
+    _number, project)
 from .planner import digest
 from .revert import LEDGER
 
@@ -58,7 +59,7 @@ PROFILE = {
     "children-per-parent-max": "fan_out/children_max",
     "children-per-parent-median": "fan_out/children_median",
 }
-PROJECT_REF = re.compile(r"[a-z0-9_]{1,64}")
+PROJECT_REF = re.compile(IMPROVE_PROJECT_REF)
 COST_METRICS = (*PER_DAY, *RATIOS, *PROFILE)
 
 

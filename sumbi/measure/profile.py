@@ -174,7 +174,9 @@ def measure(found, rows, window, *, long_session_minutes=LONG_SESSION_MINUTES, a
         for ref, allocations in groups.items():
             project = projects.setdefault(ref, {"bucket": (allocations[0] if allocations
                 else row["project"])["bucket"], "rules": set(), "entries": []})
-            project["rules"].update(a["rule"] for a in allocations if a["rule"])
+            # Without usage events the session project candidate supplies the rule label.
+            project["rules"].update(a["rule"] for a in (allocations or [row["project"]])
+                if a.get("rule"))
             project["entries"].append({**base, "tokens": _tokens(
                 [{"tokens": a["tokens"]} for a in allocations]) if allocations else row["tokens"]})
     agents = sorted(set(agents) | {e["row"]["agent"] for e in entries})
@@ -223,14 +225,27 @@ def _fan_line(name, fan):
         f"per parent max {_show(fan['children_max'])}; median {_show(fan['children_median'])}")
 
 
+MODEL_LINE_ROWS = 5
+
+
+def _models_line(models):
+    """Largest rows by name; the rest fold into an explicit count and token share."""
+    parts = [("+".join(m["models"]) or "none") + f" sessions {m['sessions']} token share "
+        + _show(m["token_share"]) for m in models[:MODEL_LINE_ROWS]]
+    rest = models[MODEL_LINE_ROWS:]
+    if rest:
+        shares = [m["token_share"] for m in rest]
+        parts.append(f"{len(rest)} more model sets sessions {sum(m['sessions'] for m in rest)} "
+            "token share " + _show(None if None in shares else sum(shares)))
+    return "  Models: " + ("; ".join(parts) or "none")
+
+
 def _detail(name, group):
     lines = []
     for role_name, row in group["roles"].items():
         if row["sessions"]:
             lines.append(_role_line(f"{name} {role_name}", row))
-            lines.append("  Models: " + "; ".join(
-                ("+".join(m["models"]) or "none") + f" sessions {m['sessions']} token share "
-                + _show(m["token_share"]) for m in row["models"][:5]))
+            lines.append(_models_line(row["models"]))
             lines.append(_latency_line(role_name, row))
     lines.append(_fan_line(name, group["fan_out"]))
     return lines
