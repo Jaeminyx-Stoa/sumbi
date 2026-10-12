@@ -638,7 +638,33 @@ origin. No remote request is made. HTTPS and SSH origin forms normalize to the
 same host/repository identity, removing credentials, transport, default ports,
 trailing slashes and `.git`. Hosts are case-insensitive; repository path case is
 preserved. Windows paths normalize separators, dot segments and case; POSIX paths
-preserve case. Origins and paths are cached during a run.
+preserve case. Origins and paths are cached during a run. A directory's
+repository root is shared between files only while the filesystem still proves
+the answer Git would give: the cache is keyed by the resolved real directory (a
+retargeted link is a new key); between the directory and the root there must be
+no `.git` entry and no bare-repository marks (HEAD, objects and refs together);
+and the root's `.git` must be the one cached. That identity is the inode and
+config file of a `.git` directory, or for a `.git` file its content plus the
+existence, readability and identity of the gitdir it names. "Not a repository"
+holds only while no repository appears anywhere up the chain, up to a Git
+discovery ceiling. A subdirectory of a proven work tree reuses its root's
+origin query, which is dropped and read again when the root's `.git` identity
+changed, and the root is handed to Git exactly as Git printed it. Only regular
+files are opened; a `.git` FIFO, socket or device is never read and counts as
+unprovable. Anything that cannot be proven is asked again; a timeout, OS error
+or unexpected Git failure is never cached as a root and never shared: an origin
+read that failed this way stays that path's answer, as before, while
+subdirectories ask Git for themselves.
+
+Assumption: repository layout (`.git` entries, objects, refs, permissions and
+origins) does not change during one collect run. The per-path cache that existed
+before this sharing already relied on it, because a path asked once was never
+asked again during a run; sharing extends the same assumption to subdirectories
+of a proven root. The filesystem checks above catch the common ways it breaks,
+but they are not a full re-implementation of Git's repository discovery: for
+example, deleting `objects` or `refs`, or removing read access to `HEAD`, during
+a run is not detected. Under this assumption results equal querying every path
+alone; only the number of Git processes changes.
 
 Origin rules take priority. When any origin rules are configured, a known origin
 that matches none is explicitly `other` and cannot use a path fallback. An

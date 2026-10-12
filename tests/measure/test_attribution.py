@@ -4,13 +4,16 @@ from datetime import timedelta
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 from support import IsolatedTemporaryDirectory
+import threading
 import unittest
 from unittest.mock import patch
 
 from sumbi.events.tool_paths import resolve_path, shell_paths, tool_evidence
 from sumbi.measure.attribution import Attributor, ProjectRule
+from sumbi.core.paths import normalize_path
 from sumbi.core.time import Window
 from sumbi.core.values import timestamp
 from sumbi.measure.report import collect, text_summary
@@ -298,6 +301,296 @@ class EventAttributionTests(unittest.TestCase):
         output = json.dumps(salted) + text_summary(salted)
         for private in (str(self.home), "SYNTHETIC_SECRET", "synthetic-salt", "private.txt", "fixture-session", "cd "):
             self.assertNotIn(private, output)
+
+
+class RepositoryRootCacheTests(unittest.TestCase):
+    """Git is asked once per directory; nested repositories keep their own roots."""
+
+    def setUp(self):
+        temporary = IsolatedTemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name)
+        self.outer, self.inner = self.base / "outer", self.base / "outer" / "inner"
+        self.plain = self.base / "plain"
+        for repo in (self.outer, self.inner):
+            repo.mkdir(parents=True)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
+        (self.outer / "src").mkdir()
+        self.plain.mkdir()
+        for path in (self.outer / "a.txt", self.outer / "b.txt", self.outer / "src" / "c.txt",
+                     self.inner / "d.txt", self.inner / "e.txt", self.plain / "f.txt"):
+            path.write_text("synthetic\n", encoding="utf-8")
+
+    def toplevel_calls(self, attributor, values):
+        with patch("sumbi.measure.attribution.subprocess.run", wraps=subprocess.run) as run:
+            roots = {value: attributor.repository_path(value) for value in values}
+        calls = [c.args[0] for c in run.call_args_list if "--show-toplevel" in c.args[0]]
+        return roots, calls
+
+    def test_files_in_one_directory_share_one_query_and_nested_roots_stay_apart(self):
+        values = [str(self.outer / "a.txt"), str(self.outer / "b.txt"),
+                  str(self.outer / "missing.txt"), str(self.outer / "src" / "c.txt"),
+                  str(self.inner / "d.txt"), str(self.inner / "e.txt"), str(self.inner),
+                  str(self.plain / "f.txt"), str(self.plain)]
+        cached, calls = self.toplevel_calls(Attributor([]), values)
+        # outer, outer/src, inner and plain: one query each, whatever the file count.
+        self.assertEqual(len(calls), 4)
+        outer, inner = (Attributor([]).repository_path(str(p)) for p in (self.outer, self.inner))
+        self.assertNotEqual(outer, inner)
+        self.assertEqual({cached[v] for v in values[:4]}, {outer})
+        self.assertEqual({cached[v] for v in values[4:7]}, {inner})
+        for value in values[7:]:
+            self.assertEqual(cached[value], normalize_path(value))
+        # Each answer equals a fresh attributor's, which queries git for that value alone.
+        for value in values:
+            self.assertEqual(Attributor([]).repository_path(value), cached[value], value)
+
+    def test_work_tree_subdirectories_share_their_repository_origin(self):
+        for repo, url in ((self.outer, "https://example.invalid/synthetic/outer.git"),
+                          (self.inner, "git@example.invalid:synthetic/inner.git")):
+            subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", url],
+                           check=True, capture_output=True)
+        (self.inner / "deep").mkdir()
+        cwds = [str(self.outer / "src"), str(self.outer), str(self.inner / "deep"),
+                str(self.inner), str(self.plain)]
+        attributor = Attributor([])
+        with patch("sumbi.measure.attribution.subprocess.run", wraps=subprocess.run) as run:
+            links = {cwd: attributor.event_link(cwd) for cwd in cwds}
+        origin_calls = [c.args[0] for c in run.call_args_list if "--show-toplevel" not in c.args[0]]
+        # Two queries each for outer and inner, one for plain; subdirectories reuse their root's.
+        self.assertEqual(len(origin_calls), 5)
+        for cwd in cwds:
+            fresh = Attributor([])
+            self.assertEqual(fresh.event_link(cwd), links[cwd], cwd)
+            self.assertEqual(fresh.origin(cwd), attributor.origin(cwd), cwd)
+            key = normalize_path(cwd)
+            self.assertEqual(fresh.origin_queries[key], attributor.origin_queries[key], cwd)
+        self.assertNotEqual(attributor.origin(str(self.outer / "src")),
+                            attributor.origin(str(self.inner / "deep")))
+        self.assertEqual(attributor.origin_queries[normalize_path(str(self.plain))], "outside")
+
+    def test_failed_queries_are_cached_per_directory_too(self):
+        values = [str(self.plain / "f.txt"), str(self.plain / "g.txt")]
+        roots, calls = self.toplevel_calls(Attributor([]), values)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(roots, {v: normalize_path(v) for v in values})
+
+
+class RepositoryRootChangeTests(unittest.TestCase):
+    """A shared answer must equal a fresh per-path query, also after the tree changes."""
+
+    URLS = {"outer": "https://example.invalid/synthetic/outer.git",
+            "inner": "https://example.invalid/synthetic/inner.git"}
+
+    def setUp(self):
+        temporary = IsolatedTemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name)
+
+    def repo(self, path, name):
+        path.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init", "-q", str(path)], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(path), "remote", "add", "origin", self.URLS[name]],
+                       check=True, capture_output=True)
+
+    def answers(self, attributor, directory, step):
+        """Paths never asked before `step`, so only shared state can answer them."""
+        child = directory / f"c{step}"
+        child.mkdir(exist_ok=True)
+        return (attributor.repository_path(str(directory / f"f{step}.txt")),
+                attributor.repository_path(str(child / "file.txt")),
+                attributor.origin(str(child)), attributor.event_link(str(child)))
+
+    def assertSameAsFresh(self, attributor, directory, step):
+        self.assertEqual(self.answers(attributor, directory, step),
+                         self.answers(Attributor([]), directory, step), str(directory))
+
+    def test_failed_root_query_is_retried_not_cached(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        (outer / "src").mkdir()
+        real = subprocess.run
+        calls = []
+
+        def flaky(command, *args, **kwargs):
+            calls.append(command)
+            if len(calls) == 1:
+                raise subprocess.TimeoutExpired(command, 5)
+            return real(command, *args, **kwargs)
+        attributor = Attributor([])
+        with patch("sumbi.measure.attribution.subprocess.run", side_effect=flaky):
+            first = attributor.repository_path(str(outer / "src" / "a.txt"))
+            second = attributor.repository_path(str(outer / "src" / "b.txt"))
+        self.assertEqual(first, normalize_path(str(outer / "src" / "a.txt")))
+        self.assertEqual(second, Attributor([]).repository_path(str(outer)))
+        self.assertEqual(attributor.origin(str(outer / "src"))[0],
+                         normalize_origin_for_test(self.URLS["outer"]))
+
+    def check_one_origin_timeout_is_not_shared(self, marker):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        for name in ("a", "b", "c"):
+            (outer / name).mkdir()
+        real = subprocess.run
+        failed = []
+
+        def flaky(command, *args, **kwargs):
+            if marker in command and not failed:
+                failed.append(command)
+                raise subprocess.TimeoutExpired(command, 5)
+            return real(command, *args, **kwargs)
+        attributor = Attributor([])
+        # Learn the root first, as event_link does, so subdirectories may share it.
+        attributor.repository_path(str(outer / "a" / "seen.txt"))
+        with patch("sumbi.measure.attribution.subprocess.run", side_effect=flaky):
+            self.assertEqual(attributor.origin(str(outer))[1], "origin_unavailable")
+            shared = [attributor.origin(str(outer / name)) for name in ("a", "b", "c")]
+        self.assertTrue(failed)
+        fresh = [Attributor([]).origin(str(outer / name)) for name in ("a", "b", "c")]
+        self.assertEqual(shared, fresh)
+        self.assertTrue(all(state == "origin" for _, state in shared))
+
+    def test_one_time_work_tree_check_timeout_is_not_shared(self):
+        self.check_one_origin_timeout_is_not_shared("--is-inside-work-tree")
+
+    def test_one_time_config_timeout_is_not_shared(self):
+        self.check_one_origin_timeout_is_not_shared("remote.origin.url")
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "FIFOs are POSIX only")
+    def test_fifo_git_entry_is_never_opened(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        (outer / "pkg").mkdir()
+        os.mkfifo(outer / "pkg" / ".git")
+        attributor = Attributor([])
+        result = {}
+
+        def ask():
+            result["cached"] = [self.answers(attributor, outer / "pkg", step) for step in (1, 2)]
+        worker = threading.Thread(target=ask, daemon=True)
+        worker.start()
+        worker.join(30)
+        self.assertFalse(worker.is_alive(), "lookup blocked on a FIFO .git")
+        self.assertEqual(result["cached"][1], self.answers(Attributor([]), outer / "pkg", 2))
+
+    def test_nested_repository_created_or_removed_during_a_run(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        (outer / "pkg").mkdir()
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, outer / "pkg", 1)
+        self.assertSameAsFresh(attributor, outer, 2)
+        self.repo(outer / "pkg", "inner")  # inner appears: now owns pkg
+        self.assertSameAsFresh(attributor, outer / "pkg", 3)
+        self.assertEqual(attributor.origin(str(outer / "pkg" / "c3"))[0],
+                         normalize_origin_for_test(self.URLS["inner"]))
+        shutil.rmtree(outer / "pkg" / ".git")  # inner disappears: outer owns pkg again
+        self.assertSameAsFresh(attributor, outer / "pkg", 4)
+        self.assertEqual(attributor.origin(str(outer / "pkg" / "c4"))[0],
+                         normalize_origin_for_test(self.URLS["outer"]))
+
+    def test_non_repository_becoming_a_repository(self):
+        plain = self.base / "plain"
+        (plain / "sub").mkdir(parents=True)
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, plain / "sub", 1)
+        self.repo(plain, "outer")
+        self.assertSameAsFresh(attributor, plain / "sub", 2)
+        self.assertSameAsFresh(attributor, plain, 3)
+
+    def test_repository_removed_during_a_run(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        (outer / "src").mkdir()
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, outer / "src", 1)
+        shutil.rmtree(outer / ".git")
+        self.assertSameAsFresh(attributor, outer / "src", 2)
+
+    def test_symlink_retargeted_during_a_run(self):
+        one, two = self.base / "one", self.base / "two"
+        self.repo(one, "outer")
+        self.repo(two, "inner")
+        link = self.base / "link"
+        try:
+            link.symlink_to(one, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlinks unavailable")
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, link, 1)
+        link.unlink()
+        link.symlink_to(two, target_is_directory=True)
+        self.assertSameAsFresh(attributor, link, 2)
+        self.assertEqual(attributor.origin(str(link / "c2"))[0], normalize_origin_for_test(self.URLS["inner"]))
+
+    def separate(self, path, name, git_dir):
+        subprocess.run(["git", "init", "-q", "--separate-git-dir", str(git_dir), str(path)],
+                       check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(path), "remote", "add", "origin", self.URLS[name]],
+                       check=True, capture_output=True)
+
+    def test_gitdir_file_whose_target_is_removed(self):
+        root = self.base / "root"
+        root.mkdir()
+        self.separate(root, "outer", self.base / "meta")
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, root, 1)
+        shutil.rmtree(self.base / "meta")  # the .git file stays, its target is gone
+        self.assertSameAsFresh(attributor, root, 2)
+
+    def test_gitdir_file_pointed_at_another_repository(self):
+        root = self.base / "root"
+        root.mkdir()
+        self.separate(root, "outer", self.base / "meta1")
+        other = self.base / "other"
+        other.mkdir()
+        self.separate(other, "inner", self.base / "meta2")
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, root, 1)
+        (root / ".git").unlink()
+        (root / ".git").write_text("gitdir: " + str(self.base / "meta2") + chr(10), encoding="utf-8")
+        self.assertSameAsFresh(attributor, root, 2)
+        self.assertEqual(attributor.origin(str(root / "c2"))[0],
+                         normalize_origin_for_test(self.URLS["inner"]))
+
+    def test_nested_bare_repository_created_during_a_run(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        (outer / "pkg").mkdir()
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, outer / "pkg", 1)
+        subprocess.run(["git", "init", "-q", "--bare", str(outer / "pkg")],
+                       check=True, capture_output=True)
+        self.assertSameAsFresh(attributor, outer / "pkg", 2)
+
+    def test_root_recreated_at_the_same_path_reads_its_new_origin(self):
+        outer = self.base / "outer"
+        self.repo(outer, "outer")
+        attributor = Attributor([])
+        self.assertSameAsFresh(attributor, outer, 1)
+        shutil.rmtree(outer / ".git")
+        self.repo(outer, "inner")
+        self.assertSameAsFresh(attributor, outer, 2)
+        self.assertEqual(attributor.origin(str(outer / "c2"))[0],
+                         normalize_origin_for_test(self.URLS["inner"]))
+
+    @unittest.skipIf(os.name == "nt", "backslash is a path separator on Windows")
+    def test_backslash_in_a_posix_repository_name(self):
+        outer = self.base / ("back" + chr(92) + "slash")
+        self.repo(outer, "outer")
+        (outer / "src").mkdir()
+        attributor = Attributor([])
+        attributor.repository_path(str(outer / "src" / "a.txt"))
+        attributor.repository_path(str(outer / "a.txt"))
+        # The subdirectory is asked first, so its answer cannot come from a root query.
+        sub = attributor.origin(str(outer / "src"))
+        self.assertEqual(sub[0], normalize_origin_for_test(self.URLS["outer"]))
+        self.assertEqual(attributor.origin_queries[normalize_path(str(outer / "src"))], "checkout")
+        self.assertEqual(attributor.origin(str(outer)), sub)
+
+def normalize_origin_for_test(url):
+    from sumbi.core.paths import normalize_origin
+    return normalize_origin(url)
 
 
 class PathEvidenceTests(unittest.TestCase):
