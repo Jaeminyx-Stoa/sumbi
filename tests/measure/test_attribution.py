@@ -440,6 +440,8 @@ class RepositoryRootChangeTests(unittest.TestCase):
                 raise subprocess.TimeoutExpired(command, 5)
             return real(command, *args, **kwargs)
         attributor = Attributor([])
+        # Learn the root first, as event_link does, so subdirectories may share it.
+        attributor.repository_path(str(outer / "a" / "seen.txt"))
         with patch("sumbi.measure.attribution.subprocess.run", side_effect=flaky):
             self.assertEqual(attributor.origin(str(outer))[1], "origin_unavailable")
             shared = [attributor.origin(str(outer / name)) for name in ("a", "b", "c")]
