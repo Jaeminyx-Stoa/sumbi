@@ -16,6 +16,11 @@ sumbi improve --root . --evidence collect.json --bundle local-bundle.json
 sumbi improve --root . --evidence collect.json --bundle local-bundle.json --json
 sumbi improve --root . --evidence collect.json --bundle local-bundle.json --apply --reviewed-sha256 BUNDLE_SHA256
 sumbi improve --root . --revert BACKUP_ID
+sumbi improve --evidence collect.json --json-out out/observations.json
+sumbi improve --root . --register-external ID --applied-at UTC --change LABEL \
+  --predict METRIC:DIRECTION:PERCENT --revert-if METRIC:DIRECTION:PERCENT \
+  --before-days N --after-days N
+sumbi improve --root . --check ID --before before.json --after after.json [--signals FILE]
 ```
 
 With evidence alone, output is finite numeric observations: sessions, tool/API
@@ -176,3 +181,109 @@ registration timestamp later than the current UTC time. Then pass
 actual apply timestamp. Apply does not claim adoption, cost savings or success.
 The existing comparison exposure reader ignores revert audit rows; do not treat
 a reverted intervention as persistent exposure or compare across that reversal.
+
+## JSON files
+
+`--json-out OUT` writes the same allow-listed JSON object that `--json` prints
+for the selected mode (guide, observations, proposal, revert counts,
+registration or check) to `OUT`. It is UTF-8 without a byte-order mark, LF,
+published atomically, and avoids shell redirection differences such as a BOM
+added by an older PowerShell. Standard output is unchanged, so text mode still
+prints the local review diff. The name differs from collect's `--json OUT`
+because improve's `--json` is already a format flag. Output may not replace an
+input file (evidence, bundle, registration, before/after reports, signals), a
+bundle target, anything under the repository's `.sumbi/` or a local agent-log
+directory under the home directory, using collect's log-root check. Apply
+writes the file after the transaction; a failed write reports an error but does
+not undo an applied change.
+
+```console
+sumbi improve --evidence collect.json --json-out out/observations.json
+```
+
+## External interventions
+
+Some changes are applied through the host repository's own pull request rather
+than an improve bundle. Register them in the same intervention ledger so a
+later round can compare them without hand-written notes:
+
+```console
+sumbi improve --root . --register-external worker-cap-round \
+  --applied-at 2030-01-03T00:00:00Z --change worker-time-cap \
+  --predict tokens-per-day:decrease:30 --predict tokens-per-success:decrease:10 \
+  --revert-if tool-error-rate:increase:50 --before-days 2 --after-days 2
+```
+
+The command appends one `"action": "register"` row to
+`.sumbi/interventions.jsonl` under the install lock. It refuses an intervention
+ID that already appears in the ledger, and improve apply refuses to reuse a
+registered ID. Every value is a bounded label or number: the ID, `--change`
+labels (1-16) and metric labels use `[a-z][a-z0-9-]{0,63}`; `--predict` and
+`--revert-if` take `METRIC:increase|decrease:PERCENT` (1-16 each). There is no
+free-text field. Keep a description or rationale in your own local notes, as a
+bundle keeps its hypothesis outside the ledger. The row records the windows
+`[applied-before_days, applied)` and `[applied, applied+after_days)`, the
+registration time, and `preregistered: false` when registered after the apply
+time. Its `utc_time` is the apply time, so `compare --interventions` reads it
+as the actual apply time.
+
+```json
+{"action": "register", "practice_id": "external-change",
+ "intervention_id": "worker-cap-round", "changes": ["worker-time-cap"],
+ "predictions": [{"metric": "tokens-per-day", "direction": "decrease",
+   "rough_size_percent": 30.0}],
+ "revert_if": [{"metric": "tool-error-rate", "direction": "increase",
+   "threshold_percent": 50.0}],
+ "windows": {"before_days": 2.0, "after_days": 2.0,
+   "before": {"since": "2030-01-01T00:00:00Z", "until": "2030-01-03T00:00:00Z"},
+   "after": {"since": "2030-01-03T00:00:00Z", "until": "2030-01-05T00:00:00Z"},
+   "bounds": "[since,until)"},
+ "applied_at": "2030-01-03T00:00:00Z", "registered_at": "2030-01-02T09:00:00Z",
+ "preregistered": true, "utc_time": "2030-01-03T00:00:00Z"}
+```
+
+Check the registration with two collect reports for the windows before and
+after the change:
+
+```console
+sumbi improve --root . --check worker-cap-round \
+  --before before-collect.json --after after-collect.json --json-out out/check.json
+```
+
+The before report must end, and the after report start, on their own side of
+the apply time; each window reports whether it matches the registration. Base
+cost metrics are normalized per day of each report's window so unequal windows
+stay readable: `sessions-per-day`, `tokens-per-day`, the reported token
+components (`new-input-`, `cache-write-`, `cache-read-`, `output-` and
+`reasoning-output-subset-tokens-per-day`), `compactions-per-day`,
+`estimated-active-seconds-per-day`, and `tool-error-rate` (tool errors per
+tool result). Each row shows before, after, change percent and observed
+direction; a missing component stays `null`. Predictions and revert criteria
+naming these metrics are shown side by side, with `crossed` for a revert
+criterion whose observed change reaches its threshold in its direction.
+`tokens-per-success`, `time-per-success` and `success-rate` are
+`not-available` with reason `no-success-denominator`: collect has no success
+outcome. Other labels are `not-available` with reason `not-in-collect`. The
+verdict is always `observation-not-causal`; work volume, model mix and other
+changes in the same windows are not removed, and `crossed` is a prompt for the
+owner's review, not an automatic revert. Registrations are read only from
+`register` rows; bundle applies keep their success-based comparison flow.
+
+### External signal files
+
+A hook or wrapper may log simple events of its own, such as a warning or cap
+count. Pass that file to a check with `--signals FILE`:
+
+```json
+{"ts": "2030-01-02T10:00:00Z", "event": "warn"}
+{"ts": 1893636000, "event": "cap"}
+```
+
+Each nonblank line is a JSON object with `ts` (epoch seconds, or ISO 8601 with
+a UTC offset) and an `event` label. All other fields are ignored and never
+printed. The check counts labels per before/after window. Labels outside
+`[a-z][a-z0-9-]{0,63}` count as `invalid` in their window; lines without a JSON
+object or a valid `ts` count as `unreadable_lines`; events outside both windows
+count as `outside_windows`. The file is at most 64 MiB. This is a separate
+input, not a [sumbi-events v1](EVENTS.md) stream: do not put these lines under
+`<home>/.sumbi/events/`, where unknown event types are coverage defects.

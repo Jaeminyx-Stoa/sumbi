@@ -198,4 +198,10 @@ not treat project or parent evidence as an accepted pull request. Instruction
 loading, propagation, remote transport and producer authentication have their
 own contracts and remain outside this format.
 
+Simple hook or wrapper signal logs (`ts` plus an `event` label) are not part of
+this format and need no new v1 event type. Pass them to
+`sumbi improve --check --signals FILE`, which only counts labels per window; see
+[external signal files](IMPROVE.md#external-signal-files). Keep them out of
+`<home>/.sumbi/events/`, where unknown types are coverage defects.
+
 See [measurement rules](MEASUREMENT.md) and [the support matrix](DESIGN.md#support-matrix).
