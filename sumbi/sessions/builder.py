@@ -3,7 +3,7 @@ Named rules retain snapshot, cumulative usage, execution pairing, context, and d
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Iterable
 
 from sumbi.core.paths import execution_cwd
@@ -17,9 +17,6 @@ from sumbi.events.references import branch, branch_query, tool_refs
 from sumbi.events.tool_paths import resolve_path, tool_evidence
 from sumbi.sessions.session import Session
 from sumbi.sessions.hook_denials import reason_key
-
-# Covers sub-second record reordering and modification-time flush delays.
-SKIP_MARGIN = timedelta(minutes=1)
 
 
 @dataclass
@@ -599,26 +596,27 @@ def collect(adapter, home, window, coverage, *, local_review=False, collect_link
 def collect_window(adapter, home, window, coverage, *, local_review=False, reason_salt=None):
     """Like `collect`, but skip files that cannot change any session it returns.
 
-    A file is pre-window when both its modification time and its last
-    timestamped record precede `since` by SKIP_MARGIN. It is read only when it
+    A file is pre-window when its modification time precedes `since` (a cheap
+    prefilter only) and every time its translator could read from it, found by
+    the adapter's `latest` scan, precedes `since` as well. It is read only when it
     shares a session identity with a read file or holds a read session's parent.
     Every returned session is therefore folded from all of its files in the
     original order. Returns (sessions, files_skipped).
     """
-    # A window starting in the future means log clocks are not ours: no skipping.
+    # Every file predates a future window, so the prefilter cannot help there.
     if not hasattr(adapter, "session_keys") or window.since > datetime.now(timezone.utc):
         return collect(adapter, home, window, coverage, local_review=local_review,
             reason_salt=reason_salt), 0
     paths = adapter.sources(home)
     probes, by_key, needed = {}, {}, set()
-    bound = window.since - SKIP_MARGIN
     for path in paths:
         try:
-            # Both must hold: some writers leave modification times at creation.
-            stale = path.stat().st_mtime < bound.timestamp() and (
-                (latest := adapter.latest(home, path)) is not None and latest < bound)
+            # Some writers leave modification times at creation: the scan decides.
+            stale = path.stat().st_mtime < window.since.timestamp() and (
+                (latest := adapter.latest(home, path)) is not None and latest < window.since)
             probes[path] = adapter.session_keys(home, path)
-        except OSError:
+        except (OSError, ValueError):
+            # Unreadable or undecodable time evidence: read the file in full.
             stale = False
         if not stale:
             needed.add(path)

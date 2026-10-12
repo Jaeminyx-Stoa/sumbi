@@ -12,7 +12,7 @@ from sumbi.events.schema import (
     Counter, Request, SessionEnd, Resume, LocalText, Diagnostic, SourceIdentity, freeze,
     RequestUsage, CompactionBoundary,
 )
-from .common import key, latest, record_identity
+from .common import key, latest_time, record_identity
 
 KNOWN = {"session_meta", "turn_context", "event_msg", "response_item", "compacted",
     "token_usage_record", "inter_agent_communication_metadata", "world_state"}
@@ -286,3 +286,8 @@ def read(home: Path, path: Path, coverage: Coverage):
             fallback_id=str(event["ordinal"]) if "ordinal" in event else None,
             fallback_source_identity=SourceIdentity(freeze(event["ordinal"]))
             if "ordinal" in event else None)
+
+
+def latest(home: Path, path: Path):
+    """Record timestamps and the payload start/completion times the translator reads."""
+    return latest_time(path, ("timestamp", "started_at", "completed_at"))

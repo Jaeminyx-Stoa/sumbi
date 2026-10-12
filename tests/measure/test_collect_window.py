@@ -7,17 +7,24 @@ import os
 from pathlib import Path
 from support import IsolatedTemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from sumbi.core.records import Coverage
 from sumbi.core.time import Window
 from sumbi.core.values import timestamp
 from sumbi.events.adapters import claude_code, codex
 from sumbi.measure.report import collect
-from sumbi.sessions.builder import collect_window
+from sumbi.events.adapters.common import latest_time
+from sumbi.sessions.builder import collect as collect_sessions, collect_window
 
 WINDOW = Window(timestamp("2020-01-02T00:00:00Z"), timestamp("2020-01-03T00:00:00Z"))
 STALE = timestamp("2020-01-01T12:00:00Z").timestamp()
 FRESH = timestamp("2020-01-02T12:00:00Z").timestamp()
+
+
+def main_path(adapter, home, window, coverage, **options):
+    """The pre-skipping call: every file of every adapter is read."""
+    return collect_sessions(adapter, home, window, coverage, **options), 0
 
 
 def without_coverage(report):
@@ -48,12 +55,12 @@ class WindowSkipTests(unittest.TestCase):
         for path, mtime in self.files.items():
             os.utime(path, (now, now) if fresh else (mtime, mtime))
 
-    def compare(self):
-        """Return (skipping report, reference report with every file fresh)."""
+    def compare(self, window=WINDOW):
+        """Return (skipping report, report folded by main's unskipped collection path)."""
         self.stamp()
-        skipping = collect(self.home, WINDOW)[0]
-        self.stamp(fresh=True)
-        reference = collect(self.home, WINDOW)[0]
+        skipping = collect(self.home, window)[0]
+        with patch("sumbi.measure.report.collect_window", main_path):
+            reference = collect(self.home, window)[0]
         self.assertEqual(without_coverage(skipping), without_coverage(reference))
         for agent in ("claude-code", "codex"):
             self.assertEqual(reference["coverage"]["adapters"][agent]["files_skipped"], 0)
@@ -148,17 +155,60 @@ class WindowSkipTests(unittest.TestCase):
         self.write(".codex/sessions/g/rollout-edge.jsonl", [self.meta("thread-b",
             "2020-01-01T09:00:00Z"), self.token("2020-01-01T23:59:30Z", 10, 0, 1)], STALE)
         skipping, _ = self.compare()
-        self.assertEqual(self.adapters(skipping)["codex"]["files_skipped"], 0)
+        self.assertEqual(self.adapters(skipping)["codex"]["files_skipped"], 1)
         self.assertEqual(skipping["summary"]["sessions"], 1)
 
-    def test_last_records_reads_long_and_partial_tail_lines(self):
-        from sumbi.core.records import last_records, records
-        path = self.home / "tail.jsonl"
-        long_line = json.dumps({"timestamp": "2020-01-01T00:00:01Z", "pad": "x" * 200000})
-        path.write_bytes(b'{"a": 1}\nnot json\n' + long_line.encode() + b'\n{"b": 2')
-        expected = list(records(path, Coverage()))
-        self.assertEqual(list(last_records(path)), expected[::-1])
-        self.assertEqual(codex.latest(self.home, path), timestamp("2020-01-01T00:00:01Z"))
+    def completion(self, outer, **payload):
+        record = {"type": "event_msg", "payload": payload}
+        if outer is not None:
+            record["timestamp"] = outer
+        return record
+
+    def test_codex_completion_times_inside_the_window_keep_the_file(self):
+        start_ms = timestamp("2020-01-01T23:59:00Z").timestamp() * 1000
+        end_ms = timestamp("2020-01-02T00:01:30Z").timestamp() * 1000
+        item = {"type": "item_completed", "started_at_ms": start_ms, "completed_at_ms": end_ms,
+            "item": {"type": "CommandExecution", "id": "call-1", "command": ["true"],
+                "cwd": str(self.cwd), "exit_code": 0}}
+        task = {"type": "task_complete", "turn_id": "turn-1",
+            "started_at": start_ms / 1000, "completed_at": end_ms / 1000}
+        cases = {"no outer timestamp": self.completion(None, **item),
+            "old outer timestamp": self.completion("2020-01-01T10:00:00Z", **item),
+            "request completion": self.completion("2020-01-01T10:00:00Z", **task)}
+        for name, record in cases.items():
+            with self.subTest(case=name):
+                self.files.clear()
+                for path in self.home.glob(".codex/sessions/g/*"):
+                    path.unlink()
+                self.write(".codex/sessions/g/rollout-a.jsonl", [self.meta("thread-a",
+                    "2020-01-01T09:00:00Z"), record, self.token("2020-01-01T10:00:01Z", 5, 0, 1)],
+                    STALE)
+                skipping, reference = self.compare()
+                self.assertEqual(self.adapters(skipping)["codex"]["files_skipped"], 0)
+                self.assertEqual(reference["summary"]["sessions"], 1)
+                durations = reference["summary"]["time"]["durations"]
+                self.assertEqual(durations["request" if name == "request completion"
+                    else "tool"]["seconds"], 90.0)
+
+    def test_latest_time_scan_over_reports_but_never_misses(self):
+        path = self.home / "scan.jsonl"
+        path.write_text("\n".join([json.dumps({"timestamp": "2020-01-01T00:00:01Z"}),
+            json.dumps({"payload": {"nested": {"completed_at": "2020-01-05T00:00:00Z"}}}),
+            json.dumps({"payload": {"started_at_ms": 1577836800000, "text":
+                '"timestamp": "2099-01-01T00:00:00Z"'}}), "not json"]) + "\n", encoding="utf-8")
+        self.assertEqual(latest_time(path, ("timestamp",)), timestamp("2020-01-01T00:00:01Z"))
+        self.assertEqual(latest_time(path, ("timestamp", "started_at", "completed_at")),
+            timestamp("2020-01-05T00:00:00Z"))
+        path.write_text('{"timestamp": 2020-01-01}\n', encoding="utf-8")
+        with self.assertRaises(ValueError):
+            latest_time(path, ("timestamp",))
+
+    def test_minimum_date_window_collects_like_main(self):
+        window = Window(timestamp("0001-01-01T00:00:00Z"), timestamp("0001-01-02T00:00:00Z"))
+        self.assertEqual(self.compare(window)[0]["summary"]["sessions"], 0)
+        self.write(".claude/projects/g/main-a.jsonl",
+            [self.claude("2020-01-02T01:00:00Z", "a1")], FRESH)
+        self.assertEqual(self.compare(window)[0]["summary"]["sessions"], 0)
 
     def test_future_window_never_skips(self):
         path = self.write(".claude/projects/g/main-a.jsonl",

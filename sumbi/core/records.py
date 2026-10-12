@@ -53,29 +53,6 @@ def records(path: Path, coverage: Coverage, *, ignore_blank: bool = False):
         coverage.unreadable_files += 1
 
 
-def last_records(path: Path):
-    """Yield the objects `records` would yield, from the end backwards, uncounted.
-
-    Blocks grow geometrically so a long final line costs at most a few reads.
-    An OSError propagates like `first_records`.
-    """
-    with path.open("rb") as stream:
-        position = stream.seek(0, 2)
-        block, partial = 1 << 16, b""
-        while position > 0:
-            step = min(block, position)
-            position -= step
-            stream.seek(position)
-            lines = (stream.read(step) + partial).split(b"\n")
-            partial = lines[0]
-            for raw in reversed(lines[1:]):
-                if (event := _decode(raw)) is not None:
-                    yield event
-            block = min(block * 2, 1 << 24)
-        if (event := _decode(partial)) is not None:
-            yield event
-
-
 def first_records(path: Path):
     """Yield the same objects as `records`, lazily and without coverage counts.
 

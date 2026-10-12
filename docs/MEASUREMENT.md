@@ -44,28 +44,32 @@ Broken JSON, invalid UTF-8 and non-object lines increase coverage counters and
 do not stop subsequent records from being read. There is no line cap or
 model-search cap.
 
-`sumbi collect` (and the install baseline) may skip a Claude or Codex file when
-both its modification time and its last timestamped record precede `since` by
-at least one minute. Both are only evidence that the file need not be read:
-native streams append records as they happen, so no event in it can be in the
-window. Neither ever supplies an event time, identity or window membership;
-those still come from the records. The modification time alone is not enough:
+`sumbi collect` (and the install baseline) may skip a Claude or Codex file whose
+modification time precedes `since` and in which every time the translator could
+read also precedes `since`. The modification time is only a cheap prefilter:
 some writers leave it at the file's creation time while they keep appending.
-The margin absorbs sub-second record reordering and delayed time updates.
-A candidate's tail is read back to its last timestamped record, and its first
-record (Codex: up to its first session header) to learn which session
-identities it holds. The file
+The deciding evidence is a raw scan of the whole file for every field the
+translator turns into a time: record `timestamp` values for both adapters, plus
+Codex `started_at`, `completed_at`, `started_at_ms` and `completed_at_ms` (tool,
+execution and request endpoints, which can lie after the record's own
+timestamp or stand in a record without one). The scan matches those names at
+any depth, so nested or unrelated fields can only keep a file in; values decode
+exactly as the translator decodes them, and a value it cannot decode, an
+unreadable file or a file without any time keeps the file in. A field name
+spelled with JSON escape sequences is not matched; the native writers do not
+emit them. Neither the
+modification time nor the scan ever supplies an event time, identity or window
+membership; those still come from the records the translator folds. The scan
+costs a byte search per line and full JSON decoding only of the matched
+values. A skipped file's first record (Codex: up to its first session header)
+is read to learn which session identities it holds. The file
 is read in full after all when it shares a session identity with any read file
 or holds the parent of a read session, repeating until no read session's
 identity or parent remains in a skipped file. Each reported session, and every
 parent used by delegation, is therefore folded from all of its files in the
 original order, so sessions, summaries, spend, delegation and hook denials are
 the same as without skipping. Skipping is off when `since` lies in the future
-(log clocks then disagree with the file system's) and for `sumbi-events` logs.
-It assumes records are appended in time order and that log timestamps and file
-modification times come from one clock. Logs rewritten out of order, or written
-by a host whose clock runs ahead, should be collected with a window that starts
-after those files were last written.
+(every file would pass the prefilter) and for `sumbi-events` logs.
 
 Claude sources are the JSONL files directly inside each project directory and
 all JSONL files below its subagent directories, including nested histories.

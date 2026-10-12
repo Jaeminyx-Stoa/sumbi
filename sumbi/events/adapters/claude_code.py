@@ -11,7 +11,7 @@ from sumbi.events.schema import (
     ToolInput, ToolOutput, ToolStart, ToolEnd, CommandExecution, FileEdit,
     Counter, Request, LocalText, Diagnostic, SourceIdentity, freeze, ModelRequest,
 )
-from .common import key, latest, record_identity
+from .common import key, latest_time, record_identity
 
 KNOWN = {"assistant", "user", "system", "progress", "attachment", "summary",
     "file-history-snapshot", "file-history-delta", "queue-operation", "pr-link",
@@ -217,3 +217,8 @@ def _subagent_metadata(path):
         return status, depth, parent
     except (OSError, ValueError, UnicodeError):
         return "unknown", None, None
+
+
+def latest(home: Path, path: Path):
+    """Claude translates only the record timestamp into times."""
+    return latest_time(path, ("timestamp",))
