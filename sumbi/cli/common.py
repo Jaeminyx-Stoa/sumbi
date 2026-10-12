@@ -102,6 +102,9 @@ def configure_collection(command, *, deliver=False, comparison=False):
     command.add_argument("--idle-minutes", type=idle, default=5.0)
     command.add_argument("--json", default="out/compare.json" if comparison
         else "out/deliver.json" if deliver else "out/collect.json", metavar="OUT")
+    if not deliver and not comparison:
+        command.add_argument("--long-session-minutes", type=idle, default=60.0,
+            help="Active minutes above which a session counts as long (profile)")
     if not deliver:
         command.add_argument("--local-review", type=Path, metavar="OUT")
     else:

@@ -11,6 +11,8 @@ from sumbi.events.registry import ADAPTERS, DEFAULT_AGENTS, log_roots
 from sumbi.measure.attribution import Attributor, ProjectRule, RepositoryAttributor
 from sumbi.measure.delegation import measure as delegation, text_lines as delegation_text
 from sumbi.measure.hook_denials import measure as hooks, text_lines as hooks_text
+from sumbi.measure.profile import (LONG_SESSION_MINUTES, measure as profile,
+    tail_lines as profile_tail, text_lines as profile_text)
 from sumbi.sessions.hook_denials import reason_key
 from sumbi.sessions.session import COUNT_KINDS, EVIDENCE_TYPES, TOKEN_KINDS
 from sumbi.core.records import Coverage
@@ -55,14 +57,16 @@ def totals(sessions: list[dict], idle_minutes: float = 5) -> dict:
 def collect(home: Path, window: Window, *, agents: list[str] | None = None,
     rules: list[ProjectRule] | None = None, idle_minutes: float = 5,
     local_review: bool = False, salt: bytes | None = None,
-    repository: Path | None = None) -> tuple[dict, str]:
+    repository: Path | None = None,
+    long_session_minutes: float = LONG_SESSION_MINUTES) -> tuple[dict, str]:
     with pseudonym_key(salt if salt is not None else read_salt()):
         return _collect(home, window, agents=agents, rules=rules, idle_minutes=idle_minutes,
-            local_review=local_review, repository=repository)
+            local_review=local_review, repository=repository,
+            long_session_minutes=long_session_minutes)
 
 
 def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
-    local_review, repository) -> tuple[dict, str]:
+    local_review, repository, long_session_minutes) -> tuple[dict, str]:
     attributor = RepositoryAttributor(repository) if repository is not None else Attributor(
         rules or [])
     sessions = []
@@ -120,7 +124,9 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
         "delegation": delegation(found_sessions, {s["id"]: s for s in sessions}, window,
             attributor, idle_minutes, agents=by_agent),
         "hook_denials": hooks(found_sessions, {s["id"]: s for s in sessions}, window,
-            agents=by_agent, persistent_ids=salted)}
+            agents=by_agent, persistent_ids=salted),
+        "profile": profile(found_sessions, {s["id"]: s for s in sessions}, window,
+            long_session_minutes=long_session_minutes, agents=by_agent)}
     if repository is not None:
         scanned = sum(c["sessions_in_window"] for c in coverage.values())
         report["scope"] = {"kind": "repository", "sessions_in_window": scanned,
@@ -185,8 +191,10 @@ def text_summary(report: dict) -> str:
     lines.append("Evidence token shares: "
         + "; ".join(f"{k} {v:.6f}" for k, v in report["coverage"]["evidence_shares"].items()))
     lines.append(f"Unattributed token share: {report['coverage']['unattributed_share']:.6f}")
+    lines.extend(profile_text(report["profile"]))
     lines.extend(delegation_text(report["delegation"]))
     lines.extend(hooks_text(report["hook_denials"]))
+    lines.extend(profile_tail(report, report["profile"]))
     return "\n".join(lines)
 
 

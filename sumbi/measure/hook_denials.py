@@ -81,10 +81,16 @@ def text_lines(report):
     lines = _text("all", report["summary"])
     for agent, group in report["by_agent"].items():
         lines.extend(_text(agent, group))
+    quiet = 0
     for group in report["by_project_and_agent"]:
+        if not group["denials"] and not group["timeouts"]:
+            quiet += 1  # Folded below so the summary stays near the end.
+            continue
         name = " ".join(str(group[k]) for k in ("bucket", "rule", "project_key", "agent")
             if group[k] is not None)
         lines.extend(_text(name, group))
+    if quiet:
+        lines.append(f"Hook denials: {quiet} project/agent rows: no hook denials")
     lines.append("Hook reason IDs: " + report["reason_ids"]["key"] + " key (HMAC-SHA256).")
     lines.append("Hook classes are a heuristic; other hook events are invisible. "
         "Reason text stays local and is never emitted.")
