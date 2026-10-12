@@ -60,6 +60,20 @@ sumbi deliver --outcome-source local-verify --repository . --verify scripts/chec
   --scan-until 2030-01-09T00:00Z
 ```
 
+To name the target repository in reports, add a rule before the measurement:
+`--project NAME` followed by one or more `--match-path GLOB` or
+`--match-origin GLOB` patterns (repeat the block for more rules):
+
+```sh
+sumbi collect --since 2030-01-01T00:00Z --until 2030-01-08T00:00Z \
+  --project sample --match-path '*/sample'
+```
+
+Without a rule, projects appear only as `project_key` hashes and you may have to
+collect again to tell which one is your repository. Rule semantics are in
+[the measurement guide](https://github.com/Jaeminyx-Stoa/sumbi/blob/main/docs/MEASUREMENT.md).
+For the full before/after round, see [docs/CYCLE.md](docs/CYCLE.md).
+
 Replace the example UTC bounds with your measurement window. Collection prints
 a summary and writes `out/collect.json`. Install keeps its baseline and backups
 local through `.sumbi/.gitignore`. The intervention ledger is outside those
