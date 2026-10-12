@@ -15,7 +15,7 @@ Active sensitivity (estimated seconds): 2 minutes 16; 5 minutes 16; 10 minutes 1
 Paired tool durations (observed): 2 seconds; pairs 2; unpaired starts 0; unpaired ends 0
 Paired request durations (observed): 0 seconds; pairs 0; unpaired starts 0; unpaired ends 0
 Parallel session times are summed; they are not human waiting time.
-Coverage sumbi-events: files_scanned 3; lines_read 22; broken_lines 0; duplicate_events 2; unreadable_files 0; invalid_timestamps 0; invalid_token_records 0; inherited_session_meta 0; sessions_read 4; sessions_in_window 4
+Coverage sumbi-events: files_scanned 3; lines_read 22; broken_lines 0; duplicate_events 2; unreadable_files 0; invalid_timestamps 0; invalid_token_records 0; inherited_session_meta 0; files_skipped 0; sessions_read 4; sessions_in_window 4
   Unknown record types: none
 Spend other: 0 tokens (observed); share 0.000000
   Evidence events: cwd 0; tool_path 0; previous_event 0; unassigned 0; fallback token share 0.000000

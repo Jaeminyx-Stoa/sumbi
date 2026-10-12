@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.4",
+  "schema_version": "1.5",
   "pseudonyms": {
     "salted": true,
     "algorithm": "hmac-sha256"
@@ -220,6 +220,7 @@
         "unknown_record_types": {
           "fixture_record": 1
         },
+        "files_skipped": 0,
         "sessions_read": 2,
         "sessions_in_window": 2
       },
@@ -235,6 +236,7 @@
         "unknown_record_types": {
           "fixture_record": 1
         },
+        "files_skipped": 0,
         "sessions_read": 1,
         "sessions_in_window": 1
       }
@@ -461,6 +463,12 @@
             "unpaired_starts": 0,
             "unpaired_ends": 0
           }
+        },
+        "events": {
+          "measurement": "observed",
+          "resolution": "minute_floor",
+          "first_at": "2030-01-01T00:02:00Z",
+          "last_at": "2030-01-01T00:02:00Z"
         }
       }
     },
@@ -570,6 +578,12 @@
             "unpaired_starts": 0,
             "unpaired_ends": 0
           }
+        },
+        "events": {
+          "measurement": "observed",
+          "resolution": "minute_floor",
+          "first_at": "2030-01-01T00:00:00Z",
+          "last_at": "2030-01-01T00:09:00Z"
         }
       }
     },
@@ -683,6 +697,12 @@
             "unpaired_starts": 0,
             "unpaired_ends": 0
           }
+        },
+        "events": {
+          "measurement": "observed",
+          "resolution": "minute_floor",
+          "first_at": "2030-01-01T00:00:00Z",
+          "last_at": "2030-01-01T00:09:00Z"
         }
       }
     }
