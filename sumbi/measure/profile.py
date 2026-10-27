@@ -10,6 +10,7 @@ import math
 from statistics import median
 
 from sumbi.core.values import TOKEN_KINDS
+from sumbi.measure.calls import START_CALLS, contexts as call_contexts, measure as calls, summarize
 from sumbi.measure.delegation import _percentile
 
 
@@ -35,6 +36,9 @@ TOOL_CLASS_TABLE = {
     "webfetch": "web", "websearch": "web", "web_fetch": "web", "web_search": "web",
     "web_search_call": "web",
 }
+CALL_LEAVES = ("count", "sessions_with_calls", "per_session_median", "context_unobserved",
+    "context_median", "context_p90", "context_max", "start_sessions", "first_context_median",
+    "first5_context_sum_median", "first5_context_sum_total")
 LATENCY_LEAVES = ("paired_calls", "median_seconds", "p90_seconds")
 FAN_OUT_LEAVES = ("parents", "children", "children_max", "children_median")
 # Numeric leaves an improve evidence pointer may name below roles/<role>/.
@@ -47,7 +51,8 @@ ROLE_LEAVES = ("sessions", "sessions_per_day", *(f"tokens/{k}" for k in KINDS),
     "long_tail/sessions", "long_tail/total_tokens", "long_tail/token_share",
     "concentration/top_decile_sessions", "concentration/top_decile_total_tokens",
     "concentration/top_decile_share",
-    *(f"tool_latency/{c}/{leaf}" for c in TOOL_CLASSES for leaf in LATENCY_LEAVES))
+    *(f"tool_latency/{c}/{leaf}" for c in TOOL_CLASSES for leaf in LATENCY_LEAVES),
+    *(f"calls/{leaf}" for leaf in CALL_LEAVES))
 
 
 def tool_class(name) -> str:
@@ -140,7 +145,8 @@ def _role(entries, days, long_minutes):
             sorted(models.items(), key=lambda item: (-item[1][1], item[0]))],
         "tool_latency": {name: {"paired_calls": len(latency[name]),
             "median_seconds": median(latency[name]) if latency[name] else None,
-            "p90_seconds": _percentile(latency[name], .9)} for name in TOOL_CLASSES}}
+            "p90_seconds": _percentile(latency[name], .9)} for name in TOOL_CLASSES},
+        "calls": summarize(entries)}
 
 
 def _fan_out(entries):
@@ -164,7 +170,8 @@ def measure(found, rows, window, *, long_session_minutes=LONG_SESSION_MINUTES, a
         if row is None:
             continue
         base = {"row": row, "role": role(session), "latency": _latency(session, window),
-            "tokens": row["tokens"]}
+            "tokens": row["tokens"], "calls": calls(session, window),
+            "contexts": call_contexts(session, window)}
         entries.append(base)
         groups = {}
         for allocation in row["allocations"]:
@@ -220,6 +227,16 @@ def _latency_line(name, row):
     return f"  Tool latency {name} (median/p90 seconds): " + ("; ".join(parts) or "none")
 
 
+def _calls_line(name, row):
+    calls = row["calls"]
+    return (f"  Calls {name}: {calls['count']} (per session median "
+        f"{_show(calls['per_session_median'])}); context per call median/p90/max "
+        f"{_show(calls['context_median'])}/{_show(calls['context_p90'])}/"
+        f"{_show(calls['context_max'])}; starts {calls['start_sessions']}: first call median "
+        f"{_show(calls['first_context_median'])}, first {START_CALLS} calls sum median "
+        f"{_show(calls['first5_context_sum_median'])}")
+
+
 def _fan_line(name, fan):
     return (f"Profile {name} fan-out: parents {fan['parents']}; children {fan['children']}; "
         f"per parent max {_show(fan['children_max'])}; median {_show(fan['children_median'])}")
@@ -246,6 +263,7 @@ def _detail(name, group):
         if row["sessions"]:
             lines.append(_role_line(f"{name} {role_name}", row))
             lines.append(_models_line(row["models"]))
+            lines.append(_calls_line(role_name, row))
             lines.append(_latency_line(role_name, row))
     lines.append(_fan_line(name, group["fan_out"]))
     return lines
@@ -288,4 +306,6 @@ def tail_lines(report, profile):
         f"{_show(fan['children_max'])}; median {_show(fan['children_median'])}")
     for role_name, row in profile["summary"]["roles"].items():
         lines.append(_latency_line(role_name, row))
+    for role_name, row in profile["summary"]["roles"].items():
+        lines.append(_calls_line(role_name, row))
     return lines

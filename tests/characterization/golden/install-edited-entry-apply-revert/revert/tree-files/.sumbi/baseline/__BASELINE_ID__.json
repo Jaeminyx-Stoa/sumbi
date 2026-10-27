@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.6",
+  "schema_version": "1.7",
   "pseudonyms": {
     "salted": true,
     "algorithm": "hmac-sha256"
@@ -866,6 +866,19 @@
               "median_seconds": null,
               "p90_seconds": null
             }
+          },
+          "calls": {
+            "count": 0,
+            "sessions_with_calls": 0,
+            "per_session_median": null,
+            "context_unobserved": 0,
+            "context_median": null,
+            "context_p90": null,
+            "context_max": null,
+            "start_sessions": 0,
+            "first_context_median": null,
+            "first5_context_sum_median": null,
+            "first5_context_sum_total": 0
           }
         },
         "worker": {
@@ -963,6 +976,19 @@
               "median_seconds": null,
               "p90_seconds": null
             }
+          },
+          "calls": {
+            "count": 0,
+            "sessions_with_calls": 0,
+            "per_session_median": null,
+            "context_unobserved": 0,
+            "context_median": null,
+            "context_p90": null,
+            "context_max": null,
+            "start_sessions": 0,
+            "first_context_median": null,
+            "first5_context_sum_median": null,
+            "first5_context_sum_total": 0
           }
         }
       },
@@ -1071,6 +1097,19 @@
                 "median_seconds": null,
                 "p90_seconds": null
               }
+            },
+            "calls": {
+              "count": 0,
+              "sessions_with_calls": 0,
+              "per_session_median": null,
+              "context_unobserved": 0,
+              "context_median": null,
+              "context_p90": null,
+              "context_max": null,
+              "start_sessions": 0,
+              "first_context_median": null,
+              "first5_context_sum_median": null,
+              "first5_context_sum_total": 0
             }
           },
           "worker": {
@@ -1168,6 +1207,19 @@
                 "median_seconds": null,
                 "p90_seconds": null
               }
+            },
+            "calls": {
+              "count": 0,
+              "sessions_with_calls": 0,
+              "per_session_median": null,
+              "context_unobserved": 0,
+              "context_median": null,
+              "context_p90": null,
+              "context_max": null,
+              "start_sessions": 0,
+              "first_context_median": null,
+              "first5_context_sum_median": null,
+              "first5_context_sum_total": 0
             }
           }
         },
@@ -1275,6 +1327,19 @@
                 "median_seconds": null,
                 "p90_seconds": null
               }
+            },
+            "calls": {
+              "count": 0,
+              "sessions_with_calls": 0,
+              "per_session_median": null,
+              "context_unobserved": 0,
+              "context_median": null,
+              "context_p90": null,
+              "context_max": null,
+              "start_sessions": 0,
+              "first_context_median": null,
+              "first5_context_sum_median": null,
+              "first5_context_sum_total": 0
             }
           },
           "worker": {
@@ -1372,6 +1437,19 @@
                 "median_seconds": null,
                 "p90_seconds": null
               }
+            },
+            "calls": {
+              "count": 0,
+              "sessions_with_calls": 0,
+              "per_session_median": null,
+              "context_unobserved": 0,
+              "context_median": null,
+              "context_p90": null,
+              "context_max": null,
+              "start_sessions": 0,
+              "first_context_median": null,
+              "first5_context_sum_median": null,
+              "first5_context_sum_total": 0
             }
           }
         },

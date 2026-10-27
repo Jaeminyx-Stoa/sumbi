@@ -9,6 +9,7 @@ from pathlib import Path
 from sumbi import SCHEMA_VERSION
 from sumbi.events.registry import ADAPTERS, DEFAULT_AGENTS, log_roots
 from sumbi.measure.attribution import Attributor, ProjectRule, RepositoryAttributor
+from sumbi.measure.calls import measure as calls
 from sumbi.measure.delegation import measure as delegation, text_lines as delegation_text
 from sumbi.measure.hook_denials import measure as hooks, text_lines as hooks_text
 from sumbi.measure.profile import (LONG_SESSION_MINUTES, measure as profile,
@@ -86,6 +87,7 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
         selected_count = 0
         for session in included:
             row = session.as_dict(window, attributor, idle_minutes)
+            row["calls"] = calls(session, window)
             if repository is not None and not _select_repository(row):
                 continue
             sessions.append(row)

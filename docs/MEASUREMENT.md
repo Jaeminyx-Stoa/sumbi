@@ -171,7 +171,7 @@ session crossing M is not divided. Schema 1.5 also adds adapter coverage
 
 ## Usage profile
 
-Collect schema **1.6** adds `profile` and its text lines. All other fields keep
+Collect schema **1.6** adds `profile` and its text lines; **1.7** adds `calls`. All other fields keep
 their meanings. The section answers the usual before/after questions per role
 without a hand-written script: sessions, tokens, tools, compaction, active time,
 the long tail, concentration, fan-out, model mix and tool latency.
@@ -241,6 +241,24 @@ and each agent, and fan-out lines. Hook-denial project rows with no denials and
 no timeouts fold into one line. The output ends with `Key summary` lines (window,
 sessions, tokens, each role's long tail and decile share, fan-out and tool
 latency) so the tail of the text shows the headline numbers.
+
+**Model calls (schema 1.7).** Each session row has `calls`, and each profile
+role has `calls`. A call is one native request record: a Claude Code assistant
+message snapshot (after the streaming deduplication above), a Codex turn's
+`last_token_usage`, or an open-event request usage record. Cumulative Codex
+deltas are not calls. A call's context is new input plus cache write plus cache
+read (the delegation rule); a call without new input is counted in
+`context_unobserved` and never guessed. Per session: `count` (in-window calls),
+`context.total/median/p90/max` (nearest-rank p90), and `start`: when the
+session's own first call falls in the window, `first_context` and
+`first5_context_sum` (the first five calls, or fewer when the session made fewer;
+null when any of them is unobserved); otherwise `observed` is false. Per role:
+`count`, `sessions_with_calls`, `per_session_median` (calls per session with
+calls), pooled per-call `context_median/p90/max`, `start_sessions`, and the
+median and total of the sessions' start values. Large per-call context with few
+calls points at a heavy loaded context; a large first-five sum points at an
+expensive start (handoff bundles, re-reads). `Calls <role>` lines join the
+profile and the `Key summary` tail.
 
 **Differences from ad hoc scripts.** A script that selects sessions by the
 session `project` candidate and sums whole-session tokens can differ from the
