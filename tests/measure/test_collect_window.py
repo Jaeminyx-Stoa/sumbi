@@ -118,8 +118,9 @@ class WindowSkipTests(unittest.TestCase):
             {"hits": 0, "misses": 2})
         with patch.object(claude_code, "latest", side_effect=AssertionError("rescanned")):
             second = collect(self.home, WINDOW, cache_dir=cache)[0]
+        # Only pre-window files are scanned for a latest time, so only they are cached.
         self.assertEqual(self.adapters(second)["claude-code"]["probe_cache"],
-            {"hits": 2, "misses": 0})
+            {"hits": 1, "misses": 1})
         self.assertEqual(self.adapters(second)["codex"]["probe_cache"], {"hits": 1, "misses": 0})
         for report in (first, second):
             for agent in ("claude-code", "codex"):
@@ -133,10 +134,18 @@ class WindowSkipTests(unittest.TestCase):
         os.utime(old, (STALE, STALE))
         third = collect(self.home, WINDOW, cache_dir=cache)[0]
         self.assertEqual(self.adapters(third)["claude-code"]["probe_cache"],
-            {"hits": 1, "misses": 1})
+            {"hits": 0, "misses": 2})
         self.assertEqual(third["summary"]["sessions"], 2)
         (cache / "probes-claude-code.json").write_text("{broken", encoding="utf-8")
         self.assertEqual(collect(self.home, WINDOW, cache_dir=cache)[0]["summary"]["sessions"], 2)
+        malformed = {"size": old.stat().st_size, "mtime_ns": old.stat().st_mtime_ns,
+            "ino": old.stat().st_ino}
+        for latest in (7, "not a time", "2020-01-01T10:00:00", ["x"]):
+            (cache / "probes-claude-code.json").write_text(json.dumps({"version": 2,
+                "entries": {str(old): {**malformed, "latest": latest}}}), encoding="utf-8")
+            report = collect(self.home, WINDOW, cache_dir=cache)[0]
+            self.assertEqual(report["summary"]["sessions"], 2)
+            self.assertEqual(self.adapters(report)["claude-code"]["probe_cache"]["hits"], 0)
 
     def test_resumed_codex_baseline_in_a_stale_file_is_still_read(self):
         self.write(".codex/sessions/g/rollout-first.jsonl", [self.meta("thread-a",

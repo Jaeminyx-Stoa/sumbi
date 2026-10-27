@@ -603,7 +603,7 @@ def collect_window(adapter, home, window, coverage, *, local_review=False, reaso
     shares a session identity with a read file or holds a read session's parent.
     Every returned session is therefore folded from all of its files in the
     original order. Returns (sessions, files_skipped). A `ProbeCache` reuses the
-    probes of files whose size and modification time are unchanged.
+    latest-time scan of files whose inode, size and modification time are unchanged.
     """
     # Every file predates a future window, so the prefilter cannot help there.
     if not hasattr(adapter, "session_keys") or window.since > datetime.now(timezone.utc):
@@ -620,9 +620,7 @@ def collect_window(adapter, home, window, coverage, *, local_review=False, reaso
             if old and "latest" not in entry:
                 entry["latest"] = adapter.latest(home, path)
             stale = old and entry["latest"] is not None and entry["latest"] < window.since
-            if "keys" not in entry:
-                entry["keys"] = adapter.session_keys(home, path)
-            probes[path] = entry["keys"]
+            probes[path] = adapter.session_keys(home, path)
             if cache is not None:
                 cache.put(path, stat, entry)
         except (OSError, ValueError):

@@ -1,10 +1,11 @@
-"""Local cache of per-file window probes, keyed by path, size and modification time.
+"""Local cache of per-file latest-time scans, keyed by path, inode, size and mtime.
 
-`collect_window` probes every log file for its latest time and session keys before
-it decides which files to read. Those probes depend only on the file's bytes, so an
-unchanged file (same size and nanosecond modification time) reuses them. The cache
-holds local paths and native session IDs, so it is written privately and never
-leaves the machine; a corrupt or foreign cache file is ignored.
+`collect_window` scans every pre-window log file for its latest time before it
+decides which files to read. That scan depends only on the file's bytes, so an
+unchanged file (same inode, size and nanosecond modification time) reuses it.
+Session keys are not cached: they read only a first record and, for Claude Code
+subagents, a sidecar file. The cache holds local paths, so it is written privately
+and never leaves the machine; a corrupt entry or file is ignored.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 import tempfile
 
-VERSION = 1
+VERSION = 2
 
 
 class ProbeCache:
@@ -33,30 +34,31 @@ class ProbeCache:
     def get(self, path: Path, stat) -> dict:
         """A mutable probe entry for this file version (empty when not cached)."""
         raw = self.entries.get(str(path))
-        if (isinstance(raw, dict) and raw.get("size") == stat.st_size
-            and raw.get("mtime_ns") == stat.st_mtime_ns):
-            self.hits += 1
-            entry = {}
-            if "latest" in raw:
-                entry["latest"] = (datetime.fromisoformat(raw["latest"])
-                    if raw["latest"] is not None else None)
-            if "keys" in raw:
-                entry["keys"] = (frozenset(raw["keys"][0]), frozenset(raw["keys"][1]))
-            return entry
+        try:
+            if (isinstance(raw, dict) and raw.get("size") == stat.st_size
+                and raw.get("mtime_ns") == stat.st_mtime_ns and raw.get("ino") == stat.st_ino
+                and "latest" in raw):
+                latest = raw["latest"]
+                entry = {"latest": None if latest is None else datetime.fromisoformat(latest)}
+                if entry["latest"] is not None and entry["latest"].tzinfo is None:
+                    raise ValueError
+                self.hits += 1
+                return entry
+        except (TypeError, ValueError):
+            pass
         self.misses += 1
         return {}
 
     def put(self, path: Path, stat, entry: dict):
-        raw = {"size": stat.st_size, "mtime_ns": stat.st_mtime_ns}
-        if "latest" in entry:
-            raw["latest"] = entry["latest"].isoformat() if entry["latest"] else None
-        if "keys" in entry:
-            raw["keys"] = [sorted(entry["keys"][0]), sorted(entry["keys"][1])]
-        self.used[str(path)] = raw
+        if "latest" not in entry:
+            return
+        latest = entry["latest"]
+        self.used[str(path)] = {"size": stat.st_size, "mtime_ns": stat.st_mtime_ns,
+            "ino": stat.st_ino, "latest": None if latest is None else latest.isoformat()}
 
     def save(self):
         """Keep only files seen this run; write atomically and privately."""
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         temporary = None
         try:
             with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=self.path.parent,

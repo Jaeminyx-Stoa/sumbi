@@ -793,11 +793,14 @@ than a run over the same home that skips nothing.
 
 To decide which files to skip, collect probes every discovered file for its
 latest time and session identities; a pre-window file is scanned to its end.
-`sumbi collect --cache DIR` keeps those probe results in
-`DIR/probes-<agent>.json`, keyed by path, size and nanosecond modification time,
-so a later run rescans only new or changed files. The report is unchanged except
+`sumbi collect --cache DIR` keeps the latest-time scans in
+`DIR/probes-<agent>.json`, keyed by path, inode, size and nanosecond modification
+time, so a later run rescans only new or changed files; session identities are
+probed every run (they read one record and, for subagents, a sidecar). A file
+rewritten in place to the same size within the same modification time would be
+missed; log writers append. The report is unchanged except
 for `coverage.adapters.<agent>.probe_cache` (`hits`, `misses`). The cache holds
-local paths and native session IDs, is written with owner-only permissions, keeps
+local paths, is written with owner-only permissions, keeps
 only files seen in the latest run, is ignored when unreadable, and must be outside
 the session-log directories. The deliverable ledger and comparison command remain out of M1a scope.
 
