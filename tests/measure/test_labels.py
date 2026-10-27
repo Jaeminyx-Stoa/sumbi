@@ -85,6 +85,23 @@ class LabelTests(unittest.TestCase):
         self.assertEqual(table[parent.id()]["labels"][1]["from"], "2030-01-01T00:10:00Z")
         self.assertNotIn(RAW[:8], json.dumps(report) + "\n".join(text_lines(report)))
 
+    def test_duplicate_lines_and_leading_unlabeled_start(self):
+        directory, path = label_file([
+            {"session": RAW[:8], "at": "2030-01-01T00:10:00Z", "lane": "old"},
+            {"session": RAW[:8], "at": "2030-01-01T00:10:00Z", "lane": "new"}])
+        with directory:
+            labels = Labels(read(path))
+        s = session(RAW, [(1, usage(3)), (11, usage(5))])
+        rows_ = rows(s)
+        report = measure([s], rows_, WINDOW, labels)
+        lane = {r["value"]: r for r in report["by"]["lane"]}
+        self.assertEqual(set(lane), {"new", None})
+        self.assertEqual((lane[None]["calls"]["starts"], lane["new"]["calls"]["starts"]), (1, 1))
+        self.assertEqual(lane[None]["calls"]["first_context_median"], 3)
+        self.assertEqual(report["coverage"]["sessions_partly_labeled"], 1)
+        total = sum(r["tokens"]["total"] for r in report["by"]["lane"])
+        self.assertEqual(total, 4 + 6)
+
     def test_forbidden_model_counts_only_events_on_that_model(self):
         directory, path = label_file([{"session": RAW[:8], "lane": "lane-a"}])
         with directory:
@@ -103,6 +120,9 @@ class LabelTests(unittest.TestCase):
         none = policy(found, rows(*found), WINDOW, ("gpt-*",))["forbidden_models"][0]
         self.assertEqual((none["sessions"], none["tokens"]["total"]), (0, 0))
         self.assertNotIn("by_label", none)
+        bare = session("55555555-y", [(1, usage(2))])
+        row = policy([bare], rows(bare), WINDOW, ("*",))["forbidden_models"][0]
+        self.assertEqual((row["sessions"], row["model_unobserved_events"]), (0, 1))
 
 
 if __name__ == "__main__":

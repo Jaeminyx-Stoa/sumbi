@@ -20,7 +20,10 @@ PRICED = ("new_input", "cache_write", "cache_read", "output")
 
 def read(path):
     with open(path, encoding="utf-8") as stream:
-        data = json.load(stream)
+        try:
+            data = json.load(stream)
+        except RecursionError:
+            raise ValueError("price table nesting is too deep") from None
     models = data.get("models") if isinstance(data, dict) else None
     if not isinstance(models, dict) or not models:
         raise ValueError("price table needs a models object")

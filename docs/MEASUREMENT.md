@@ -283,16 +283,18 @@ characters without control characters). A line that fails these rules counts in
 `invalid_lines` and is never echoed. Claude Code subagent IDs extend their
 parent's ID, so a parent prefix also labels its subagents. Each in-window usage
 event and call goes to the latest line for its session whose `at` is not after
-it (an untimed line applies from the start); events before the first timed line,
-and sessions with no line, are unlabeled (`value` null). Timed lines model a
+it (an untimed line applies from the start; at an equal `at`, the later line in
+the file wins); events before the first timed line, and sessions with no line,
+are unlabeled (`value` null). Timed lines model a
 session that continues under another account or lane, for example a resumed
 conversation. Session rows gain `labels` (each line's values and its `from`
 minute). `labels.coverage` counts lines, invalid lines, matched and unmatched
 entries, and sessions labeled fully or in part. `labels.by.<dimension>` has one
 row per value: distinct sessions, token kinds and `total` from the usage events
 in force, and calls as in the profile (per-call context median/p90/max) plus
-`starts`: each line's first calls after its `at` (the session start for an
-untimed line), counted when they begin in the window, with the first-call and
+`starts`: each segment's first calls (from a line's `at`, from the session start
+for an untimed line, and for the unlabeled time before a first timed line),
+counted when they begin in the window, with the first-call and
 first-five medians and the first-five total. Session IDs from the file never
 leave memory; label values are the operator's own words and appear as given.
 
@@ -302,7 +304,8 @@ the session's only model. `policy.forbidden_models` has one row per pattern
 (case-insensitive shell glob): sessions, token kinds and `total` spent on
 matching models, `models` split by label, and with labels `by_label` per
 dimension. A session that switched models counts only its events on the matching
-model.
+model. Events with no observed model match no pattern and are counted in
+`model_unobserved_events`.
 
 **`--price-table FILE`.** JSON with `models` mapping case-insensitive model-label
 globs (first match wins, in file order) to prices per million tokens for

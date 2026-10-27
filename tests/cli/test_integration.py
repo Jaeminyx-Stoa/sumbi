@@ -147,6 +147,19 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(report["sessions"][0]["value"]["amount"], 10.0)
         self.assertNotIn("fixture-session", output + errors)
 
+    def test_collect_rejects_unreadable_label_and_price_files(self):
+        self.log("fixture-session-0001", [self.repository])
+        broken = self.root / "broken.json"
+        broken.write_text("[" * 100000, encoding="utf-8")
+        for option in ("--session-labels", "--price-table"):
+            for path in (self.root / "missing.json", broken):
+                result, output, errors = self.run_cli("collect", "--since",
+                    "2030-01-01T00:00Z", "--until", "2030-01-15T00:00Z", "--home",
+                    str(self.home), "--json", "-", option, str(path))
+                self.assertEqual(result, 1 if option == "--price-table"
+                    or path.name == "missing.json" else 0, (option, path.name, errors))
+                self.assertNotIn("Traceback", errors)
+
     def test_baseline_uses_fourteen_day_bounds_and_path_scope(self):
         nested = self.repository / "src"
         nested.mkdir()

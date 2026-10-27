@@ -11,6 +11,7 @@ sums are reported; IDs in the file never leave this module.
 
 from __future__ import annotations
 
+from bisect import bisect_right
 import json
 from statistics import median
 
@@ -56,7 +57,7 @@ def read(path):
                 values = {d: _value(data.get(d)) for d in DIMENSIONS}
                 if not any(values.values()):
                     raise ValueError
-            except (ValueError, KeyError, TypeError, AttributeError):
+            except (ValueError, KeyError, TypeError, AttributeError, RecursionError):
                 invalid += 1
                 continue
             entries.append({"session": session, "agent": agent, "at": at,
@@ -98,11 +99,14 @@ def in_force(segments, when):
 
 def model_at(session, when):
     """The latest observed model at or before `when`, else the session's only model."""
-    chosen = None
-    for at, model in sorted((e for e in session.model_history if e[0] is not None),
-        key=lambda e: e[0]):
-        if at <= when:
-            chosen = model
+    index = session.__dict__.get("_model_index")
+    if index is None:
+        ordered = sorted((e for e in session.model_history if e[0] is not None),
+            key=lambda e: e[0])
+        index = ([at for at, _ in ordered], [model for _, model in ordered])
+        session.__dict__["_model_index"] = index
+    position = bisect_right(index[0], when)
+    chosen = index[1][position - 1] if position else None
     if chosen is None and len(session.models) == 1:
         chosen = next(iter(session.models))
     return chosen
@@ -115,15 +119,30 @@ def usage_events(session, window):
         key=lambda e: (e[0], e[1]))
 
 
+def boundaries(segments):
+    """Segments as they take effect: the last line wins at an equal `at`, and time
+    before the first timed line is an unlabeled (None) segment."""
+    effective = []
+    for segment in segments:
+        if effective and effective[-1]["at"] == segment["at"]:
+            effective[-1] = segment
+        else:
+            effective.append(segment)
+    if not effective or effective[0]["at"] is not None:
+        effective.insert(0, None)
+    return effective
+
+
 def _starts(session, segments, window):
     """Start cost per segment: its first calls after its `at`, when they begin in-window."""
     records = _records(session)
     starts = []
-    for index, segment in enumerate(segments or [None]):
-        begin = segment["at"] if segment and segment["at"] is not None else None
-        following = [r for r in records if begin is None or r[0] >= begin]
-        if index + 1 < len(segments) and segments[index + 1]["at"] is not None:
-            following = [r for r in following if r[0] < segments[index + 1]["at"]]
+    effective = boundaries(segments)
+    for index, segment in enumerate(effective):
+        begin = segment["at"] if segment is not None else None
+        end = effective[index + 1]["at"] if index + 1 < len(effective) else None
+        following = [r for r in records if (begin is None or r[0] >= begin)
+            and (end is None or r[0] < end)]
         if not following or not window.contains(following[0][0]):
             continue
         first = [_context(r[2]) for r in following[:START_CALLS] if window.contains(r[0])]

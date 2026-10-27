@@ -41,13 +41,17 @@ def measure(found, rows, window, patterns, labels=None, pricer=None):
     for pattern in patterns:
         folded = pattern.casefold()
         whole, models, by = _empty(), {}, {d: {} for d in DIMENSIONS}
+        unobserved = 0
         for session in found:
             if session.id() not in rows:
                 continue
             segments = labels.segments(session) if labels is not None else []
             for when, _, values in usage_events(session, window):
                 model = model_at(session, when)
-                if model is None or not fnmatchcase(model.casefold(), folded):
+                if model is None:
+                    unobserved += 1
+                    continue
+                if not fnmatchcase(model.casefold(), folded):
                     continue
                 value = pricer.value(model, values) if pricer is not None else None
                 _add(whole, session.id(), values, value)
@@ -56,7 +60,7 @@ def measure(found, rows, window, patterns, labels=None, pricer=None):
                 for dimension in DIMENSIONS:
                     label = segment["values"][dimension] if segment else None
                     _add(by[dimension].setdefault(label, _empty()), session.id(), values, value)
-        result = _out(whole, pattern=pattern)
+        result = _out(whole, pattern=pattern, model_unobserved_events=unobserved)
         result["models"] = sorted((_out(r, model=m) for m, r in models.items()),
             key=lambda r: -r["tokens"]["total"])
         if labels is not None:
