@@ -171,7 +171,7 @@ session crossing M is not divided. Schema 1.5 also adds adapter coverage
 
 ## Usage profile
 
-Collect schema **1.6** adds `profile` and its text lines; **1.7** adds `calls`. All other fields keep
+Collect schema **1.6** adds `profile` and its text lines; **1.7** adds `calls` and the optional `labels`, `policy` and `value` sections. All other fields keep
 their meanings. The section answers the usual before/after questions per role
 without a hand-written script: sessions, tokens, tools, compaction, active time,
 the long tail, concentration, fan-out, model mix and tool latency.
@@ -268,6 +268,54 @@ allocation-based project rows above, mainly for sessions whose events belong to
 several projects. A decile computed as `max(1, n // 10)` differs from
 `ceil(n / 10)` when `n` is not a multiple of ten. An error rate per tool call
 differs slightly from errors per tool result.
+
+## Session labels and forbidden models
+
+Both are optional `sumbi collect` inputs; without them the report has neither
+section. sumbi knows nothing about how a team runs its sessions, so the operator
+supplies that knowledge as a file.
+
+**`--session-labels FILE`.** JSONL, one object per line: `session` (a native
+session ID or an ID prefix of at least eight characters), optional `agent`,
+optional `at` (a UTC timestamp from which the line applies), and one or more of
+`lane`, `account`, `start_kind`, `host` (non-empty strings of at most 64
+characters without control characters). A line that fails these rules counts in
+`invalid_lines` and is never echoed. Claude Code subagent IDs extend their
+parent's ID, so a parent prefix also labels its subagents. Each in-window usage
+event and call goes to the latest line for its session whose `at` is not after
+it (an untimed line applies from the start); events before the first timed line,
+and sessions with no line, are unlabeled (`value` null). Timed lines model a
+session that continues under another account or lane, for example a resumed
+conversation. Session rows gain `labels` (each line's values and its `from`
+minute). `labels.coverage` counts lines, invalid lines, matched and unmatched
+entries, and sessions labeled fully or in part. `labels.by.<dimension>` has one
+row per value: distinct sessions, token kinds and `total` from the usage events
+in force, and calls as in the profile (per-call context median/p90/max) plus
+`starts`: each line's first calls after its `at` (the session start for an
+untimed line), counted when they begin in the window, with the first-call and
+first-five medians and the first-five total. Session IDs from the file never
+leave memory; label values are the operator's own words and appear as given.
+
+**`--forbid-model PATTERN`** (repeatable). Each in-window usage event takes the
+model label in force at its time: the latest observed model at or before it, or
+the session's only model. `policy.forbidden_models` has one row per pattern
+(case-insensitive shell glob): sessions, token kinds and `total` spent on
+matching models, `models` split by label, and with labels `by_label` per
+dimension. A session that switched models counts only its events on the matching
+model.
+
+**`--price-table FILE`.** JSON with `models` mapping case-insensitive model-label
+globs (first match wins, in file order) to prices per million tokens for
+`new_input`, `cache_write`, `cache_read` and `output`; optional `currency`
+(default `USD`) and `as_of` are echoed. Prices live only in this file. Each
+in-window usage event is valued at the model in force at its time (the forbidden
+model rule); reasoning output is part of output and is not priced twice. Tokens
+of a kind the matching row leaves out, or on a model no row matches, are counted
+as `unpriced_tokens`, never guessed. The report gains `value` (marked
+`estimated`): `summary`, `by_model`, `by_agent` and `by_role`; session rows gain
+`value`; label rows and forbidden-model rows gain `spend_value`. A price table
+gives an API-list-price equivalent; subscription seats and discounts are not
+modelled.
 
 ## Delegation
 
