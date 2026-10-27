@@ -123,6 +123,43 @@ class IntegrationTests(unittest.TestCase):
         self.assertIn("keys: unsalted", errors)
         self.assertFalse(report["pseudonyms"]["salted"])
 
+    def test_collect_session_labels_and_forbidden_model(self):
+        self.log("fixture-session-0001", [self.repository])
+        labels = self.root / "labels.jsonl"
+        labels.write_text(json.dumps({"session": "fixture-session", "lane": "lane-a",
+            "start_kind": "task_spawn"}) + "\n" + "{broken\n", encoding="utf-8")
+        prices = self.root / "prices.json"
+        prices.write_text(json.dumps({"models": {"fixture-model": {"new_input": 1e6,
+            "cache_write": 0, "cache_read": 0, "output": 0}}}), encoding="utf-8")
+        result, output, errors = self.run_cli("collect", "--since", "2030-01-01T00:00Z",
+            "--until", "2030-01-15T00:00Z", "--home", str(self.home), "--json", "-",
+            "--session-labels", str(labels), "--forbid-model", "fixture-*",
+            "--price-table", str(prices))
+        self.assertEqual(result, 0, errors)
+        report = json.loads(output)
+        self.assertEqual(report["labels"]["coverage"]["invalid_lines"], 1)
+        lane = report["labels"]["by"]["lane"][0]
+        self.assertEqual((lane["value"], lane["tokens"]["total"]), ("lane-a", 19))
+        self.assertEqual(report["sessions"][0]["labels"][0]["lane"], "lane-a")
+        self.assertEqual(report["policy"]["forbidden_models"][0]["tokens"]["total"], 19)
+        self.assertIn("Forbidden model fixture-*: sessions 1; tokens 19; value 10.00", errors)
+        self.assertEqual(report["value"]["summary"], {"amount": 10.0, "unpriced_tokens": 0})
+        self.assertEqual(report["sessions"][0]["value"]["amount"], 10.0)
+        self.assertNotIn("fixture-session", output + errors)
+
+    def test_collect_rejects_unreadable_label_and_price_files(self):
+        self.log("fixture-session-0001", [self.repository])
+        broken = self.root / "broken.json"
+        broken.write_text("[" * 100000, encoding="utf-8")
+        for option in ("--session-labels", "--price-table"):
+            for path in (self.root / "missing.json", broken):
+                result, output, errors = self.run_cli("collect", "--since",
+                    "2030-01-01T00:00Z", "--until", "2030-01-15T00:00Z", "--home",
+                    str(self.home), "--json", "-", option, str(path))
+                self.assertEqual(result, 1 if option == "--price-table"
+                    or path.name == "missing.json" else 0, (option, path.name, errors))
+                self.assertNotIn("Traceback", errors)
+
     def test_baseline_uses_fourteen_day_bounds_and_path_scope(self):
         nested = self.repository / "src"
         nested.mkdir()

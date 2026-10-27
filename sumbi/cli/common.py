@@ -105,6 +105,12 @@ def configure_collection(command, *, deliver=False, comparison=False):
     if not deliver and not comparison:
         command.add_argument("--long-session-minutes", type=idle, default=60.0,
             help="Active minutes above which a session counts as long (profile)")
+        command.add_argument("--session-labels", type=Path, metavar="FILE",
+            help="JSONL session labels (lane, account, start_kind, host) by session ID prefix")
+        command.add_argument("--forbid-model", action="append", default=[], metavar="PATTERN",
+            help="Report spend on model labels matching this glob; repeatable")
+        command.add_argument("--price-table", type=Path, metavar="FILE",
+            help="JSON prices per million tokens by model glob; adds estimated value")
     if not deliver:
         command.add_argument("--local-review", type=Path, metavar="OUT")
     else:

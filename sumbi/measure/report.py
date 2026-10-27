@@ -10,9 +10,13 @@ from sumbi import SCHEMA_VERSION
 from sumbi.events.registry import ADAPTERS, DEFAULT_AGENTS, log_roots
 from sumbi.measure.attribution import Attributor, ProjectRule, RepositoryAttributor
 from sumbi.measure.calls import measure as calls
+from sumbi.measure.labels import (Labels, measure as label_measure, model_at,
+    text_lines as label_text, usage_events)
+from sumbi.measure.pricing import Pricer, measure as value_measure, text_lines as value_text
+from sumbi.measure.policy import measure as policy, text_lines as policy_text
 from sumbi.measure.delegation import measure as delegation, text_lines as delegation_text
 from sumbi.measure.hook_denials import measure as hooks, text_lines as hooks_text
-from sumbi.measure.profile import (LONG_SESSION_MINUTES, measure as profile,
+from sumbi.measure.profile import (LONG_SESSION_MINUTES, measure as profile, role,
     tail_lines as profile_tail, text_lines as profile_text)
 from sumbi.sessions.hook_denials import reason_key
 from sumbi.sessions.session import COUNT_KINDS, EVIDENCE_TYPES, TOKEN_KINDS
@@ -59,15 +63,18 @@ def collect(home: Path, window: Window, *, agents: list[str] | None = None,
     rules: list[ProjectRule] | None = None, idle_minutes: float = 5,
     local_review: bool = False, salt: bytes | None = None,
     repository: Path | None = None,
-    long_session_minutes: float = LONG_SESSION_MINUTES) -> tuple[dict, str]:
+    long_session_minutes: float = LONG_SESSION_MINUTES, labels: Labels | None = None,
+    forbid_models: tuple[str, ...] = (), pricer: Pricer | None = None) -> tuple[dict, str]:
     with pseudonym_key(salt if salt is not None else read_salt()):
         return _collect(home, window, agents=agents, rules=rules, idle_minutes=idle_minutes,
             local_review=local_review, repository=repository,
-            long_session_minutes=long_session_minutes)
+            long_session_minutes=long_session_minutes, labels=labels,
+            forbid_models=forbid_models, pricer=pricer)
 
 
 def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
-    local_review, repository, long_session_minutes) -> tuple[dict, str]:
+    local_review, repository, long_session_minutes, labels=None,
+    forbid_models=(), pricer=None) -> tuple[dict, str]:
     attributor = RepositoryAttributor(repository) if repository is not None else Attributor(
         rules or [])
     sessions = []
@@ -134,6 +141,14 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
         report["scope"] = {"kind": "repository", "sessions_in_window": scanned,
             "sessions_selected": len(sessions),
             "sessions_excluded": scanned - len(sessions)}
+    rows = {s["id"]: s for s in sessions}
+    if pricer is not None:
+        report["value"] = value_measure(found_sessions, rows, window, pricer, role,
+            model_at, usage_events)
+    if labels is not None:
+        report["labels"] = label_measure(found_sessions, rows, window, labels, pricer)
+    if forbid_models:
+        report["policy"] = policy(found_sessions, rows, window, forbid_models, labels, pricer)
     return report, "\n".join(reviews) + ("\n" if reviews else "")
 
 
@@ -196,6 +211,12 @@ def text_summary(report: dict) -> str:
     lines.extend(profile_text(report["profile"]))
     lines.extend(delegation_text(report["delegation"]))
     lines.extend(hooks_text(report["hook_denials"]))
+    if "value" in report:
+        lines.extend(value_text(report["value"]))
+    if "labels" in report:
+        lines.extend(label_text(report["labels"]))
+    if "policy" in report:
+        lines.extend(policy_text(report["policy"]))
     lines.extend(profile_tail(report, report["profile"]))
     return "\n".join(lines)
 

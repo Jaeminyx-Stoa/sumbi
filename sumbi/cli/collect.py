@@ -7,6 +7,8 @@ from pathlib import Path
 import sys
 
 from sumbi.core.privacy import read_salt
+from sumbi.measure.labels import Labels, read as read_labels
+from sumbi.measure.pricing import read as read_prices
 from sumbi.measure.report import collect, text_summary
 
 
@@ -16,10 +18,13 @@ from sumbi.cli.common import atomic_write
 def run(args, window, agents, rules):
     try:
         salt = read_salt(args.salt_file)
+        labels = Labels(read_labels(args.session_labels)) if args.session_labels else None
+        pricer = read_prices(args.price_table) if args.price_table else None
         report, review = collect(args.home, window, agents=agents, rules=rules,
             idle_minutes=args.idle_minutes,
             local_review=bool(args.local_review), salt=salt,
-            long_session_minutes=args.long_session_minutes)
+            long_session_minutes=args.long_session_minutes, labels=labels,
+            forbid_models=tuple(args.forbid_model), pricer=pricer)
         data = json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
         if args.json == "-":
             print(data, end="")
