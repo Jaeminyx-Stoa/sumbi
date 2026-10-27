@@ -789,7 +789,17 @@ completeness verdict. `files_scanned` counts files read in full and
 `files_skipped` counts pre-window files left unread, so together they are all
 discovered files. Line, duplicate, unknown-type and other per-record counters
 and `sessions_read` describe only the files read in full; they can be smaller
-than a run over the same home that skips nothing. The deliverable ledger and comparison command remain out of M1a scope.
+than a run over the same home that skips nothing.
+
+To decide which files to skip, collect probes every discovered file for its
+latest time and session identities; a pre-window file is scanned to its end.
+`sumbi collect --cache DIR` keeps those probe results in
+`DIR/probes-<agent>.json`, keyed by path, size and nanosecond modification time,
+so a later run rescans only new or changed files. The report is unchanged except
+for `coverage.adapters.<agent>.probe_cache` (`hits`, `misses`). The cache holds
+local paths and native session IDs, is written with owner-only permissions, keeps
+only files seen in the latest run, is ignored when unreadable, and must be outside
+the session-log directories. The deliverable ledger and comparison command remain out of M1a scope.
 
 ## Install baselines
 

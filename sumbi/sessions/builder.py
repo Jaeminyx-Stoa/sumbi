@@ -593,7 +593,8 @@ def collect(adapter, home, window, coverage, *, local_review=False, collect_link
         reason_salt=reason_salt)
 
 
-def collect_window(adapter, home, window, coverage, *, local_review=False, reason_salt=None):
+def collect_window(adapter, home, window, coverage, *, local_review=False, reason_salt=None,
+    cache=None):
     """Like `collect`, but skip files that cannot change any session it returns.
 
     A file is pre-window when its modification time precedes `since` (a cheap
@@ -601,7 +602,8 @@ def collect_window(adapter, home, window, coverage, *, local_review=False, reaso
     the adapter's `latest` scan, precedes `since` as well. It is read only when it
     shares a session identity with a read file or holds a read session's parent.
     Every returned session is therefore folded from all of its files in the
-    original order. Returns (sessions, files_skipped).
+    original order. Returns (sessions, files_skipped). A `ProbeCache` reuses the
+    probes of files whose size and modification time are unchanged.
     """
     # Every file predates a future window, so the prefilter cannot help there.
     if not hasattr(adapter, "session_keys") or window.since > datetime.now(timezone.utc):
@@ -611,10 +613,18 @@ def collect_window(adapter, home, window, coverage, *, local_review=False, reaso
     probes, by_key, needed = {}, {}, set()
     for path in paths:
         try:
+            stat = path.stat()
+            entry = cache.get(path, stat) if cache is not None else {}
             # Some writers leave modification times at creation: the scan decides.
-            stale = path.stat().st_mtime < window.since.timestamp() and (
-                (latest := adapter.latest(home, path)) is not None and latest < window.since)
-            probes[path] = adapter.session_keys(home, path)
+            old = stat.st_mtime < window.since.timestamp()
+            if old and "latest" not in entry:
+                entry["latest"] = adapter.latest(home, path)
+            stale = old and entry["latest"] is not None and entry["latest"] < window.since
+            if "keys" not in entry:
+                entry["keys"] = adapter.session_keys(home, path)
+            probes[path] = entry["keys"]
+            if cache is not None:
+                cache.put(path, stat, entry)
         except (OSError, ValueError):
             # Unreadable or undecodable time evidence: read the file in full.
             stale = False
