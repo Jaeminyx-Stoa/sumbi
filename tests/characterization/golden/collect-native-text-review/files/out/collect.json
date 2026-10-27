@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.6",
+  "schema_version": "1.7",
   "pseudonyms": {
     "salted": true,
     "algorithm": "hmac-sha256"
@@ -470,6 +470,22 @@
           "first_at": "2030-01-01T00:02:00Z",
           "last_at": "2030-01-01T00:02:00Z"
         }
+      },
+      "calls": {
+        "measurement": "observed",
+        "count": 1,
+        "context_unobserved": 0,
+        "context": {
+          "total": 3,
+          "median": 3,
+          "p90": 3,
+          "max": 3
+        },
+        "start": {
+          "observed": true,
+          "first_context": 3,
+          "first5_context_sum": 3
+        }
       }
     },
     {
@@ -584,6 +600,22 @@
           "resolution": "minute_floor",
           "first_at": "2030-01-01T00:00:00Z",
           "last_at": "2030-01-01T00:09:00Z"
+        }
+      },
+      "calls": {
+        "measurement": "observed",
+        "count": 3,
+        "context_unobserved": 0,
+        "context": {
+          "total": 75,
+          "median": 9,
+          "p90": 60,
+          "max": 60
+        },
+        "start": {
+          "observed": false,
+          "first_context": null,
+          "first5_context_sum": null
         }
       }
     },
@@ -703,6 +735,22 @@
           "resolution": "minute_floor",
           "first_at": "2030-01-01T00:00:00Z",
           "last_at": "2030-01-01T00:09:00Z"
+        }
+      },
+      "calls": {
+        "measurement": "observed",
+        "count": 0,
+        "context_unobserved": 0,
+        "context": {
+          "total": 0,
+          "median": null,
+          "p90": null,
+          "max": null
+        },
+        "start": {
+          "observed": false,
+          "first_context": null,
+          "first5_context_sum": null
         }
       }
     }
@@ -1584,6 +1632,19 @@
               "median_seconds": null,
               "p90_seconds": null
             }
+          },
+          "calls": {
+            "count": 3,
+            "sessions_with_calls": 1,
+            "per_session_median": 3,
+            "context_unobserved": 0,
+            "context_median": 9,
+            "context_p90": 60,
+            "context_max": 60,
+            "start_sessions": 0,
+            "first_context_median": null,
+            "first5_context_sum_median": null,
+            "first5_context_sum_total": 0
           }
         },
         "worker": {
@@ -1690,6 +1751,19 @@
               "median_seconds": null,
               "p90_seconds": null
             }
+          },
+          "calls": {
+            "count": 1,
+            "sessions_with_calls": 1,
+            "per_session_median": 1,
+            "context_unobserved": 0,
+            "context_median": 3,
+            "context_p90": 3,
+            "context_max": 3,
+            "start_sessions": 1,
+            "first_context_median": 3,
+            "first5_context_sum_median": 3,
+            "first5_context_sum_total": 3
           }
         }
       },
@@ -1808,6 +1882,19 @@
                 "median_seconds": null,
                 "p90_seconds": null
               }
+            },
+            "calls": {
+              "count": 3,
+              "sessions_with_calls": 1,
+              "per_session_median": 3,
+              "context_unobserved": 0,
+              "context_median": 9,
+              "context_p90": 60,
+              "context_max": 60,
+              "start_sessions": 0,
+              "first_context_median": null,
+              "first5_context_sum_median": null,
+              "first5_context_sum_total": 0
             }
           },
           "worker": {
@@ -1914,6 +2001,19 @@
                 "median_seconds": null,
                 "p90_seconds": null
               }
+            },
+            "calls": {
+              "count": 1,
+              "sessions_with_calls": 1,
+              "per_session_median": 1,
+              "context_unobserved": 0,
+              "context_median": 3,
+              "context_p90": 3,
+              "context_max": 3,
+              "start_sessions": 1,
+              "first_context_median": 3,
+              "first5_context_sum_median": 3,
+              "first5_context_sum_total": 3
             }
           }
         },
@@ -2031,6 +2131,19 @@
                 "median_seconds": null,
                 "p90_seconds": null
               }
+            },
+            "calls": {
+              "count": 0,
+              "sessions_with_calls": 0,
+              "per_session_median": null,
+              "context_unobserved": 0,
+              "context_median": null,
+              "context_p90": null,
+              "context_max": null,
+              "start_sessions": 0,
+              "first_context_median": null,
+              "first5_context_sum_median": null,
+              "first5_context_sum_total": 0
             }
           },
           "worker": {
@@ -2128,6 +2241,19 @@
                 "median_seconds": null,
                 "p90_seconds": null
               }
+            },
+            "calls": {
+              "count": 0,
+              "sessions_with_calls": 0,
+              "per_session_median": null,
+              "context_unobserved": 0,
+              "context_median": null,
+              "context_p90": null,
+              "context_max": null,
+              "start_sessions": 0,
+              "first_context_median": null,
+              "first5_context_sum_median": null,
+              "first5_context_sum_total": 0
             }
           }
         },
@@ -2251,6 +2377,19 @@
                 "median_seconds": null,
                 "p90_seconds": null
               }
+            },
+            "calls": {
+              "count": 3,
+              "sessions_with_calls": 1,
+              "per_session_median": 3,
+              "context_unobserved": 0,
+              "context_median": 9,
+              "context_p90": 60,
+              "context_max": 60,
+              "start_sessions": 0,
+              "first_context_median": null,
+              "first5_context_sum_median": null,
+              "first5_context_sum_total": 0
             }
           },
           "worker": {
@@ -2357,6 +2496,19 @@
                 "median_seconds": null,
                 "p90_seconds": null
               }
+            },
+            "calls": {
+              "count": 1,
+              "sessions_with_calls": 1,
+              "per_session_median": 1,
+              "context_unobserved": 0,
+              "context_median": 3,
+              "context_p90": 3,
+              "context_max": 3,
+              "start_sessions": 1,
+              "first_context_median": 3,
+              "first5_context_sum_median": 3,
+              "first5_context_sum_total": 3
             }
           }
         },
@@ -2474,6 +2626,19 @@
                     "median_seconds": null,
                     "p90_seconds": null
                   }
+                },
+                "calls": {
+                  "count": 3,
+                  "sessions_with_calls": 1,
+                  "per_session_median": 3,
+                  "context_unobserved": 0,
+                  "context_median": 9,
+                  "context_p90": 60,
+                  "context_max": 60,
+                  "start_sessions": 0,
+                  "first_context_median": null,
+                  "first5_context_sum_median": null,
+                  "first5_context_sum_total": 0
                 }
               },
               "worker": {
@@ -2580,6 +2745,19 @@
                     "median_seconds": null,
                     "p90_seconds": null
                   }
+                },
+                "calls": {
+                  "count": 1,
+                  "sessions_with_calls": 1,
+                  "per_session_median": 1,
+                  "context_unobserved": 0,
+                  "context_median": 3,
+                  "context_p90": 3,
+                  "context_max": 3,
+                  "start_sessions": 1,
+                  "first_context_median": 3,
+                  "first5_context_sum_median": 3,
+                  "first5_context_sum_total": 3
                 }
               }
             },
@@ -2697,6 +2875,19 @@
                     "median_seconds": null,
                     "p90_seconds": null
                   }
+                },
+                "calls": {
+                  "count": 0,
+                  "sessions_with_calls": 0,
+                  "per_session_median": null,
+                  "context_unobserved": 0,
+                  "context_median": null,
+                  "context_p90": null,
+                  "context_max": null,
+                  "start_sessions": 0,
+                  "first_context_median": null,
+                  "first5_context_sum_median": null,
+                  "first5_context_sum_total": 0
                 }
               },
               "worker": {
@@ -2794,6 +2985,19 @@
                     "median_seconds": null,
                     "p90_seconds": null
                   }
+                },
+                "calls": {
+                  "count": 0,
+                  "sessions_with_calls": 0,
+                  "per_session_median": null,
+                  "context_unobserved": 0,
+                  "context_median": null,
+                  "context_p90": null,
+                  "context_max": null,
+                  "start_sessions": 0,
+                  "first_context_median": null,
+                  "first5_context_sum_median": null,
+                  "first5_context_sum_total": 0
                 }
               }
             },
