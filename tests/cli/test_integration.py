@@ -160,6 +160,13 @@ class IntegrationTests(unittest.TestCase):
                     or path.name == "missing.json" else 0, (option, path.name, errors))
                 self.assertNotIn("Traceback", errors)
 
+    def test_collect_refuses_a_probe_cache_inside_log_roots(self):
+        with self.assertRaises(SystemExit):
+            with redirect_stderr(io.StringIO()):
+                main(["collect", "--since", "2030-01-01T00:00Z", "--until", "2030-01-15T00:00Z",
+                    "--home", str(self.home), "--json", "-",
+                    "--cache", str(self.home / ".claude/projects/cache")])
+
     def test_baseline_uses_fourteen_day_bounds_and_path_scope(self):
         nested = self.repository / "src"
         nested.mkdir()

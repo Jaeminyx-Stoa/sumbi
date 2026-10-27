@@ -24,7 +24,7 @@ def run(args, window, agents, rules):
             idle_minutes=args.idle_minutes,
             local_review=bool(args.local_review), salt=salt,
             long_session_minutes=args.long_session_minutes, labels=labels,
-            forbid_models=tuple(args.forbid_model), pricer=pricer)
+            forbid_models=tuple(args.forbid_model), pricer=pricer, cache_dir=args.cache)
         data = json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
         if args.json == "-":
             print(data, end="")

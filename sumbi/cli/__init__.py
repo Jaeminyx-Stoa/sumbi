@@ -77,6 +77,9 @@ def main(argv: list[str] | None = None) -> int:
             root.error("Compare output must not overwrite interventions")
     if any(inside_log_roots(p, args.home) for p in resolved):
         root.error("Output destinations must be outside session-log directories")
+    if args.command == "collect" and args.cache is not None and inside_log_roots(
+        args.cache.resolve(), args.home):
+        root.error("The probe cache must be outside session-log directories")
     if args.command == "compare":
         return run_compare(args, root, window, agents, rules, resolved, sources, registration)
     if args.command == "deliver":

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from sumbi.sessions.builder import collect_window
+from sumbi.sessions.probe_cache import ProbeCache
 
 from pathlib import Path
 
@@ -64,17 +65,18 @@ def collect(home: Path, window: Window, *, agents: list[str] | None = None,
     local_review: bool = False, salt: bytes | None = None,
     repository: Path | None = None,
     long_session_minutes: float = LONG_SESSION_MINUTES, labels: Labels | None = None,
-    forbid_models: tuple[str, ...] = (), pricer: Pricer | None = None) -> tuple[dict, str]:
+    forbid_models: tuple[str, ...] = (), pricer: Pricer | None = None,
+    cache_dir: Path | None = None) -> tuple[dict, str]:
     with pseudonym_key(salt if salt is not None else read_salt()):
         return _collect(home, window, agents=agents, rules=rules, idle_minutes=idle_minutes,
             local_review=local_review, repository=repository,
             long_session_minutes=long_session_minutes, labels=labels,
-            forbid_models=forbid_models, pricer=pricer)
+            forbid_models=forbid_models, pricer=pricer, cache_dir=cache_dir)
 
 
 def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
     local_review, repository, long_session_minutes, labels=None,
-    forbid_models=(), pricer=None) -> tuple[dict, str]:
+    forbid_models=(), pricer=None, cache_dir=None) -> tuple[dict, str]:
     attributor = RepositoryAttributor(repository) if repository is not None else Attributor(
         rules or [])
     sessions = []
@@ -84,13 +86,17 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
     hook_key = reason_key()
     for agent in agents if agents is not None else DEFAULT_AGENTS:
         measured = Coverage()
+        cache = ProbeCache(cache_dir, agent) if cache_dir is not None else None
         found, skipped = collect_window(ADAPTERS[agent], home, window, measured,
-            local_review=local_review, reason_salt=hook_key)
+            local_review=local_review, reason_salt=hook_key, cache=cache)
         found_sessions.extend(found)
         included = [s for s in found if s.in_window(window)]
         coverage[agent] = {**measured.as_dict(), "files_skipped": skipped,
             "sessions_read": len(found),
             "sessions_in_window": len(included)}
+        if cache is not None:
+            cache.save()
+            coverage[agent]["probe_cache"] = {"hits": cache.hits, "misses": cache.misses}
         selected_count = 0
         for session in included:
             row = session.as_dict(window, attributor, idle_minutes)
@@ -141,7 +147,13 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
         report["scope"] = {"kind": "repository", "sessions_in_window": scanned,
             "sessions_selected": len(sessions),
             "sessions_excluded": scanned - len(sessions)}
-    rows = {s["id"]: s for s in sessions}
+    _optional(report, found_sessions, window, labels, forbid_models, pricer)
+    return report, "\n".join(reviews) + ("\n" if reviews else "")
+
+
+def _optional(report, found_sessions, window, labels, forbid_models, pricer):
+    """Sections that exist only when collect was given labels, patterns or prices."""
+    rows = {s["id"]: s for s in report["sessions"]}
     if pricer is not None:
         report["value"] = value_measure(found_sessions, rows, window, pricer, role,
             model_at, usage_events)
@@ -149,7 +161,6 @@ def _collect(home: Path, window: Window, *, agents, rules, idle_minutes,
         report["labels"] = label_measure(found_sessions, rows, window, labels, pricer)
     if forbid_models:
         report["policy"] = policy(found_sessions, rows, window, forbid_models, labels, pricer)
-    return report, "\n".join(reviews) + ("\n" if reviews else "")
 
 
 def spend_row(bucket, project_key, rule):

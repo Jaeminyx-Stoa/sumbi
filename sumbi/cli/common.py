@@ -111,6 +111,8 @@ def configure_collection(command, *, deliver=False, comparison=False):
             help="Report spend on model labels matching this glob; repeatable")
         command.add_argument("--price-table", type=Path, metavar="FILE",
             help="JSON prices per million tokens by model glob; adds estimated value")
+        command.add_argument("--cache", type=Path, metavar="DIR",
+            help="Private local cache of per-file probes; unchanged files are not rescanned")
     if not deliver:
         command.add_argument("--local-review", type=Path, metavar="OUT")
     else:
