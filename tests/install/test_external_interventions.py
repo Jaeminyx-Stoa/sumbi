@@ -131,7 +131,9 @@ class ExternalInterventionTests(unittest.TestCase):
         def profiled(path, share, project_share, median_seconds):
             data = json.loads(path.read_text(encoding="utf-8"))
             role = {"long_tail": {"token_share": share}, "tokens_per_day": {"total": 10},
-                "tool_latency": {"shell": {"median_seconds": median_seconds}}}
+                "tool_latency": {"shell": {"median_seconds": median_seconds}},
+                "calls": {"first5_context_sum_median": 1000 * median_seconds}}
+            data["value"] = {"summary": {"amount": 40.0 * share, "unpriced_tokens": 0}}
             data["profile"] = {"summary": {"roles": {"worker": role},
                 "fan_out": {"children_max": 4}},
                 "projects": {KEY: {"roles": {"worker": {
@@ -152,6 +154,9 @@ class ExternalInterventionTests(unittest.TestCase):
         self.assertEqual(metrics["worker-tokens-per-day"]["after"], 10)  # Already per day.
         self.assertEqual(metrics["worker-shell-tool-median-seconds"]["after"], 2.0)
         self.assertEqual(metrics["children-per-parent-max"]["before"], 4)
+        self.assertEqual(metrics["worker-first5-context-median"]["after"], 2000.0)
+        self.assertIsNone(metrics["worker-call-context-p90"]["after"])
+        self.assertEqual(metrics["estimated-value-per-day"]["before"], 10.0)  # 20 over 2 days.
         self.assertIsNone(metrics["orchestrator-long-tail-share"]["before"])
         code, output, _ = self.check("--json", "--project-key", KEY)
         summary = json.loads(output)

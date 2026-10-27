@@ -39,6 +39,8 @@ PER_DAY = {
     "reasoning-output-subset-tokens-per-day": "/summary/tokens/reasoning_output",
     "compactions-per-day": "/summary/counts/compactions",
     "estimated-active-seconds-per-day": "/summary/time/active_seconds/value",
+    # Present only when collect ran with --price-table.
+    "estimated-value-per-day": "/value/summary/amount",
 }
 RATIOS = {"tool-error-rate": ("/summary/counts/tool_errors", "/summary/counts/tool_results")}
 # Role metrics read the collect profile as reported (already per day or a share),
@@ -54,6 +56,11 @@ PROFILE = {
         ("long-tail-share", "long_tail/token_share"),
         ("compacted-session-share", "compaction/token_share"),
         ("top-decile-share", "concentration/top_decile_share"),
+        ("calls-per-session-median", "calls/per_session_median"),
+        ("call-context-median", "calls/context_median"),
+        ("call-context-p90", "calls/context_p90"),
+        ("first-call-context-median", "calls/first_context_median"),
+        ("first5-context-median", "calls/first5_context_sum_median"),
         *((f"{c}-tool-median-seconds", f"tool_latency/{c}/median_seconds")
             for c in TOOL_CLASSES))},
     "children-per-parent-max": "fan_out/children_max",

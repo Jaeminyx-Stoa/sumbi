@@ -274,8 +274,9 @@ cost metrics are normalized per day of each report's window so unequal windows
 stay readable: `sessions-per-day`, `tokens-per-day`, the reported token
 components (`new-input-`, `cache-write-`, `cache-read-`, `output-` and
 `reasoning-output-subset-tokens-per-day`), `compactions-per-day`,
-`estimated-active-seconds-per-day`, and `tool-error-rate` (tool errors per
-tool result). Each row shows before, after, change percent and observed
+`estimated-active-seconds-per-day`, `estimated-value-per-day` (the price-table
+`value` total; `null` unless both reports were collected with `--price-table`),
+and `tool-error-rate` (tool errors per tool result). Each row shows before, after, change percent and observed
 direction; a missing component stays `null`. Predictions and revert criteria
 naming these metrics are shown side by side, with `crossed` for a revert
 criterion whose observed change reaches its threshold in its direction.
@@ -291,7 +292,11 @@ as reported, already per day or a share, not divided again. For each role
 `<role>-median-session-tokens`, `<role>-tool-seconds-per-paired-call`,
 `<role>-long-tail-share` (token share of sessions over the long-session
 threshold), `<role>-compacted-session-share`, `<role>-top-decile-share`, and
-`<role>-<class>-tool-median-seconds` for each tool class; plus
+`<role>-<class>-tool-median-seconds` for each tool class, and from the role's
+model calls `<role>-calls-per-session-median`, `<role>-call-context-median`,
+`<role>-call-context-p90`, `<role>-first-call-context-median` and
+`<role>-first5-context-median` (median first-five-call context sum, the start
+cost); plus
 `children-per-parent-max` and `children-per-parent-median`. They read
 `/profile/summary` by default. `--project-key KEY` reads
 `/profile/projects/KEY` instead, so a check can follow one repository's workers;
