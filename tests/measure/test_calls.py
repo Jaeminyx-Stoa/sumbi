@@ -42,6 +42,14 @@ class CallTests(unittest.TestCase):
         self.assertEqual(row["start"]["observed"], False)
         self.assertIsNone(row["start"]["first5_context_sum"])
 
+    def test_zero_usage_records_are_not_calls(self):
+        zero = {"new_input": 0, "cache_write": 0, "cache_read": 0, "output": 0,
+            "reasoning_output": None}
+        s = session("z", [zero, usage(10), zero])
+        row = measure(s, WINDOW)
+        self.assertEqual(row["count"], 1)
+        self.assertEqual(row["start"]["first_context"], 10)
+
     def test_unobserved_context_is_counted_not_guessed(self):
         s = session("c", [usage(None, 5, 5), usage(4)])
         row = measure(s, WINDOW)

@@ -246,12 +246,14 @@ latency) so the tail of the text shows the headline numbers.
 role has `calls`. A call is one native request record: a Claude Code assistant
 message snapshot (after the streaming deduplication above), a Codex turn's
 `last_token_usage`, or an open-event request usage record. Cumulative Codex
-deltas are not calls. A call's context is new input plus cache write plus cache
+deltas are not calls, nor is a record with no reported tokens (Claude Code's
+locally generated messages). A call's context is new input plus cache write plus cache
 read (the delegation rule); a call without new input is counted in
 `context_unobserved` and never guessed. Per session: `count` (in-window calls),
 `context.total/median/p90/max` (nearest-rank p90), and `start`: when the
 session's own first call falls in the window, `first_context` and
-`first5_context_sum` (the first five calls, or fewer when the session made fewer;
+`first5_context_sum` (the first five calls, or fewer when the session made fewer
+or the window ends first;
 null when any of them is unobserved); otherwise `observed` is false. Per role:
 `count`, `sessions_with_calls`, `per_session_median` (calls per session with
 calls), pooled per-call `context_median/p90/max`, `start_sessions`, and the

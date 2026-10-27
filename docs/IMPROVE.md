@@ -121,7 +121,7 @@ profile's numeric fields: `sessions`, `sessions_per_day`, `tokens/<kind>`,
 `tool_calls_per_day`, `tool_error_rate`, `compactions_per_day`,
 `cache_read_per_tool_call`, `active_seconds`, `active_seconds_per_day`,
 `tool_seconds_per_paired_call`, `compaction/<field>`, `long_tail/<field>`,
-`concentration/<field>` and `tool_latency/<class>/<field>`, plus fan-out
+`concentration/<field>`, `tool_latency/<class>/<field>` and `calls/<field>`, plus fan-out
 `parents`, `children`, `children_max` and `children_median`. Model rows are
 lists and cannot be cited. A null value cannot be cited. A bundle cites at most
 32 pointers.

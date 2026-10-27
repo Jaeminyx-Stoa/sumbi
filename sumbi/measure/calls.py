@@ -11,10 +11,13 @@ from sumbi.measure.delegation import _context, _percentile
 
 
 START_CALLS = 5
+COUNTED = ("new_input", "cache_write", "cache_read", "output")
 
 
 def _records(session):
-    return sorted(session.request_usage, key=lambda r: (r[0], r[1]))
+    """Request records in time order, without zero-usage records (local synthetic messages)."""
+    return sorted((r for r in session.request_usage
+        if any(r[2].get(kind) for kind in COUNTED)), key=lambda r: (r[0], r[1]))
 
 
 def contexts(session, window):

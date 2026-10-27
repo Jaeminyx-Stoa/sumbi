@@ -96,7 +96,7 @@ class EvidenceImproveTests(unittest.TestCase):
 
     def test_profile_pointers_need_exact_allow_listed_numbers(self):
         worker = {"long_tail": {"token_share": 0.53, "sessions": 26},
-            "tool_latency": {"shell": {"median_seconds": None}}, "models": [{"sessions": 3}]}
+            "calls": {"context_p90": 41000}, "tool_latency": {"shell": {"median_seconds": None}}, "models": [{"sessions": 3}]}
         key, agent = "project_" + "ab" * 12, "sumbi-events:agent_" + "0f" * 12
         private = "PRIVATE sentence\nsecond line"
         self.report["profile"] = {"summary": {"roles": {"worker": worker},
@@ -110,6 +110,7 @@ class EvidenceImproveTests(unittest.TestCase):
         self.evidence.write_text(json.dumps(self.report))
         accepted = [(f"/profile/projects/{key}/roles/worker/long_tail/token_share", 0.53),
             ("/profile/summary/fan_out/children_max", 223),
+            ("/profile/summary/roles/worker/calls/context_p90", 41000),
             ("/profile/by_agent/claude-code/roles/worker/long_tail/sessions", 26),
             ("/profile/projects/other/roles/worker/long_tail/sessions", 26),
             (f"/profile/projects/{key}/agents/{agent}/roles/worker/"
