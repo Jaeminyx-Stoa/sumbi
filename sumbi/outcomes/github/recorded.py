@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import json
 from pathlib import Path
 import re
+import urllib.parse
 from typing import Protocol
 
 from sumbi.outcomes.github.ledger import REPO, utc
@@ -17,6 +18,33 @@ SHA = r"[0-9a-fA-F]{40}"
 FIX = re.compile(
     r"\b(?:fix(?:es|ed|ing)?|revert(?:s|ed|ing)?|regression|follow[ -]?up|hotfix)\b", re.I)
 REVERT = re.compile(r"\brevert(?:s|ed|ing)?\b", re.I)
+
+
+def branch_request_repo(path):
+    """Identify supported ref-scoped REST paths, excluding full commit SHAs."""
+    parsed = urllib.parse.urlsplit(path)
+    match = re.fullmatch(r"/repos/(" + REPO + r")/(.*)", parsed.path)
+    if not match or parsed.scheme or parsed.netloc or parsed.fragment:
+        return None
+    repo, endpoint = match.groups()
+    refs = []
+    if endpoint == "commits":
+        refs = urllib.parse.parse_qs(parsed.query).get("sha", [])
+    elif endpoint.startswith("commits/"):
+        match = re.fullmatch(r"commits/(.+)/(?:check-runs|statuses|status)", endpoint)
+        refs = [match[1]] if match else []
+    elif endpoint.startswith("compare/"):
+        refs = endpoint[len("compare/"):].split("...")
+        if len(refs) != 2:
+            return None
+    return repo.lower() if any(ref and not re.fullmatch(SHA,
+        urllib.parse.unquote(ref)) for ref in refs) else None
+
+
+def branch_commits_unavailable(paths):
+    """Missing listings and comparisons cannot prove complete commit evidence."""
+    return any(re.fullmatch(r"/repos/" + REPO + r"/(?:commits|compare/.+)",
+        urllib.parse.urlsplit(path).path) for path in paths)
 
 
 def references(pull):
@@ -85,8 +113,10 @@ class FixtureOutcomes:
             raise ValueError("Outcomes: malformed or unreadable repository fixture") from None
 
     def _load(self, raw, *, defer_policy=False):
-        if not isinstance(raw, dict) or set(raw) != {"repository", "coverage_start", "observed_at",
-            "pulls_complete", "commits_complete", "pulls", "commits"}:
+        required = {"repository", "coverage_start", "observed_at",
+            "pulls_complete", "commits_complete", "pulls", "commits"}
+        if (not isinstance(raw, dict) or not required <= set(raw)
+            or set(raw) - required - {"branch_unavailable"}):
             raise ValueError("Outcomes: expected documented repository fixture fields")
         repo = raw["repository"]
         if not isinstance(repo, str) or not re.fullmatch(REPO,
@@ -100,6 +130,15 @@ class FixtureOutcomes:
             raise ValueError("Outcomes: invalid observation coverage")
         self.observations[repo] = Observation(start, end, raw["pulls_complete"],
             raw["commits_complete"])
+        gaps = raw.get("branch_unavailable", [])
+        if not isinstance(gaps, list) or any(not isinstance(path, str)
+            or branch_request_repo(path) != repo for path in gaps):
+            raise ValueError("Outcomes: invalid branch request gaps")
+        self._evidence_identity = repo
+        for path in gaps:
+            self._gap("branch_unavailable", path)
+        if branch_commits_unavailable(gaps):
+            self.observations[repo] = Observation(start, end, raw["pulls_complete"], False)
         if not isinstance(raw["pulls"], list) or not isinstance(raw["commits"], list):
             raise ValueError("Outcomes: pulls and commits must be arrays")
         seen = set()

@@ -1,0 +1,12 @@
+[
+  {
+    "kind": "repository",
+    "endpoint": "",
+    "status": 404
+  },
+  {
+    "kind": "non-branch",
+    "endpoint": "/pulls",
+    "status": 404
+  }
+]
