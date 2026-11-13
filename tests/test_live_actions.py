@@ -49,6 +49,34 @@ class Tests(unittest.TestCase):
             self.assertEqual(quota(previous, sample(**changed), now)['status'], 'unknown')
         self.assertEqual(quota(sample(), sample(), now)['status'], 'unknown')
 
+    def test_quota_exhaustion_from_observation_and_now(self):
+        now = datetime.fromisoformat(NOW.replace('Z', '+00:00'))
+        def decide(old, current, reset, at=now):
+            previous = sample(observed_at='2026-01-01T11:59:00Z', used_percent=old, resets_at=reset)
+            return quota(previous, sample(used_percent=current, resets_at=reset), at)
+        cases = [(80, 90, '2026-01-01T17:00:00Z', 'signal'),
+                 (89.88888888888889, 90, '2026-01-01T14:00:00Z', 'clear'),
+                 (89.5, 90, '2026-01-01T12:10:00Z', 'clear'),
+                 (89, 90, '2026-01-01T12:10:00Z', 'clear'),
+                 (90, 100, '2026-01-01T17:00:00Z', 'signal'),
+                 (100, 100, '2026-01-01T17:00:00Z', 'signal')]
+        for old, current, reset, expected in cases:
+            with self.subTest(old=old, current=current, reset=reset):
+                self.assertEqual(decide(old, current, reset)['status'], expected)
+        previous = sample(observed_at='2026-01-01T11:59:00Z', used_percent=98, resets_at='2026-01-01T17:00:00Z')
+        current = sample(used_percent=99, resets_at='2026-01-01T17:00:00Z')
+        # Binary-exact percentages give exactly 3600 seconds after four minutes.
+        previous['used_percent'], current['used_percent'] = 98.984375, 99
+        exact = quota(previous, current, now)
+        self.assertEqual(exact['seconds_to_exhaustion'], 3840)
+        self.assertEqual(exact['status'], 'clear')
+        later = quota(previous, current, now.replace(minute=4))
+        self.assertEqual(later['seconds_to_exhaustion'], 3600)
+        self.assertEqual(later['status'], 'signal')
+        self.assertEqual(quota(previous, current, now.replace(minute=3))['status'], 'clear')
+        exhausted = decide(80, 90, '2026-01-01T17:00:00Z', now.replace(minute=2))
+        self.assertEqual((exhausted['status'], exhausted['seconds_to_exhaustion']), ('signal', 0))
+
     def test_quota_targets_only_same_account_engine(self):
         current = snapshot([window(), window(lane='lane2', engine='codex'), window(lane='lane3', account='acct2')], [sample()])
         previous = snapshot(accounts=[sample(observed_at='2026-01-01T11:55:00Z', used_percent=88)])

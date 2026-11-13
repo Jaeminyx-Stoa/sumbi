@@ -35,7 +35,7 @@ def _number(v, minimum=0, maximum=None):
 
 
 def quota(previous, current, now):
-    """Return a status and reason, with slope in percentage points per hour."""
+    """Return slope per hour and seconds to exhaustion from now, clamped at zero."""
     unknown = lambda reason: {
         "status": "unknown",
         "reason": reason,
@@ -69,15 +69,19 @@ def quota(previous, current, now):
     ):
         return unknown("invalid_reset_or_sample")
     delta = current["used_percent"] - previous["used_percent"]
-    if delta <= 0:
-        return unknown("nonpositive_slope")
     slope = delta * 3600 / (b - a).total_seconds()
-    seconds = (100 - current["used_percent"]) * 3600 / slope
+    if current["used_percent"] == 100:
+        seconds = 0.0
+    elif delta <= 0:
+        return unknown("nonpositive_slope")
+    else:
+        seconds = max(0.0, (100 - current["used_percent"]) * 3600 / slope
+                      - (now - b).total_seconds())
     remaining = (reset - now).total_seconds()
-    predicted = seconds <= remaining and remaining - seconds <= 3600
+    predicted = seconds <= 3600 and seconds < remaining
     return {
         "status": "signal" if predicted else "clear",
-        "reason": "quota_exhaustion_before_reset" if predicted else "outside_reset_hour",
+        "reason": "quota_exhaustion_before_reset" if predicted else "outside_exhaustion_hour",
         "slope": slope,
         "unit": "percentage_points_per_hour",
         "seconds_to_exhaustion": seconds,
