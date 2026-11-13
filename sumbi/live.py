@@ -40,6 +40,7 @@ class RequestAccumulator:
         self.engine = engine
         self.observations = []
         self.invalid = 0
+        self.error_observations = 0
         self.session = self.model = None
         self.order = 0
 
@@ -49,6 +50,11 @@ class RequestAccumulator:
         self.order += 1
         if not isinstance(record, dict):
             self.invalid += 1
+            return
+        if engine == "claude" and record.get("type") == "assistant" and (
+            record.get("isApiErrorMessage") is True or record.get("error")
+        ):
+            self.error_observations += 1
             return
         identity = (
             record.get("sessionId")
@@ -71,11 +77,13 @@ class RequestAccumulator:
         if isinstance(identity, str) and identity:
             if identity != self.session and (self.session is not None or self.observations):
                 self.observations, self.invalid = [], 0
+                self.error_observations = 0
                 self.model = None
             self.session = identity
         if isinstance(current_model, str) and current_model:
             if self.model is not None and current_model != self.model:
                 self.observations, self.invalid = [], 0
+                self.error_observations = 0
             self.model = current_model
         normalizers = {"claude": self._claude, "codex": self._codex, "opencode": self._opencode}
         normalizers[engine](record, order)
@@ -213,6 +221,7 @@ class RequestAccumulator:
             else None,
             "previous_calls_1h": len(previous) if observations and not invalid else None,
             "invalid": invalid,
+            "error_observations": self.error_observations,
             "future": future,
             "duplicates": duplicates,
             "last_at": _iso(observations[-1][0]) if observations else None,
@@ -307,6 +316,7 @@ def snapshot(windows, accounts=(), now=None, *, stale_after=3600):
     coverage = {
         "windows": len(windows),
         "invalid": 0,
+        "error_observations": 0,
         "future": 0,
         "duplicates": 0,
         "incomplete": 0,
@@ -324,7 +334,7 @@ def snapshot(windows, accounts=(), now=None, *, stale_after=3600):
             row["reason"] = "unknown_engine"
         else:
             result = window.get("_summary") or summarize_requests(engine, records, now)
-            for key in ("invalid", "future", "duplicates"):
+            for key in ("invalid", "error_observations", "future", "duplicates"):
                 coverage[key] += result[key]
             for key in (
                 "context_tokens",
@@ -478,7 +488,11 @@ def _table(data):
         + " | ".join("---" for _ in columns)
         + " |\n"
         + "".join(
-            "| " + " | ".join(cell(row[key]) for key, _ in columns) + " |\n"
+            "| " + " | ".join(
+                "-" if key == "reason" and row[key] is None
+                else f"{row[key]:.2f}" if key == "avg_context_1h" and row[key] is not None
+                else cell(row[key]) for key, _ in columns
+            ) + " |\n"
             for row in data["windows"]
         )
     )

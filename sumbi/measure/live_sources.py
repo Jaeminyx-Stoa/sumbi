@@ -240,6 +240,7 @@ def live_inventory(*, target, proc_root, sqlite_path, run=command, tmux_socket=N
     prefix = ["tmux", "-S", str(tmux_socket)] if tmux_socket else ["tmux"]
     text = run(prefix + ["list-windows", "-t", target, "-F", fields])
     windows = []
+    excluded = 0
     for line in text.splitlines():
         values = line.split("\t")
         if len(values) != 6:
@@ -276,8 +277,11 @@ def live_inventory(*, target, proc_root, sqlite_path, run=command, tmux_socket=N
                     window["source_paths"] = paths
                 elif paths:
                     window["_error"] = "ambiguous_session_source"
+        if not any((lane, sid, cfg, engine, window["source_paths"], window.get("_error"))):
+            excluded += 1
+            continue
         windows.append(window)
-    return {"windows": windows}
+    return {"windows": windows, "excluded_no_agent_metadata_or_source": excluded}
 
 
 class SourceProbe:

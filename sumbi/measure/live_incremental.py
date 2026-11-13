@@ -25,6 +25,7 @@ def _encode(acc):
         "model": acc.model,
         "order": acc.order,
         "invalid": acc.invalid,
+        "error_observations": acc.error_observations,
         "observations": observations,
     }
 
@@ -35,14 +36,17 @@ def _natural(n):
 
 def _decode(state):
     acc = RequestAccumulator(state["engine"])
-    if set(state) != {"engine", "session", "model", "order", "invalid", "observations"}:
+    if set(state) != {
+        "engine", "session", "model", "order", "invalid", "error_observations", "observations"
+    }:
         raise ValueError("cache_schema")
-    if not all(_natural(state[k]) for k in ("order", "invalid")):
+    if not all(_natural(state[k]) for k in ("order", "invalid", "error_observations")):
         raise ValueError("cache_count")
     if any(state[k] is not None and not isinstance(state[k], str) for k in ("session", "model")):
         raise ValueError("cache_identity")
     acc.session, acc.model = state["session"], state["model"]
     acc.order, acc.invalid = state["order"], state["invalid"]
+    acc.error_observations = state["error_observations"]
     for at, order, identity, rank, value in state["observations"]:
         at = _time(at)
         if at is None or not _natural(order) or order >= acc.order or not _natural(value):
@@ -315,6 +319,7 @@ def collect_incremental(inventory, reader, now=None, *, stale_after=3600):
                 )
                 acc.order += source.order
                 acc.invalid += source.invalid
+                acc.error_observations += source.error_observations
                 acc.session, acc.model = source.session or acc.session, source.model or acc.model
             count += info["rows"]
             partial += int(info["partial"])
