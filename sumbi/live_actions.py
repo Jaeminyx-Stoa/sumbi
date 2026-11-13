@@ -86,7 +86,11 @@ def quota(previous, current, now):
 
 def plan(snapshot, previous=None, now=None):
     """Evaluate windows and account samples, returning labeled decisions."""
-    if not isinstance(snapshot, dict) or snapshot.get("schema_version") != 1:
+    if (
+        not isinstance(snapshot, dict)
+        or type(snapshot.get("schema_version")) is not int
+        or snapshot.get("schema_version") != 1
+    ):
         raise ValueError("unsupported snapshot")
     observed = _time(snapshot.get("observed_at"))
     if (
@@ -97,10 +101,18 @@ def plan(snapshot, previous=None, now=None):
         raise ValueError("invalid snapshot")
     reference = now or datetime.now(timezone.utc)
     snapshot_fresh = _fresh(snapshot.get("observed_at"), reference)
-    now = observed
+    now = reference
     return _windows(snapshot, now, snapshot_fresh) + _accounts(
         snapshot, previous, now, snapshot_fresh
     )
+
+
+def _duplicate_window(row, rows):
+    keys = ("engine", "lane", "session_id")
+    return sum(
+        1 for other in rows
+        if isinstance(other, dict) and all(other.get(k) == row.get(k) for k in keys)
+    ) > 1
 
 
 def _windows(snapshot, now, snapshot_fresh):
@@ -109,14 +121,20 @@ def _windows(snapshot, now, snapshot_fresh):
         if not isinstance(row, dict):
             results.append({"status": "unknown", "reason": "invalid_window"})
             continue
-        identity = {k: row.get(k) for k in ("lane", "engine", "account", "session_id")}
+        identity = {
+            k: row.get(k)
+            for k in ("lane", "engine", "account", "session_id", "config_root", "observed_at")
+        }
         valid = (
             snapshot_fresh
             and row.get("status") == "ok"
             and _fresh(row.get("observed_at"), now)
-            and row.get("engine") in ENGINES
+            and isinstance(row.get("engine"), str)
+            and row["engine"] in ENGINES
+            and (row.get("account") is None or isinstance(row.get("account"), str))
+            and not _duplicate_window(row, snapshot["windows"])
             and all(
-                isinstance(row.get(k), str) and row[k] for k in ("lane", "account", "session_id")
+                isinstance(row.get(k), str) and row[k] for k in ("lane", "session_id")
             )
         )
         for kind in ("context", "calls"):
@@ -165,20 +183,8 @@ def _accounts(snapshot, previous, now, snapshot_fresh):
         if not isinstance(account, dict):
             results.append({"kind": "quota", "status": "unknown", "reason": "invalid_account"})
             continue
-        matches = [
-            a
-            for a in old
-            if isinstance(a, dict)
-            and a.get("account") == account.get("account")
-            and a.get("engine") == account.get("engine")
-        ]
-        current_matches = [
-            a
-            for a in snapshot["accounts"]
-            if isinstance(a, dict)
-            and a.get("account") == account.get("account")
-            and a.get("engine") == account.get("engine")
-        ]
+        matches = _account_matches(old, account)
+        current_matches = _account_matches(snapshot["accounts"], account)
         decision = quota(
             matches[0]
             if len(matches) == 1 and len(current_matches) == 1 and snapshot_fresh
@@ -194,8 +200,8 @@ def _accounts(snapshot, previous, now, snapshot_fresh):
             and w.get("engine") == account.get("engine")
             and w.get("status") == "ok"
             and _fresh(w.get("observed_at"), now)
-            and w.get("lane")
-            and w.get("session_id")
+            and all(isinstance(w.get(k), str) and w[k] for k in ("lane", "session_id"))
+            and not _duplicate_window(w, snapshot["windows"])
         ]
         if decision["status"] == "signal" and targets:
             for target in targets:
@@ -207,6 +213,10 @@ def _accounts(snapshot, previous, now, snapshot_fresh):
                         engine=account.get("engine"),
                         lane=target["lane"],
                         session_id=target["session_id"],
+                        config_root=target.get("config_root"),
+                        window_minutes=account.get("window_minutes"),
+                        resets_at=account.get("resets_at"),
+                        observed_at=account.get("observed_at"),
                     )
                 )
         else:
@@ -222,6 +232,19 @@ def _accounts(snapshot, previous, now, snapshot_fresh):
                     kind="quota",
                     account=account.get("account"),
                     engine=account.get("engine"),
+                    window_minutes=account.get("window_minutes"),
+                    resets_at=account.get("resets_at"),
+                    observed_at=account.get("observed_at"),
                 )
             )
     return results
+
+
+def _account_matches(rows, account):
+    if not isinstance(rows, list):
+        return []
+    return [
+        row for row in rows
+        if isinstance(row, dict)
+        and all(row.get(k) == account.get(k) for k in ("account", "engine", "window_minutes"))
+    ]

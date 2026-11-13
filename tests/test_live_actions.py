@@ -38,7 +38,7 @@ class Sink:
 
 class Tests(unittest.TestCase):
     def test_threshold_and_missing_comparison(self):
-        rows = plan(snapshot([window(), window(context_tokens=200001, previous_calls_1h=None)]), now=datetime.fromisoformat(NOW.replace("Z", "+00:00")))
+        rows = plan(snapshot([window(), window(lane="lane2", context_tokens=200001, previous_calls_1h=None)]), now=datetime.fromisoformat(NOW.replace("Z", "+00:00")))
         self.assertEqual([r['status'] for r in rows], ['clear', 'signal', 'signal', 'unknown'])
 
     def test_quota(self):
@@ -57,5 +57,54 @@ class Tests(unittest.TestCase):
         self.assertEqual([(d['lane'], d['status']) for d in matches], [('lane1', 'signal')])
         stale = plan(current, previous, now=datetime.fromisoformat('2026-01-01T12:11:00+00:00'))
         self.assertTrue(all(d['status'] == 'unknown' for d in stale))
+
+class ValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.now = datetime.fromisoformat(NOW.replace('Z', '+00:00'))
+
+    def test_unknown_account_keeps_window_signals(self):
+        for account in (None, ''):
+            rows = plan(snapshot([window(account=account, context_tokens=200001)]), now=self.now)
+            self.assertEqual([r['status'] for r in rows], ['signal', 'signal'])
+
+    def test_duplicate_windows_are_unknown(self):
+        rows = plan(snapshot([window(), window()]), now=self.now)
+        self.assertTrue(all(r['status'] == 'unknown' for r in rows))
+
+    def test_future_and_stale_samples(self):
+        for stamp in ('2026-01-01T12:00:01Z', '2026-01-01T11:49:59Z'):
+            rows = plan(snapshot([window(observed_at=stamp)]), now=self.now)
+            self.assertTrue(all(r['status'] == 'unknown' for r in rows))
+        stale = snapshot([window()])
+        stale['observed_at'] = '2026-01-01T11:59:00Z'
+        rows = plan(stale, now=self.now)
+        self.assertEqual(rows[1]['status'], 'signal')
+
+    def test_invalid_numeric_samples(self):
+        for value in (True, -1, float('nan'), float('inf'), '200001'):
+            rows = plan(snapshot([window(context_tokens=value)]), now=self.now)
+            self.assertEqual(rows[0]['status'], 'unknown')
+
+    def test_quota_windows_are_independent(self):
+        current = snapshot([window()], [sample(), sample(window_minutes=10080)])
+        old_rows = [sample(observed_at='2026-01-01T11:55:00Z', used_percent=88),
+                    sample(window_minutes=10080, observed_at='2026-01-01T11:55:00Z', used_percent=88)]
+        rows = [r for r in plan(current, snapshot(accounts=old_rows), self.now) if r['kind'] == 'quota']
+        self.assertEqual([(r['window_minutes'], r['status']) for r in rows],
+                         [(300, 'signal'), (10080, 'signal')])
+        current['accounts'].append(sample())
+        rows = [r for r in plan(current, snapshot(accounts=old_rows), self.now) if r['kind'] == 'quota']
+        self.assertEqual([r['status'] for r in rows], ['unknown', 'signal', 'unknown'])
+
+    def test_duplicate_previous_and_nonlist_previous(self):
+        a = sample(observed_at='2026-01-01T11:55:00Z', used_percent=88)
+        for previous in (snapshot(accounts=[a, a]), dict(schema_version=1, accounts=None)):
+            rows = plan(snapshot([window()], [sample()]), previous, self.now)
+            self.assertEqual(rows[-1]['status'], 'unknown')
+
+    def test_invalid_snapshot(self):
+        for data in (None, {}, dict(schema_version=1, observed_at=NOW, windows={}, accounts=[])):
+            with self.assertRaises(ValueError):
+                plan(data, now=self.now)
 
 if __name__ == '__main__': unittest.main()
