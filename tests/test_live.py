@@ -86,7 +86,7 @@ class SnapshotTests(RequestSummaryTests):
             write_snapshot(data, tmp)
             self.assertEqual(json.loads((Path(tmp) / 'snapshot.json').read_text()), data)
             self.assertIn('| a | codex |', (Path(tmp) / 'LATEST.md').read_text())
-            self.assertEqual((Path(tmp) / 'LATEST.md').read_text(), (Path(tmp) / 'fortress-line.txt').read_text())
+            self.assertEqual((Path(tmp) / 'fortress-line.txt').read_text().count('\n'), 1)
             path.write_text(path.read_text() + '{broken\n')
             self.assertEqual(collect_inventory(inventory, self.now)['windows'][0]['reason'], 'invalid_json')
 

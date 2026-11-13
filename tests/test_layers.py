@@ -6,8 +6,9 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parent.parent / "sumbi"
+# The existing top-level live snapshot API belongs to the measurement layer.
 LAYERS = {"core": 0, "catalog": 0, "events": 1, "sessions": 2,
-          "measure": 3, "outcomes": 4, "install": 4, "judge": 5, "cli": 6}
+          "measure": 3, "live": 3, "outcomes": 4, "install": 4, "judge": 5, "cli": 6}
 # Both existing command entry points are explicitly allowed to delegate to CLI.
 ENTRIES = {"sumbi.__main__", "sumbi.install.__main__"}
 
