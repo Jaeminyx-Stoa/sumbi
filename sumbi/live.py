@@ -327,11 +327,14 @@ def snapshot(windows, accounts=(), now=None, *, stale_after=3600):
     for window in windows:
         engine = window.get("engine")
         row = _empty_row(window)
+        if window.get("_excluded_source_count"):
+            row["excluded_source_count"] = window["_excluded_source_count"]
+            row["excluded_source_reason"] = window["_excluded_source_reason"]
         coverage["bytes"] += window.get("_bytes", 0)
         records = window.get("records", window.get("messages", []))
         coverage["rows"] += window.get("_rows", len(records))
         if engine not in ("claude", "codex", "opencode"):
-            row["reason"] = "unknown_engine"
+            row["reason"] = window.get("_error") or "unknown_engine"
         else:
             result = window.get("_summary") or summarize_requests(engine, records, now)
             for key in ("invalid", "error_observations", "future", "duplicates"):

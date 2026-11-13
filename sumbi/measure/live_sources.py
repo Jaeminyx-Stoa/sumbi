@@ -211,7 +211,9 @@ def command(arguments):
 
 def open_rollouts(pid, proc_root):
     """Inspect only descendants of this pane, using their actual open FDs."""
-    todo, seen, paths = [str(pid)], set(), {}
+    todo, seen, paths, errors = [str(pid)], set(), {}, set()
+    if not str(pid).isdigit():
+        errors.add("proc_pid_unavailable")
     while todo:
         current = todo.pop()
         if current in seen or not current.isdigit():
@@ -221,17 +223,22 @@ def open_rollouts(pid, proc_root):
         try:
             todo.extend((base / "task" / current / "children").read_text().split())
         except OSError:
-            pass
+            errors.add("proc_children_unreadable")
         try:
-            for fd in (base / "fd").iterdir():
+            fds = list((base / "fd").iterdir())
+        except OSError:
+            errors.add("proc_fd_unreadable")
+            continue
+        for fd in fds:
+            try:
                 target = os.readlink(fd)
                 name = Path(target.removesuffix(" (deleted)")).name
                 if name.startswith("rollout-") and name.endswith(".jsonl"):
                     stat = fd.stat()
                     paths.setdefault((stat.st_dev, stat.st_ino), (str(fd), target))
-        except OSError:
-            continue
-    return sorted(paths.values())
+            except OSError:
+                errors.add("proc_fd_entry_unreadable")
+    return sorted(paths.values()), sorted(errors)
 
 
 def live_inventory(*, target, proc_root, sqlite_path, run=command, tmux_socket=None):
@@ -257,7 +264,10 @@ def live_inventory(*, target, proc_root, sqlite_path, run=command, tmux_socket=N
         if engine == "opencode":
             window.update(sqlite_session(sqlite_path, sid))
         elif engine == "codex" or engine not in ENGINES:
-            paths = open_rollouts(pid, proc_root)
+            paths, errors = open_rollouts(pid, proc_root)
+            if errors:
+                window["_error"] = "proc_observation_incomplete"
+                window["_observation_errors"] = errors
             if len(paths) == 1:
                 window.update(
                     engine="codex", source_paths=[paths[0][0]], source_targets=[paths[0][1]]
@@ -392,6 +402,11 @@ class SourceProbe:
                     engine = next(iter(supported))
             window["engine"] = engine
             window["source_paths"] = by_engine.get(engine, []) if engine in ENGINES else []
+            excluded = sum(len(paths) for key, paths in by_engine.items() if key != engine)
+            if excluded:
+                window["_excluded_source_count"] = excluded
+                window["_excluded_source_reason"] = "source_format_unconfirmed_or_mismatch"
+                window["_error"] = window.get("_error", "source_fragments_unconfirmed")
             if not window["source_paths"]:
                 window["_error"] = window.get("_error", "source_format_unconfirmed")
             windows.append(window)

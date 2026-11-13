@@ -11,6 +11,11 @@ from sumbi.measure.live_sources import live_inventory
 class LiveWindowSelectionTests(unittest.TestCase):
     def test_only_unidentified_windows_without_sources_are_excluded(self):
         with tempfile.TemporaryDirectory() as temp:
+            for pid in range(1, 6):
+                base = Path(temp) / str(pid)
+                (base / 'task' / str(pid)).mkdir(parents=True)
+                (base / 'task' / str(pid) / 'children').write_text('')
+                (base / 'fd').mkdir()
             inv = live_inventory(
                 target="x", proc_root=Path(temp), sqlite_path=Path(temp) / "db",
                 run=lambda _: "0\t\t\t\t\t1\n1\t\ts\t\t\t2\n2\t\t\t\tcodex\t3\n"
