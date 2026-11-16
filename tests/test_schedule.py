@@ -4,15 +4,18 @@ from contextlib import redirect_stderr
 from datetime import datetime, timezone
 from io import StringIO
 import fcntl
+import gc
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from unittest.mock import patch
 
-from sumbi.cli import main
+from sumbi.cli import main, schedule
 
 UTC = timezone.utc
 
@@ -43,10 +46,13 @@ class ScheduleTests(unittest.TestCase):
         self.config.write_text("\n".join(blocks), encoding="utf-8")
 
     def invoke(self, now):
+        arguments = ["schedule", "--config", str(self.config), "--state", str(self.state)]
+        if now is not None:
+            arguments += ["--now", str(now)]
         errors = StringIO()
+        gc.collect()
         with redirect_stderr(errors):
-            code = main(["schedule", "--config", str(self.config),
-                "--state", str(self.state), "--now", str(now)])
+            code = main(arguments)
         return code, errors.getvalue()
 
     def records(self):
@@ -156,6 +162,71 @@ class ScheduleTests(unittest.TestCase):
         self.assertEqual((code, errors), (1, ""))
         record = self.records()[-1]
         self.assertEqual((record["status"], record["rc"]), ("timeout", None))
+
+    def test_timeout_ends_the_whole_process_group(self):
+        now = 1_900_000_000.0
+        pid_file = self.root / "grandchild.pid"
+        code = ("import os, pathlib, time; "
+            "pathlib.Path(" + repr(str(pid_file)) + ").write_text(str(os.getpid())); "
+            "time.sleep(60)")
+        command = ["/bin/sh", "-c", '"$0" -c "$1"; true', sys.executable, code]
+        self.write_config(job_block("group-job", command,
+            every_sec=60, timeout_sec=2, cwd=str(self.root)))
+        code_value, errors = self.invoke(now)
+        self.assertEqual((code_value, errors), (1, ""))
+        record = self.records()[-1]
+        self.assertEqual((record["status"], record["rc"]), ("timeout", None))
+        pid = int(pid_file.read_text(encoding="utf-8"))
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.05)
+        else:
+            self.fail("grandchild process survived the timeout")
+
+    def test_lock_recheck_skips_when_another_call_started_first(self):
+        now = 1_900_000_000.0
+        self.write_config(job_block("every-job", marker_command(self.marker),
+            every_sec=60, cwd=str(self.root)))
+        real_due, calls = schedule._due, []
+        def due(job, state, moment):
+            if not calls:
+                calls.append(True)
+                self.last_start("every-job", now)
+                return True
+            return real_due(job, state, moment)
+        with patch("sumbi.cli.schedule._due", side_effect=due):
+            code, errors = self.invoke(now)
+        self.assertEqual((code, errors), (0, ""))
+        self.assertFalse(self.marker.exists())
+        self.assertEqual([row["status"] for row in self.records()], ["skipped"])
+
+    def test_without_now_uses_the_real_clock(self):
+        self.write_config(job_block("every-job", marker_command(self.marker),
+            every_sec=60, cwd=str(self.root)))
+        before = time.time()
+        code, errors = self.invoke(None)
+        after = time.time()
+        self.assertEqual((code, errors), (0, ""))
+        self.assertTrue(self.marker.exists())
+        record = self.records()[-1]
+        self.assertEqual(record["status"], "ok")
+        self.assertLessEqual(before, record["start"])
+        self.assertLessEqual(record["start"], after)
+        self.assertLessEqual(before, self.last_start_value("every-job"))
+        self.assertLessEqual(self.last_start_value("every-job"), after)
+
+    def test_every_sec_below_sixty_is_a_config_error(self):
+        self.write_config(job_block("fast-job", marker_command(self.marker),
+            every_sec=30, cwd=str(self.root)))
+        code, errors = self.invoke(1_900_000_000.0)
+        self.assertEqual(code, 2)
+        self.assertEqual(len(errors.splitlines()), 1)
+        self.assertFalse(self.marker.exists())
+        self.assertFalse((self.state / "runs.jsonl").exists())
 
 
 if __name__ == "__main__":

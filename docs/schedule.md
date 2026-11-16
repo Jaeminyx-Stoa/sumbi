@@ -29,10 +29,13 @@ Each `[[job]]` needs a bounded `name`, a `command` array of strings that runs
 without a shell, and exactly one of:
 
 - `every_sec`: run when the time since the last start is at least this many
-  seconds, with a 30-second tolerance for a one-minute external tick.
+  seconds, with a 30-second tolerance for a one-minute external tick. It must be
+  at least 60; a smaller value is a configuration error and no job runs.
 - `at_utc`: run once a day at `HH:MM` UTC after that time has passed.
 
-`timeout_sec` defaults to 3600. `cwd` is optional.
+`timeout_sec` defaults to 3600. When it passes, the command's whole process
+group receives `SIGTERM`, then `SIGKILL` after up to five seconds, so children
+the command started do not survive the timeout. `cwd` is optional.
 
 State under `--state`:
 

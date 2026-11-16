@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -71,8 +72,8 @@ def _job(job, seen):
         raise ConfigError("timeout_sec must be a positive integer.")
     normalized["timeout_sec"] = timeout
     if every is not None:
-        if isinstance(every, bool) or not isinstance(every, int) or every <= 0:
-            raise ConfigError("every_sec must be a positive integer.")
+        if isinstance(every, bool) or not isinstance(every, int) or every < 60:
+            raise ConfigError("every_sec must be an integer of at least 60 seconds.")
         normalized["every_sec"] = every
     if daily is not None:
         if not isinstance(daily, str) or not CLOCK.fullmatch(daily):
@@ -102,6 +103,10 @@ def _day_target(value, now):
         tzinfo=timezone.utc).timestamp()
 
 
+def _moment(now):
+    return time.time() if now is None else now
+
+
 def _due(job, state, now):
     last = _last_start(state / (job["name"] + ".json"))
     if "every_sec" in job:
@@ -128,34 +133,57 @@ def _record(state, name, start, end, rc, status):
         stream.write(line)
 
 
-def _execute(job):
+def _end_group(proc):
     try:
-        done = subprocess.run(list(job["command"]), cwd=job["cwd"],
-            timeout=job["timeout_sec"])
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        proc.wait(timeout=5)
     except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    proc.wait()
+
+
+def _execute(job):
+    proc = subprocess.Popen(list(job["command"]), cwd=job["cwd"],
+        start_new_session=True)
+    try:
+        returncode = proc.wait(timeout=job["timeout_sec"])
+    except subprocess.TimeoutExpired:
+        _end_group(proc)
         return "timeout", None
-    return ("ok" if done.returncode == 0 else "failed"), done.returncode
+    return ("ok" if returncode == 0 else "failed"), returncode
 
 
 def _run_job(job, state, now):
     name = job["name"]
-    if not _due(job, state, now):
-        _record(state, name, now, now, None, "skipped")
+    moment = _moment(now)
+    if not _due(job, state, moment):
+        _record(state, name, moment, moment, None, "skipped")
         return "skipped", None
     try:
         descriptor = os.open(state / (name + ".lock"), os.O_CREAT | os.O_RDWR, 0o644)
     except OSError:
-        _record(state, name, now, now, None, "failed")
+        _record(state, name, moment, moment, None, "failed")
         return "failed", None
     try:
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
-            _record(state, name, now, now, None, "busy")
+            _record(state, name, moment, moment, None, "busy")
             return "busy", None
-        _write_start(state / (name + ".json"), now)
+        moment = _moment(now)
+        if not _due(job, state, moment):
+            _record(state, name, moment, moment, None, "skipped")
+            return "skipped", None
+        _write_start(state / (name + ".json"), moment)
         status, rc = _execute(job)
-        _record(state, name, now, time.time(), rc, status)
+        _record(state, name, moment, time.time(), rc, status)
         return status, rc
     finally:
         os.close(descriptor)
@@ -163,8 +191,6 @@ def _run_job(job, state, now):
 
 def run(args, now=None):
     timestamp = args.now if now is None else now
-    if timestamp is None:
-        timestamp = time.time()
     try:
         jobs = _load(Path(args.config))
     except (ConfigError, OSError, tomllib.TOMLDecodeError):
