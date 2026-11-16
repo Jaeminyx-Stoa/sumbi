@@ -157,6 +157,28 @@ class ScheduleTests(unittest.TestCase):
         record = self.records()[-1]
         self.assertEqual((record["status"], record["rc"]), ("timeout", None))
 
+    def test_job_started_by_another_caller_before_lock_is_not_run_again(self):
+        from unittest import mock
+        from sumbi.cli import schedule
+        now = 1_900_000_000.0
+        self.write_config(job_block("race-job", marker_command(self.marker),
+            every_sec=300))
+        real_due, calls = schedule._due, []
+
+        def due_then_other_caller_ran(job, state, when):
+            calls.append(when)
+            if len(calls) == 1:
+                verdict = real_due(job, state, when)
+                self.last_start("race-job", when)
+                return verdict
+            return real_due(job, state, when)
+
+        with mock.patch.object(schedule, "_due", due_then_other_caller_ran):
+            code, _ = self.invoke(now)
+        self.assertEqual(code, 0)
+        self.assertFalse(self.marker.exists())
+        self.assertEqual(self.records()[-1]["status"], "skipped")
+
 
 if __name__ == "__main__":
     unittest.main()

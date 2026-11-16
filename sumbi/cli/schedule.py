@@ -153,6 +153,10 @@ def _run_job(job, state, now):
         except OSError:
             _record(state, name, now, now, None, "busy")
             return "busy", None
+        if not _due(job, state, now):
+            # Another caller ran this job between the first check and the lock.
+            _record(state, name, now, now, None, "skipped")
+            return "skipped", None
         _write_start(state / (name + ".json"), now)
         status, rc = _execute(job)
         _record(state, name, now, time.time(), rc, status)
