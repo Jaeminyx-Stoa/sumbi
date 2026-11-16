@@ -157,6 +157,38 @@ class ScheduleTests(unittest.TestCase):
         record = self.records()[-1]
         self.assertEqual((record["status"], record["rc"]), ("timeout", None))
 
+    def test_timeout_ends_grandchildren_started_by_a_shell(self):
+        now = 1_900_000_000.0
+        pid_file = self.root / "grandchild.pid"
+        inner = ("import os, pathlib, time; pathlib.Path(" + repr(str(pid_file))
+            + ").write_text(str(os.getpid())); time.sleep(60)")
+        script = '"$0" -c "$1"; true'
+        self.write_config(job_block("shell-job",
+            ["/bin/sh", "-c", script, sys.executable, inner],
+            every_sec=60, timeout_sec=2, cwd=str(self.root)))
+        code, _ = self.invoke(now)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.records()[-1]["status"], "timeout")
+        grandchild = int(pid_file.read_text())
+        import time
+        deadline = time.monotonic() + 5  # the orphan is reaped by init shortly after the kill
+        while time.monotonic() < deadline:
+            try:
+                os.kill(grandchild, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.1)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(grandchild, 0)
+
+    def test_every_sec_below_sixty_is_invalid(self):
+        self.write_config(job_block("fast-job", marker_command(self.marker),
+            every_sec=30))
+        code, errors = self.invoke(1_900_000_000.0)
+        self.assertEqual(code, 2)
+        self.assertIn("no job was run", errors)
+        self.assertFalse(self.marker.exists())
+
     def test_job_started_by_another_caller_before_lock_is_not_run_again(self):
         from unittest import mock
         from sumbi.cli import schedule

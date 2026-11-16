@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -71,8 +72,8 @@ def _job(job, seen):
         raise ConfigError("timeout_sec must be a positive integer.")
     normalized["timeout_sec"] = timeout
     if every is not None:
-        if isinstance(every, bool) or not isinstance(every, int) or every <= 0:
-            raise ConfigError("every_sec must be a positive integer.")
+        if isinstance(every, bool) or not isinstance(every, int) or every < 60:
+            raise ConfigError("every_sec must be an integer of at least 60.")
         normalized["every_sec"] = every
     if daily is not None:
         if not isinstance(daily, str) or not CLOCK.fullmatch(daily):
@@ -128,16 +129,38 @@ def _record(state, name, start, end, rc, status):
         stream.write(line)
 
 
-def _execute(job):
+def _stop_group(process):
+    """End the whole process group so a shell's children cannot outlive the lock."""
     try:
-        done = subprocess.run(list(job["command"]), cwd=job["cwd"],
-            timeout=job["timeout_sec"])
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        process.wait(timeout=5)
     except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait()
+
+
+def _execute(job):
+    process = subprocess.Popen(list(job["command"]), cwd=job["cwd"],
+        start_new_session=True)
+    try:
+        returncode = process.wait(timeout=job["timeout_sec"])
+    except subprocess.TimeoutExpired:
+        _stop_group(process)
         return "timeout", None
-    return ("ok" if done.returncode == 0 else "failed"), done.returncode
+    except BaseException:
+        _stop_group(process)
+        raise
+    return ("ok" if returncode == 0 else "failed"), returncode
 
 
-def _run_job(job, state, now):
+def _run_job(job, state, now, clock=None):
     name = job["name"]
     if not _due(job, state, now):
         _record(state, name, now, now, None, "skipped")
@@ -153,6 +176,8 @@ def _run_job(job, state, now):
         except OSError:
             _record(state, name, now, now, None, "busy")
             return "busy", None
+        if clock is None:
+            now = time.time()
         if not _due(job, state, now):
             # Another caller ran this job between the first check and the lock.
             _record(state, name, now, now, None, "skipped")
@@ -166,9 +191,8 @@ def _run_job(job, state, now):
 
 
 def run(args, now=None):
-    timestamp = args.now if now is None else now
-    if timestamp is None:
-        timestamp = time.time()
+    fixed = args.now if now is None else now
+    timestamp = time.time() if fixed is None else fixed
     try:
         jobs = _load(Path(args.config))
     except (ConfigError, OSError, tomllib.TOMLDecodeError):
@@ -181,7 +205,7 @@ def run(args, now=None):
     failed = False
     for job in jobs:
         try:
-            status, _ = _run_job(job, state, timestamp)
+            status, _ = _run_job(job, state, timestamp, fixed)
         except OSError:
             failed = True
             continue
