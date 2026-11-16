@@ -4,6 +4,7 @@ from contextlib import redirect_stderr
 from datetime import datetime, timezone
 from io import StringIO
 import fcntl
+import gc
 import json
 import os
 from pathlib import Path
@@ -43,6 +44,9 @@ class ScheduleTests(unittest.TestCase):
         self.config.write_text("\n".join(blocks), encoding="utf-8")
 
     def invoke(self, now):
+        # Finalize objects leaked by earlier tests so their ResourceWarnings are not
+        # captured as this command's standard error (seen on Python 3.13 CI).
+        gc.collect()
         errors = StringIO()
         with redirect_stderr(errors):
             code = main(["schedule", "--config", str(self.config),
