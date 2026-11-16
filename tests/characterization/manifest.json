@@ -1701,6 +1701,44 @@
         "improve"
       ],
       "expected_exit": 1
+    },
+    {
+      "name": "schedule-help",
+      "command": "schedule",
+      "setup": "empty",
+      "argv": [
+        "schedule",
+        "--help"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "schedule-skipped",
+      "command": "schedule",
+      "setup": "schedule",
+      "argv": [
+        "schedule",
+        "--config",
+        "{fixture}/jobs.toml",
+        "--state",
+        "state",
+        "--now",
+        "1900000000"
+      ],
+      "expected_exit": 0
+    },
+    {
+      "name": "schedule-invalid-config",
+      "command": "schedule",
+      "setup": "schedule",
+      "argv": [
+        "schedule",
+        "--config",
+        "{fixture}/invalid.toml",
+        "--state",
+        "state"
+      ],
+      "expected_exit": 2
     }
   ]
 }

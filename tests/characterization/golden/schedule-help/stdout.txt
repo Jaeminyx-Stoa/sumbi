@@ -1,0 +1,7 @@
+usage: sumbi schedule [-h] --config TOML --state DIR
+
+options:
+  -h, --help     show this help message and exit
+  --config TOML  Local job table, read with tomllib; keep it outside the
+                 repository
+  --state DIR    Local directory for locks, last-start files and run records

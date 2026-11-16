@@ -120,6 +120,11 @@ def prepare(root, case):
             "utc_time": "2030-01-02T01:00:01Z"}) + "\n")
     elif setup == "improve":
         copy_text_tree(DIRECTORY / "fixtures/improve", fixture)
+    elif setup == "schedule":
+        save(fixture / "jobs.toml", "[[job]]\nname = \"example-live\"\n"
+            "command = [\"git\", \"rev-parse\", \"--git-dir\"]\nevery_sec = 300\n")
+        save(fixture / "invalid.toml", "[[job]]\nname = \"example-daily\"\n")
+        save(root / "state/example-live.json", '{"last_start": 1900000000.0}\n')
     elif setup == "register-existing":
         save(root / "published-registration.json", '{"existing": "synthetic sentinel"}\n')
     elif setup.startswith("worker-github"):

@@ -17,6 +17,7 @@ from sumbi.cli.collect import run as run_collect
 from sumbi.cli.deliver import run as run_deliver, configure_parser as configure_deliver
 from sumbi.cli.compare import run as run_compare, configure_parser as configure_compare
 from sumbi.cli.register import run as run_register, configure_parser as configure_register
+from sumbi.cli.schedule import run as run_schedule, configure_parser as configure_schedule
 from sumbi.judge.registration import read_registration
 
 def parser() -> argparse.ArgumentParser:
@@ -35,6 +36,8 @@ def parser() -> argparse.ArgumentParser:
         help="Measure GitHub deliverables or local worker verification"))
     configure_compare(commands.add_parser("compare",
         help="Propose a verdict for one pre-registered intervention"))
+    configure_schedule(commands.add_parser("schedule",
+        help="Run local jobs that are due now, once; an external cron calls it"))
     return root
 
 
@@ -47,6 +50,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_install(args)
     if args.command == "register":
         return run_register(args)
+    if args.command == "schedule":
+        return run_schedule(args)
     try:
         if args.command == "compare":
             registration = read_registration(args.registration)
