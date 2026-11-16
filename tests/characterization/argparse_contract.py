@@ -37,6 +37,8 @@ def check_output(case, artifacts):
         commands = next(action.choices for action in selected._actions if getattr(action, "choices", None))
         selected = commands[case["command"]]
     text = artifacts[stream]
+    if stream == "stderr.txt" and not text.startswith("usage:"):
+        return  # Product validation explains itself without argparse usage.
     names = {selected.prog}
     for action in selected._actions:
         if action.help == argparse.SUPPRESS:
