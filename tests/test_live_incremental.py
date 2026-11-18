@@ -27,6 +27,27 @@ from sumbi.measure.live_sources import (
     live_inventory,
     sqlite_session,
 )
+
+
+_CV_ENV = "SUMBI_CUSTOMER_VALUE_DIR"
+_cv_saved = None
+_cv_tmp = None
+
+
+def setUpModule():
+    """Plain unittest runs (no conftest) never read the real customer-value folder."""
+    global _cv_saved, _cv_tmp
+    _cv_saved = os.environ.get(_CV_ENV)
+    _cv_tmp = tempfile.TemporaryDirectory()
+    os.environ[_CV_ENV] = os.path.join(_cv_tmp.name, "customer-value-empty")
+
+
+def tearDownModule():
+    if _cv_saved is None:
+        os.environ.pop(_CV_ENV, None)
+    else:
+        os.environ[_CV_ENV] = _cv_saved
+    _cv_tmp.cleanup()
 import test_live as native_fixtures
 
 

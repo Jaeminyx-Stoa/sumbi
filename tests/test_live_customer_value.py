@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -11,8 +12,29 @@ FIXTURE = Path(__file__).parent / "fixtures" / "customer_value_2026-11-13.json"
 NOW = datetime(2026, 11, 14, 0, 0, tzinfo=timezone.utc)
 
 
+_CV_ENV = "SUMBI_CUSTOMER_VALUE_DIR"
+_cv_saved = None
+_cv_tmp = None
+
+
+def setUpModule():
+    """Plain unittest runs (no conftest) never read the real customer-value folder."""
+    global _cv_saved, _cv_tmp
+    _cv_saved = os.environ.get(_CV_ENV)
+    _cv_tmp = tempfile.TemporaryDirectory()
+    os.environ[_CV_ENV] = os.path.join(_cv_tmp.name, "customer-value-empty")
+
+
+def tearDownModule():
+    if _cv_saved is None:
+        os.environ.pop(_CV_ENV, None)
+    else:
+        os.environ[_CV_ENV] = _cv_saved
+    _cv_tmp.cleanup()
+
+
 def _data():
-    return snapshot([{"lane": "주인·숨비", "engine": "claude"}, {"lane": "주인·큐", "engine": "claude"}], now=NOW)
+    return snapshot([{"lane": "창-가", "engine": "claude"}, {"lane": "창-나", "engine": "claude"}], now=NOW)
 
 
 class CustomerValueTableTests(unittest.TestCase):
