@@ -243,16 +243,16 @@ def open_rollouts(pid, proc_root):
 
 def live_inventory(*, target, proc_root, sqlite_path, run=command, tmux_socket=None):
     """tmux labels + process FDs/cfg+sid. No session recency heuristics."""
-    fields = "#{window_index}\t#{@lane}\t#{@sid}\t#{@cfg}\t#{@engine}\t#{pane_pid}"
+    fields = "#{window_index}\t#{@lane}\t#{@sid}\t#{@cfg}\t#{@engine}\t#{pane_pid}\t#{pane_current_command}"
     prefix = ["tmux", "-S", str(tmux_socket)] if tmux_socket else ["tmux"]
     text = run(prefix + ["list-windows", "-t", target, "-F", fields])
     windows = []
     excluded = 0
     for line in text.splitlines():
         values = line.split("\t")
-        if len(values) != 6:
+        if len(values) != 7:
             raise ValueError("tmux_inventory_shape")
-        index, lane, sid, cfg, engine, pid = values
+        index, lane, sid, cfg, engine, pid, pane_command = values
         window = {
             "lane": lane,
             "engine": engine or "unknown",
@@ -261,6 +261,17 @@ def live_inventory(*, target, proc_root, sqlite_path, run=command, tmux_socket=N
             "window_index": index,
             "source_paths": [],
         }
+        idle_shell = False
+        if pane_command in ("bash", "zsh", "sh", "fish") and pid.isdigit():
+            try:
+                children = (Path(proc_root) / pid / "task" / pid / "children").read_text().split()
+            except OSError:
+                children = None
+            idle_shell = children == []
+            if idle_shell and any((lane, sid, cfg, engine)):
+                window["_error"] = "no_active_native"
+                windows.append(window)
+                continue
         if engine == "opencode":
             window.update(sqlite_session(sqlite_path, sid))
         elif engine == "codex" or engine not in ENGINES:
@@ -290,6 +301,8 @@ def live_inventory(*, target, proc_root, sqlite_path, run=command, tmux_socket=N
         if not any((lane, sid, cfg, engine, window["source_paths"], window.get("_error"))):
             excluded += 1
             continue
+        if idle_shell:
+            window["_error"] = "no_active_native"
         windows.append(window)
     return {"windows": windows, "excluded_no_agent_metadata_or_source": excluded}
 
