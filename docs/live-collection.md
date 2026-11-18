@@ -95,6 +95,21 @@ of convenience links can straddle a subsequent generation switch. Failed
 publication leaves the previous complete generation available. Old generations
 are retained so readers holding a generation path remain valid.
 
+## Company-wide customer value
+
+The «고객 가치당 토큰» section of `LATEST.md` reads one file per KST day from
+`$SUMBI_CUSTOMER_VALUE_DIR` (default `~/runs/sumbi-live/customer-value`),
+named `<YYYY-MM-DD>.json`. It shows yesterday (KST) and falls back to today's
+file marked «KST 부분 기간». A file whose `period_date` differs from its name is
+rejected. Shape: `period_date`, `observed_at`, `source_ref`, `coverage`, and
+`cells` keyed by metric (`signups`, `payments`, `real_fills`,
+`account_connections`, `mcp_first_calls`, `api_calls`), each with `value`
+(number or null), optional `status`, `reason`, `caveat` and, for fills,
+`accounts`. Null, a non-complete status, incomplete coverage or a future
+observation time render as «모름»/«미확인», never as zero. The collector that
+writes these files lives outside this repository; tests point the directory at
+an empty temporary folder.
+
 The local runner, real source paths, evidence, quota caches and scheduler drafts
 belong in ignored local storage. Nothing here installs a schedule or sends a
 message.

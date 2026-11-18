@@ -66,6 +66,13 @@ class CustomerValueTableTests(unittest.TestCase):
         self.assertIn("| 회사 전체 · 가입 | 모름: customer_filter_unverified", text)
         self.assertIn("30행/9계좌", text)
 
+    def test_partial_cell_status_not_shown_as_value(self):
+        doc = json.loads(FIXTURE.read_text())
+        doc["cells"]["signups"] = {"value": 0, "status": "partial"}
+        text = self.render({"2026-11-13.json": doc})
+        self.assertNotIn("| 회사 전체 · 가입 | 0", text)
+        self.assertIn("30행/9계좌", text)
+
     def test_stale_file_ignored(self):
         doc = json.loads(FIXTURE.read_text())
         doc["period_date"] = "2026-11-12"

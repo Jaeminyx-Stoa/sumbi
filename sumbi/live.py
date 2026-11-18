@@ -520,7 +520,8 @@ def _expand_cells(doc, day, now):
             "metric_id": key, "unit": meta[2], "source_kind": meta[3],
             "period_start": _iso(start), "period_end": _iso(end),
             "value": cell_in.get("value"),
-            "status": "complete" if cell_in.get("value") is not None else "unknown",
+            "status": (cell_in.get("status") or "complete")
+            if cell_in.get("value") is not None else "unknown",
             "coverage": cell_in.get("coverage", doc.get("coverage")),
             "reason": cell_in.get("reason"),
             "observed_at": cell_in.get("observed_at", doc.get("observed_at")),

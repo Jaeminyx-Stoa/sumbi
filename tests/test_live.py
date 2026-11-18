@@ -83,7 +83,7 @@ class SnapshotTests(RequestSummaryTests):
             data = collect_inventory(inventory, self.now)
             self.assertEqual(data['windows'][0]['calls_1h'], 1)
             self.assertEqual(collect_inventory(inventory, self.now, max_bytes=3)['windows'][0]['reason'], 'byte_limit')
-            write_snapshot(data, tmp)
+            write_snapshot(data, tmp, value_dir=str(Path(tmp) / 'customer-value-empty'))
             self.assertEqual(json.loads((Path(tmp) / 'snapshot.json').read_text()), data)
             self.assertIn('| a | codex |', (Path(tmp) / 'LATEST.md').read_text())
             self.assertEqual((Path(tmp) / 'fortress-line.txt').read_text().count('\n'), 1)
