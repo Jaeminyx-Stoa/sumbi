@@ -485,13 +485,162 @@ _VALUE_METRICS = (
 )
 
 
-def _value_table(data, cell):
+# Company-wide cells (no lane). Same record validation as per-window records,
+# except lane attribution, which does not apply to a company total.
+_MCP_FIRST = ("mcp_first_calls", "MCP 첫 호출", "count", "mcp_first_call")
+_COMPANY_METRICS = tuple(
+    next(m for m in _VALUE_METRICS if m[0] == key)
+    for key in ("signups", "real_fills", "account_connections", "payments")
+) + (_MCP_FIRST, next(m for m in _VALUE_METRICS if m[0] == "api_calls"))
+_COMPANY_FLAGS = ("complete", "customer_scope", "period", "deduplicated")
+_LANE_FLAGS = _COMPANY_FLAGS + ("lane_attribution",)
+_KST = timezone(timedelta(hours=9))
+CUSTOMER_VALUE_ENV = "SUMBI_CUSTOMER_VALUE_DIR"
+
+
+def default_customer_value_dir():
+    default = Path.home() / "runs" / "sumbi-live" / "customer-value"
+    return Path(os.environ.get(CUSTOMER_VALUE_ENV) or default)
+
+
+def _expand_cells(doc, day, now):
+    """Turn a one-file `cells` form into the same records lanes use."""
+    start = datetime(day.year, day.month, day.day, tzinfo=_KST)
+    file_observed = _time(doc.get("observed_at"))
+    end = start + timedelta(days=1)
+    if end > now and file_observed is not None:
+        end = min(end, file_observed)  # today's file is a partial day
+    records = []
+    cells = doc.get("cells")
+    for key, cell_in in (cells.items() if isinstance(cells, dict) else ()):
+        meta = next((m for m in _COMPANY_METRICS if m[0] == key), None)
+        if meta is None or not isinstance(cell_in, dict):
+            continue
+        record = {
+            "metric_id": key, "unit": meta[2], "source_kind": meta[3],
+            "period_start": _iso(start), "period_end": _iso(end),
+            "value": cell_in.get("value"),
+            "status": "complete" if cell_in.get("value") is not None else "unknown",
+            "coverage": cell_in.get("coverage", doc.get("coverage")),
+            "reason": cell_in.get("reason"),
+            "observed_at": cell_in.get("observed_at", doc.get("observed_at")),
+            "source_ref": cell_in.get("source_ref", doc.get("source_ref")),
+            "caveat": cell_in.get("caveat"),
+        }
+        if "accounts" in cell_in:
+            record["accounts"] = cell_in["accounts"]
+        records.append(record)
+    return records
+
+
+def load_customer_value(directory, now):
+    """Find yesterday's, else today's, KST-dated collection file (read-only).
+
+    Returns (payload, reason). Exactly one of them is None. A file whose inner
+    period_date differs from its name is ignored, so a stale file cannot pass.
+    """
+    directory = Path(directory) if directory is not None else default_customer_value_dir()
+    today = now.astimezone(_KST).date()
+    tried = []
+    for day in (today - timedelta(days=1), today):
+        path = directory / f"{day}.json"
+        tried.append(path.name)
+        if not path.is_file():
+            continue
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None, f"{path.name} 읽기 실패"
+        if not isinstance(doc, dict) or doc.get("period_date") != str(day):
+            return None, f"{path.name} 날짜가 파일 이름과 다름"
+        records = list(doc["records"]) if isinstance(doc.get("records"), list) else []
+        records += _expand_cells(doc, day, now)
+        return {"period_date": str(day), "records": records}, None
+    return None, f"수집 파일 없음 ({', '.join(tried)})"
+
+
+def _check_record(record, unit, kind, metric, day_end, now, flags, cell):
+    """Return (text, number-or-None). number is set only for an accepted value."""
+    coverage = record.get("coverage")
+    observed = _time(record.get("observed_at"))
+    end = _time(record.get("period_end"))
+    number = record.get("value")
+    period = (f"{cell(record.get('period_start'))} ~ {cell(record.get('period_end'))} (끝 제외; "
+              + ("하루 전체" if end == day_end else "부분 기간") + ")")
+    if number is None and record.get("status") != "complete":
+        why = record.get("reason")
+        return f"모름: {cell(why) if why else '값 비어 있음'}; {period}", None
+    valid_number = ((type(number) is int and number >= 0) or
+                    (unit in ("seconds", "currency") and type(number) is float
+                     and math.isfinite(number) and number >= 0))
+    complete = isinstance(coverage, dict) and all(coverage.get(k) is True for k in flags)
+    evidence = (isinstance(record.get("source_ref"), str) and bool(record["source_ref"].strip())
+                and record.get("source_kind") == kind and record.get("unit") == unit
+                and observed is not None and end is not None and end <= observed <= now)
+    if metric == "production_features":
+        evidence = (evidence and all(isinstance(record.get(k), str) and record[k].strip()
+                                    for k in ("production_promotion_ref", "customer_walk_ref")))
+    if metric == "contract_revenue":
+        evidence = (evidence and isinstance(record.get("currency_code"), str)
+                    and bool(record["currency_code"].strip()))
+    if not (record.get("status") == "complete" and complete and evidence and valid_number):
+        return f"미확인: 입력의 완전성·범위·기간·귀속 또는 근거 미확인; {period}", None
+    text = (f"{_shown(record, metric, number, unit)}; {period}; "
+            f"관측 {cell(record['observed_at'])}; 근거 {cell(record['source_ref'])}")
+    if metric == "production_features":
+        text += (f"; 승격 {cell(record['production_promotion_ref'])}; "
+                 f"고객 걸음 {cell(record['customer_walk_ref'])}")
+    if metric == "contract_revenue":
+        text += f"; 통화 {cell(record['currency_code'])}"
+    if isinstance(record.get("caveat"), str) and record["caveat"].strip():
+        text += f"; 주의 {cell(record['caveat'])}"
+    return text, number
+
+
+def _shown(record, metric, number, unit):
+    accounts = record.get("accounts")
+    if metric == "real_fills" and type(accounts) is int and accounts >= 0:
+        return f"{number}행/{accounts}계좌"
+    return f"{number} {unit}"
+
+
+def _company_rows(records, start, day_end, now, cell, reason):
+    rows, parts = [], []
+    for metric, label, unit, kind in _COMPANY_METRICS:
+        matches = [r for r in records if isinstance(r, dict) and r.get("lane") is None
+                   and r.get("metric_id") == metric
+                   and _time(r.get("period_start")) == start
+                   and _time(r.get("period_end")) is not None
+                   and start < _time(r.get("period_end")) <= min(day_end, now)]
+        if len(matches) > 1:
+            text, number = "상충 또는 중복: 미확인", None
+        elif matches:
+            text, number = _check_record(matches[0], unit, kind, metric, day_end, now,
+                                         _COMPANY_FLAGS, cell)
+        else:
+            text, number = f"모름: {reason or '이 칸 기록 없음'}", None
+        if number is None:
+            parts.append(f"{label} 모름")
+        else:
+            parts.append(f"{label} {_shown(matches[0], metric, number, '')}".rstrip())
+        rows.append(f"| 회사 전체 · {label} | {text} |")
+    partial = any(isinstance(r, dict) and r.get("lane") is None
+                  and _time(r.get("period_start")) == start
+                  and _time(r.get("period_end")) not in (None, day_end) for r in records)
+    span = "KST 부분 기간" if partial else "KST 하루"
+    head = f"| 회사 전체 · {start.date()} {span} | {' · '.join(parts)} |"
+    return [head] + rows
+
+
+def _value_table(data, cell, value_dir=None):
     now = _time(data.get("observed_at"))
     if now is None:
         return "\n\n고객 가치당 토큰: 기간 미확인\n"
-    kst = timezone(timedelta(hours=9))
-    local_now = now.astimezone(kst)
+    local_now = now.astimezone(_KST)
     payload = data.get("customer_value")
+    load_reason = None
+    if not isinstance(payload, dict):
+        payload, load_reason = load_customer_value(value_dir, now)
     start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
     if isinstance(payload, dict) and payload.get("period_date") is not None:
         try:
@@ -501,15 +650,19 @@ def _value_table(data, cell):
             start = start.replace(year=requested.year, month=requested.month, day=requested.day)
         except (ValueError, TypeError):
             return "\n\n고객 가치당 토큰: 기간 미확인\n"
+    elif load_reason is not None:
+        start = start - timedelta(days=1)  # the headline asks about yesterday
     day_end = start + timedelta(days=1)
     records = payload.get("records", []) if isinstance(payload, dict) else []
     if not isinstance(records, list):
         records = []
     lines = [f"\n\n고객 가치당 토큰: {start.date()} KST 달력일 (끝 제외)", "| 고객 가치당 토큰 | 값 · 기간 · 근거 |", "| --- | --- |"]
+    lines.extend(_company_rows(records, start, day_end, now, cell, load_reason))
     lanes = [r.get("lane") for r in data.get("windows", []) if isinstance(r.get("lane"), str)]
     valid = {}
+    unattributed = 0
     for lane in dict.fromkeys(lanes):
-        missing = []
+        missing, shown = [], []
         for metric, label, unit, kind in _VALUE_METRICS:
             matches = []
             for record in records:
@@ -519,84 +672,47 @@ def _value_table(data, cell):
                 # Other days and intervals outside this day cannot contaminate this table.
                 if begin == start and end is not None and start < end <= min(day_end, now):
                     matches.append(record)
-            value = "미수집 또는 연결 미확인"
             if len(matches) > 1:
-                value = "상충 또는 중복: 미확인"
+                shown.append(f"| {cell(lane)} · {label} | 상충 또는 중복: 미확인 |")
             elif matches:
-                record = matches[0]
-                coverage = record.get("coverage")
-                observed = _time(record.get("observed_at"))
-                end = _time(record.get("period_end"))
-                number = record.get("value")
-                valid_number = ((type(number) is int and number >= 0) or
-                                (unit in ("seconds", "currency") and type(number) is float
-                                 and math.isfinite(number) and number >= 0))
-                complete = (isinstance(coverage, dict) and all(coverage.get(k) is True for k in
-                            ("complete", "customer_scope", "period", "deduplicated", "lane_attribution")))
-                evidence = (isinstance(record.get("source_ref"), str) and bool(record["source_ref"].strip())
-                            and record.get("source_kind") == kind and record.get("unit") == unit
-                            and observed is not None and end <= observed <= now)
-                if metric == "production_features":
-                    evidence = (evidence and all(isinstance(record.get(k), str) and record[k].strip()
-                                                for k in ("production_promotion_ref", "customer_walk_ref")))
-                if metric == "contract_revenue":
-                    evidence = (evidence and isinstance(record.get("currency_code"), str)
-                                and bool(record["currency_code"].strip()))
-                period = f"{cell(record.get('period_start'))} ~ {cell(record.get('period_end'))} (끝 제외; " + ("하루 전체" if end == day_end else "부분 기간") + ")"
-                if record.get("status") == "complete" and complete and evidence and valid_number:
-                    value = f"{number} {unit}; {period}; 관측 {cell(record['observed_at'])}; 근거 {cell(record['source_ref'])}"
-                    if metric == "production_features":
-                        value += f"; 승격 {cell(record['production_promotion_ref'])}; 고객 걸음 {cell(record['customer_walk_ref'])}"
-                    if metric == "contract_revenue":
-                        value += f"; 통화 {cell(record['currency_code'])}"
-                    valid[(lane, metric)] = (number, _time(record.get("period_start")), end, record)
-                else:
-                    value = f"미확인: 입력의 완전성·범위·기간·귀속 또는 근거 미확인; {period}"
-            if not matches:
-                missing.append(f"{label} ({kind})")
+                text, number = _check_record(matches[0], unit, kind, metric, day_end, now,
+                                             _LANE_FLAGS, cell)
+                shown.append(f"| {cell(lane)} · {label} | {text} |")
+                if number is not None:
+                    valid[(lane, metric)] = (number, start, _time(matches[0].get("period_end")),
+                                             matches[0])
             else:
-                lines.append(f"| {cell(lane)} · {label} | {value} |")
+                missing.append(f"{label} ({kind})")
+        if not shown:
+            unattributed += 1
+            continue
+        lines.extend(shown)
         if missing:
             lines.append(f"| {cell(lane)} · 모름: 미수집 또는 연결 미확인 | {cell(', '.join(missing))}; 필요: 각 이벤트·기간·창 귀속 및 출처 |")
-    daily = data.get("daily_results") or {}
-    if daily.get("error"):
-        merge = f"미확인: {cell(daily['error'])}"
-    elif daily:
-        merge = f"미확인: {cell(daily['tokens_per_merge']['reason'])}; 분자 하루 전체 토큰, 분모 머지; 기간 {cell(daily['window_start'])} ~ {cell(daily['window_end_exclusive'])} (끝 제외)"
-    else:
-        merge = "미확인: 하루 전체 토큰·머지와 동일 기간의 출처 필요"
-    merge = f"전역 전체 범위 (창별 값 아님); {merge}"
-    lines.extend(["", "| 창 | 머지당 토큰 | 피쳐당 토큰 | KPI당 토큰 |", "| --- | --- | --- | --- |"])
-    def ratio(lane, metric):
-        numerator = valid.get((lane, "window_tokens"))
-        denominator = valid.get((lane, metric))
-        if not numerator or not denominator or numerator[1:3] != denominator[1:3]:
-            return "모름: 동일 기간·창의 토큰과 지표 및 출처 필요"
-        n, begin, end, nr = numerator
-        d, _, _, dr = denominator
-        period = f"{cell(nr['period_start'])} ~ {cell(nr['period_end'])} (끝 제외)"
-        detail = f"분자 {n} tokens ({cell(nr['source_ref'])}); 분모 {d} {cell(dr['unit'])} ({cell(dr['source_ref'])}); {period}"
-        if metric == "production_features":
-            detail += f"; 승격 {cell(dr['production_promotion_ref'])}; 고객 걸음 {cell(dr['customer_walk_ref'])}"
-        if metric == "contract_revenue":
-            detail += f"; 통화 {cell(dr['currency_code'])}"
-        return (f"계산 불가: 분모 0; {detail}" if d == 0 else f"{n / d:.2f} tokens/{cell(dr['unit'])}; {detail}")
     for lane in dict.fromkeys(lanes):
-        kpi_metrics = [(metric, label) for metric, label, _, _ in _VALUE_METRICS
-                       if metric not in ("window_tokens", "production_features", "signups", "account_connections", "first_backtests", "payments")]
-        kpis = [f"{label}: {ratio(lane, metric)}" for metric, label in kpi_metrics if (lane, metric) in valid]
-        absent = [label for metric, label in kpi_metrics if (lane, metric) not in valid]
-        if absent:
-            kpis.append(f"{cell(', '.join(absent))}: 모름; 각 이벤트·동일 기간·창 귀속 및 출처 필요")
-        lines.append(f"| {cell(lane)} | {merge} | {ratio(lane, 'production_features')} | {'<br>'.join(kpis)} |")
-    lines.append("운영 반영 기능·수정 분모: 운영 배포·승격 기록과 고객 화면 걸음 증거 필요; dev·머지 제외.")
-    if not lanes:
-        lines.append("| 창별 고객 가치 | 창 미관측; 값 미확인 |")
-    lines.append("과거 근거 (11-13 KST): 23:08~23:14 ①~③ 담당 미보유, 23:20 ④⑥ 미수신, 23:24 ⑤ 연결 NO-GO; 23:11 창별 하루 전체 귀속 미확인. 이 회신은 오늘 제품 입력이나 0이 아님.")
+        numerator = valid.get((lane, "window_tokens"))
+        if not numerator:
+            continue
+        for metric, label, unit, kind in _VALUE_METRICS:
+            denominator = valid.get((lane, metric))
+            if metric == "window_tokens" or not denominator or numerator[1:3] != denominator[1:3]:
+                continue
+            n, d = numerator[0], denominator[0]
+            result = "계산 불가: 분모 0" if d == 0 else f"{n / d:.2f} tokens/{unit}"
+            extra = ""
+            if metric == "contract_revenue":
+                extra = f"; 통화 {cell(denominator[3].get('currency_code'))}"
+            lines.append(f"| {cell(lane)} · {label}당 토큰 | {result}; "
+                         f"분자 {n} tokens, 분모 {d} {unit}; 같은 기간·창{extra} |")
+    if lanes:
+        if unattributed:
+            lines.extend(["", f"창별 귀속: 모름 — 귀속 기록 없음({unattributed}창)"])
+    else:
+        lines.extend(["", "창별 귀속: 모름 — 창 미관측"])
     return "\n".join(lines) + "\n"
 
 
-def _table(data):
+def _table(data, value_dir=None):
     def cell(value):
         return (
             str(value).replace("|", "\\|").replace("\n", " ").replace("\r", " ")
@@ -628,7 +744,7 @@ def _table(data):
     if daily and daily.get("error"):
         daily_table = ("\n\n| 오늘 결과 | 값 · 범위 |\n| --- | --- |\n" +
                        "".join(f"| {label} | 미확인: {cell(daily['error'])} |\n" for label in
-                               ("머지당 토큰", "하루 토큰", "머지", "검수", "OpenCode 구현 접수 몫")))
+                               ("하루 토큰", "머지", "검수", "OpenCode 구현 접수 몫")))
     elif daily:
         share = daily["impl_share"]
         selected = daily["tokens"]["selected_review_outcomes"]
@@ -640,7 +756,6 @@ def _table(data):
         review_text = (f"미확인: {cell(reviews['reason'])}" if reviews['observed'] is None else f"관측 {reviews['observed']}; 미확인 항목 {reviews['unknown']}, 전체 미확인")
         daily_table = (
             "\n\n| 오늘 결과 | 값 · 범위 |\n| --- | --- |\n"
-            f"| 머지당 토큰 | 미확인: {cell(daily['tokens_per_merge']['reason'])} |\n"
             f"| 하루 토큰 | 미확인: {cell(daily['tokens']['reason'])}; 선택 검수 부분합 {sum(observed) if observed else '미관측'} ({len(observed)}/{len(selected['outcomes'])} 결과), {cell(selected['reason'])} |\n"
             f"| 머지 | {merge_text} |\n"
             f"| 검수 | {review_text} |\n"
@@ -654,7 +769,7 @@ def _table(data):
         + coverage
         + "\n\n"
         + engines
-        + _value_table(data, cell)
+        + _value_table(data, cell, value_dir)
         + daily_table
         + "\n\n| "
         + " | ".join(title for _, title in columns)
@@ -704,7 +819,7 @@ def fortress_line(data):
     return text.replace("\n", " ").replace("\r", " ") + "\n"
 
 
-def write_snapshot(data, directory):
+def write_snapshot(data, directory, value_dir=None):
     """Publish a complete generation through one atomic current symlink switch.
 
     Readers needing a multi-file transaction should resolve current once (or use
@@ -715,7 +830,7 @@ def write_snapshot(data, directory):
     directory.mkdir(parents=True, exist_ok=True)
     outputs = {
         "snapshot.json": json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
-        "LATEST.md": _table(data),
+        "LATEST.md": _table(data, value_dir),
         "fortress-line.txt": fortress_line(data),
     }
     with exclusive_lock(directory / ".publish.lock"):

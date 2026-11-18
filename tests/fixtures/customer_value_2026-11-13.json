@@ -1,0 +1,14 @@
+{
+  "period_date": "2026-11-13",
+  "observed_at": "2026-11-13T23:50:00+00:00",
+  "source_ref": "synthetic-fixture",
+  "coverage": {"complete": true, "customer_scope": true, "period": true, "deduplicated": true},
+  "cells": {
+    "signups": {"value": 5, "caveat": "synthetic caveat"},
+    "real_fills": {"value": 30, "accounts": 9},
+    "account_connections": {"value": 0},
+    "payments": {"value": 2},
+    "mcp_first_calls": {"value": 1, "source_ref": "synthetic-mcp"},
+    "api_calls": {"value": 0, "source_ref": "synthetic-api"}
+  }
+}
