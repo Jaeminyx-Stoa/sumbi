@@ -318,6 +318,33 @@ class IncrementalTests(unittest.TestCase):
             with self.assertRaises(CollectorBusy):
                 write_snapshot(data, out, value_dir=self.root / "empty")
 
+    def test_read_bundle_holds_publication_lock_after_resolve(self):
+        data = self.collect()
+        out = self.root / "out"
+        write_snapshot(data, out, value_dir=self.root / "empty")
+        expected = read_snapshot_bundle(out)
+        changed = dict(data, observed_at="2026-01-01T13:00:00Z")
+        original_resolve = Path.resolve
+        attempts = []
+
+        def resolve_then_publish(path, *args, **kwargs):
+            resolved = original_resolve(path, *args, **kwargs)
+            if path == out / "current":
+                try:
+                    write_snapshot(changed, out, value_dir=self.root / "empty")
+                except CollectorBusy:
+                    attempts.append("busy")
+                else:
+                    attempts.append("published")
+            return resolved
+
+        with patch.object(Path, "resolve", resolve_then_publish):
+            bundle = read_snapshot_bundle(out)
+        self.assertEqual(attempts, ["busy"])
+        self.assertEqual(bundle, expected)
+        write_snapshot(changed, out, value_dir=self.root / "empty")
+        self.assertEqual(json.loads(read_snapshot_bundle(out)["snapshot.json"]), changed)
+
     def test_legacy_output_migration_preserves_complete_previous_generation(self):
         data = self.collect()
         source = self.root / "published"

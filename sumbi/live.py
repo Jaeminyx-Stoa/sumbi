@@ -691,8 +691,10 @@ def write_snapshot(data, directory, value_dir=None):
 
 def read_snapshot_bundle(directory):
     """Pin a publication generation before opening any of its three files."""
-    generation = (Path(directory) / "current").resolve(strict=True)
-    return {
-        name: (generation / name).read_text(encoding="utf-8")
-        for name in ("snapshot.json", "LATEST.md", "fortress-line.txt")
-    }
+    directory = Path(directory)
+    with exclusive_lock(directory / ".publish.lock"):
+        generation = (directory / "current").resolve(strict=True)
+        return {
+            name: (generation / name).read_text(encoding="utf-8")
+            for name in ("snapshot.json", "LATEST.md", "fortress-line.txt")
+        }
