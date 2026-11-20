@@ -285,7 +285,7 @@ class IncrementalTests(unittest.TestCase):
     def test_publication_is_one_generation_and_failure_preserves_previous(self):
         data = self.collect()
         out = self.root / "out"
-        write_snapshot(data, out)
+        write_snapshot(data, out, value_dir=self.root / "empty")
         bundle = read_snapshot_bundle(out)
         self.assertEqual(json.loads(bundle["snapshot.json"]), data)
         self.assertTrue(bundle["fortress-line.txt"].endswith("\n"))
@@ -302,26 +302,53 @@ class IncrementalTests(unittest.TestCase):
 
         with patch("sumbi.live.os.replace", side_effect=fail_at_switch):
             with self.assertRaises(OSError):
-                write_snapshot(changed, out)
+                write_snapshot(changed, out, value_dir=self.root / "empty")
         self.assertEqual(read_snapshot_bundle(out), bundle)
-        write_snapshot(changed, out)
+        write_snapshot(changed, out, value_dir=self.root / "empty")
         self.assertEqual(
             json.loads(read_snapshot_bundle(out)["snapshot.json"])["observed_at"],
             changed["observed_at"],
         )
         unknown = snapshot([{"lane": "unknown", "engine": "unknown"}], now=self.now)
-        write_snapshot(unknown, out)
+        write_snapshot(unknown, out, value_dir=self.root / "empty")
         line = (out / "fortress-line.txt").read_text()
         self.assertIn("1h호출 unknown", line)
         self.assertIn("평균 unknown", line)
         with exclusive_lock(out / ".publish.lock"):
             with self.assertRaises(CollectorBusy):
-                write_snapshot(data, out)
+                write_snapshot(data, out, value_dir=self.root / "empty")
+
+    def test_read_bundle_holds_publication_lock_after_resolve(self):
+        data = self.collect()
+        out = self.root / "out"
+        write_snapshot(data, out, value_dir=self.root / "empty")
+        expected = read_snapshot_bundle(out)
+        changed = dict(data, observed_at="2026-01-01T13:00:00Z")
+        original_resolve = Path.resolve
+        attempts = []
+
+        def resolve_then_publish(path, *args, **kwargs):
+            resolved = original_resolve(path, *args, **kwargs)
+            if path == out / "current":
+                try:
+                    write_snapshot(changed, out, value_dir=self.root / "empty")
+                except CollectorBusy:
+                    attempts.append("busy")
+                else:
+                    attempts.append("published")
+            return resolved
+
+        with patch.object(Path, "resolve", resolve_then_publish):
+            bundle = read_snapshot_bundle(out)
+        self.assertEqual(attempts, ["busy"])
+        self.assertEqual(bundle, expected)
+        write_snapshot(changed, out, value_dir=self.root / "empty")
+        self.assertEqual(json.loads(read_snapshot_bundle(out)["snapshot.json"]), changed)
 
     def test_legacy_output_migration_preserves_complete_previous_generation(self):
         data = self.collect()
         source = self.root / "published"
-        write_snapshot(data, source)
+        write_snapshot(data, source, value_dir=self.root / "empty")
         previous = read_snapshot_bundle(source)
         legacy = self.root / "legacy"
         legacy.mkdir()
@@ -338,7 +365,7 @@ class IncrementalTests(unittest.TestCase):
 
         with patch("sumbi.live.os.replace", side_effect=fail_new_generation):
             with self.assertRaises(OSError):
-                write_snapshot(dict(data, observed_at="2026-01-01T13:00:00Z"), legacy)
+                write_snapshot(dict(data, observed_at="2026-01-01T13:00:00Z"), legacy, value_dir=self.root / "empty")
         self.assertEqual(read_snapshot_bundle(legacy), previous)
         self.assertTrue(
             all((legacy / name).read_text() == content for name, content in previous.items())

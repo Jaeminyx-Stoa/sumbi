@@ -98,3 +98,16 @@ are retained so readers holding a generation path remain valid.
 The local runner, real source paths, evidence, quota caches and scheduler drafts
 belong in ignored local storage. Nothing here installs a schedule or sends a
 message.
+
+## Dated customer value
+
+The table reads only yesterday's KST file from `SUMBI_CUSTOMER_VALUE_DIR`
+(default `~/runs/sumbi-live/customer-value`), named `YYYY-MM-DD.json`. Missing,
+malformed, mismatched and incomplete input stays unknown; a later publication
+reads the same date again. No collector is run here. The synthetic fixture
+illustrates the legacy `period_date`, `observed_at`, `source_ref`, `coverage`,
+and `cells` form. The optional `records` form carries its own metric, unit,
+source kind, status, coverage, period, observation time, source and optional
+lane. A full day, complete coverage and matching evidence are required; duplicate
+records are ambiguous. Window ratios require independently validated records
+for the same day and lane. Tests must supply an isolated directory.

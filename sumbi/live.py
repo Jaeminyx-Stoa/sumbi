@@ -7,6 +7,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from sumbi.measure.customer_value import COMPANY, _VALUE_METRICS, load_customer_value
 from sumbi.core.values import mapping, timestamp
 from sumbi.core.local_cache import exclusive_lock
 from sumbi.events.adapters import claude_code, codex
@@ -451,7 +452,104 @@ def collect_inventory(
     return snapshot(windows, inventory.get("accounts", ()), now, stale_after=stale_after)
 
 
-def _table(data):
+def _value_table(data, cell, value_dir=None):
+    now = _time(data.get("observed_at"))
+    if now is None:
+        return "\n\n고객 가치당 토큰: 기간 미확인\n"
+    day, values, reason = load_customer_value(value_dir, now, data.get("customer_value"))
+    lines = [f"\n\n고객 가치당 토큰: {day} KST 하루 (끝 제외)",
+             "| 고객 가치당 토큰 | 값 · 기간 · 근거 |", "| --- | --- |"]
+    def describe(item):
+        if "value" not in item:
+            return "모름: " + cell(item.get("reason") or reason or "이 칸 기록 없음")
+        value = item["value"]
+        accounts = item.get("accounts")
+        shown = f"{value} {item['unit']}"
+        if item['unit'] == 'count' and type(accounts) is int and accounts >= 0:
+            shown = f"{value}행/{accounts}계좌"
+        text = (f"{shown}; {cell(item['start'])} ~ {cell(item['end'])} (끝 제외); "
+                f"관측 {cell(item['observed_at'])}; 근거 {cell(item['source_ref'])}")
+        if item.get('currency_code'):
+            text += f"; 통화 {cell(item['currency_code'])}"
+        if item.get('production_promotion_ref') and item.get('customer_walk_ref'):
+            text += (f"; 승격 {cell(item['production_promotion_ref'])}; "
+                     f"고객 걸음 {cell(item['customer_walk_ref'])}")
+        if isinstance(item.get('caveat'), str) and item['caveat'].strip():
+            text += f"; 주의 {cell(item['caveat'])}"
+        return text
+    for key, label, _, _ in COMPANY:
+        lines.append(f"| 회사 전체 · {label} | {describe(values.get((None, key), {}))} |")
+    lanes = dict.fromkeys(row['lane'] for row in data.get('windows', [])
+                          if isinstance(row.get('lane'), str))
+    absent = 0
+    for lane in lanes:
+        matching = [(key, label, unit) for key, label, unit, _ in _VALUE_METRICS
+                    if (lane, key) in values]
+        if not matching:
+            absent += 1
+            continue
+        for key, label, unit in matching:
+            item = values[(lane, key)]
+            lines.append(f"| {cell(lane)} · {label} | {describe(item)} |")
+            numerator = values.get((lane, 'window_tokens'), {})
+            if key != 'window_tokens' and 'value' in item and 'value' in numerator:
+                n, d = numerator['value'], item['value']
+                try:
+                    ratio = "계산 불가: 분모 0" if d == 0 else f"{n / d:.2f} tokens/{unit}"
+                except OverflowError:
+                    ratio = "계산 불가: 값 범위 초과"
+                lines.append(
+                    f"| {cell(lane)} · {label}당 토큰 | {ratio}; "
+                    f"분자 근거 {cell(numerator['source_ref'])}; "
+                    f"분모 근거 {cell(item['source_ref'])}; "
+                    f"{cell(item['start'])} ~ {cell(item['end'])} (끝 제외) |")
+    if absent or not lanes:
+        lines.append(f"창별 귀속: 모름 — 귀속 기록 없음({absent}창)" if lanes else "창별 귀속: 모름 — 창 미관측")
+    return "\n".join(lines) + "\n"
+
+
+def _daily_table(data, cell):
+    try:
+        daily = data.get("daily_results")
+        daily_table = ""
+        if daily and daily.get("error"):
+            daily_table = ("\n\n| 오늘 결과 | 값 · 범위 |\n| --- | --- |\n" +
+                           "".join(f"| {label} | 미확인: {cell(daily['error'])} |\n" for label in
+                                   ("하루 토큰", "머지", "검수", "OpenCode 구현 접수 몫")))
+        elif daily:
+            share = daily["impl_share"]
+            selected = daily["tokens"]["selected_review_outcomes"]
+            observed = [item["tokens"] for item in selected["outcomes"]
+                        if item["tokens"] is not None]
+            ratio = (f"{share['ratio'] * 100:.1f}%" if share['ratio'] is not None
+                     else "미확인" if share['denominator'] is None else "미관측 (빈 분모)")
+            merges = daily['merges']
+            reviews = daily['reviews']
+            merge_text = (f"미확인: {cell(merges['reason'])}"
+                          if merges['observed'] is None and merges['unreadable_or_unparsed'] is None
+                          else f"관측 {cell(merges['observed'])}; 전체 미확인, 읽기/파싱 미확인 "
+                               f"{merges['unreadable_or_unparsed']}")
+            review_text = (f"미확인: {cell(reviews['reason'])}" if reviews['observed'] is None
+                           else f"관측 {reviews['observed']}; "
+                                f"미확인 항목 {reviews['unknown']}, 전체 미확인")
+            daily_table = (
+                "\n\n| 오늘 결과 | 값 · 범위 |\n| --- | --- |\n"
+                f"| 하루 토큰 | 미확인: {cell(daily['tokens']['reason'])}; 선택 검수 부분합 "
+                f"{sum(observed) if observed else '미관측'} "
+                f"({len(observed)}/{len(selected['outcomes'])} 결과), {cell(selected['reason'])} |\n"
+                f"| 머지 | {merge_text} |\n"
+                f"| 검수 | {review_text} |\n"
+                f"| OpenCode 구현 접수 몫 | {cell(share['numerator'])}/"
+                f"{cell(share['denominator'])} ({ratio}); 엔진별 {cell(share['engines'])}; "
+                f"미확인 {cell(share['unknown'])}; {cell(share['basis'])} |\n"
+                f"기간 {cell(daily['window_start'])} ~ {cell(daily['window_end_exclusive'])} (끝 제외)\n"
+            )
+    except (AttributeError, KeyError, TypeError, ValueError):
+        daily_table = "\n\n오늘 결과: 미확인 — 이전 입력 형식\n"
+    return daily_table
+
+
+def _table(data, value_dir=None):
     def cell(value):
         return (
             str(value).replace("|", "\\|").replace("\n", " ").replace("\r", " ")
@@ -478,6 +576,7 @@ def _table(data):
     engines = " · ".join(
         f"{engine} {count}창" + ("/미관측" if not count else "") for engine, count in counts.items()
     )
+    daily_table = _daily_table(data, cell)
     return (
         "관측시각: "
         + cell(data["observed_at"])
@@ -485,6 +584,8 @@ def _table(data):
         + coverage
         + "\n\n"
         + engines
+        + _value_table(data, cell, value_dir)
+        + daily_table
         + "\n\n| "
         + " | ".join(title for _, title in columns)
         + " |\n| "
@@ -492,7 +593,8 @@ def _table(data):
         + " |\n"
         + "".join(
             "| " + " | ".join(
-                "-" if key == "reason" and row[key] is None
+                "멈춤/셸만" if key == "status" and row["reason"] == "no_active_native"
+                else "-" if key == "reason" and row[key] is None
                 else f"{row[key]:.2f}" if key == "avg_context_1h" and row[key] is not None
                 else cell(row[key]) for key, _ in columns
             ) + " |\n"
@@ -532,7 +634,7 @@ def fortress_line(data):
     return text.replace("\n", " ").replace("\r", " ") + "\n"
 
 
-def write_snapshot(data, directory):
+def write_snapshot(data, directory, value_dir=None):
     """Publish a complete generation through one atomic current symlink switch.
 
     Readers needing a multi-file transaction should resolve current once (or use
@@ -543,7 +645,7 @@ def write_snapshot(data, directory):
     directory.mkdir(parents=True, exist_ok=True)
     outputs = {
         "snapshot.json": json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
-        "LATEST.md": _table(data),
+        "LATEST.md": _table(data, value_dir),
         "fortress-line.txt": fortress_line(data),
     }
     with exclusive_lock(directory / ".publish.lock"):
@@ -589,8 +691,10 @@ def write_snapshot(data, directory):
 
 def read_snapshot_bundle(directory):
     """Pin a publication generation before opening any of its three files."""
-    generation = (Path(directory) / "current").resolve(strict=True)
-    return {
-        name: (generation / name).read_text(encoding="utf-8")
-        for name in ("snapshot.json", "LATEST.md", "fortress-line.txt")
-    }
+    directory = Path(directory)
+    with exclusive_lock(directory / ".publish.lock"):
+        generation = (directory / "current").resolve(strict=True)
+        return {
+            name: (generation / name).read_text(encoding="utf-8")
+            for name in ("snapshot.json", "LATEST.md", "fortress-line.txt")
+        }
